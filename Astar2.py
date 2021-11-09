@@ -99,7 +99,7 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
                         # Check that the drone only use it when the other drone has had time to leave
                         if exit_time_drone2 - t_safety < enter_time_drone1 < exit_time_drone2 + t_safety:
                             neighbor_to_be_added = False
-
+                    # TODO On a des pb vis a vis des temps de passage sur les noeuds de sortie car on connait pas encore le next node pour le drone actuel
                     # A drone uses the same street the same way
                     if constrained_node == neighbor[0] and next_constrained_node == neighbor[1]:
                         # Check that they exit in the same order and not too close
