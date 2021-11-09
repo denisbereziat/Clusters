@@ -10,6 +10,7 @@ class Path:
         self.path = path
         # Previous path is used to store the last path that was taken
         # TODO ajouter un set path pour forcer la mise a jour de previous path aussi
+        # TODO passer les attributs en private et forcer l'utilisation des setters et getters
         self.previous_path = []
         # Path dict contain a path with the time as keys and the node as value
         self.path_dict = {}
@@ -33,8 +34,6 @@ class Path:
             # print(new_path)
             edge_dual = ((new_path[node_index-1], new_path[node_index]),
                          (new_path[node_index], new_path[node_index+1]))
-            # print(edge_dual)
-            # print(graph_dual.edges)
             # Determine travel cost to the node (remove the post turn cost)
             # print(edge_dual)
             try:
