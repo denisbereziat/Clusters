@@ -1,5 +1,4 @@
 import tools as tools
-import networkx
 
 
 class Path:
@@ -24,7 +23,8 @@ class Path:
 
     def set_path(self, new_path, graph, graph_dual, drone):
         """Adds a new path to the drone, in terms of waypoints (self.path) and waypoints
-        and timestamps (self.pathDict)"""
+        and timestamps (self.pathDict) using the dual graph to set the timestamps with
+        the added turning times into account"""
         self.path_dict = {}
         self.path = new_path
         t = self.hStart
@@ -70,12 +70,10 @@ class Path:
                 self.path_dict_discretized[t] = (x0, y0)
         dist_to_travel = dt*drone.speed
         traveled = 0
-        
         geometryList = graph.edges[edge]["geometry"]
         if (geometryList[i], geometryList[i+1]) != (graph.nodes[edge[0]]['x'], graph.nodes[edge[0]]['y']):
             geometryList = reverse_geometry_list(geometryList)
         lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
-
         while loop:
             if lengthSegment >= dist_to_travel:
                 v = (geometryList[i+2]-x0, geometryList[i+3]-y0) 

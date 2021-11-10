@@ -129,7 +129,7 @@ def solve_with_announce_time():
     with open(scenario_path, 'r+') as f:
         content = f.read()
         f.seek(0, 0)
-        f.write("00:00:00>ASAS STATEBASED")
+        f.write("00:00:00>CDMETHOD STATEBASED")
         f.write("\n00:00:00>DTLOOK 20")
         f.write("\n")
         f.write(content)
@@ -185,6 +185,7 @@ def solve_clusters_with_dual_and_constraints(model):
 
 
 def extract_deposit_times(filepath):
+    """Extract just the flight plans deposit times"""
     deposit_times_list = []
     with open(filepath) as f:
         for line in f.readlines():
@@ -230,8 +231,9 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
         node_y = graph.nodes[node]['y']
         lats.append(node_y)
         lon.append(node_x)
-    # TODO faire turn bool
     turn_bool = [False for _i in range(len(lats))]
+    for i in range(1, len(turn_bool)-1):
+        turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
     return lats, lon, turn_bool
 
 
@@ -331,9 +333,9 @@ def turn_cost_function(node1, node2, node3):
 
 
 def turn_bool_function(node1, node2, node3):
-    x1, y1 = float(node1["x"]), float(node1["y"])
-    x2, y2 = float(node2["x"]), float(node2["y"])
-    x3, y3 = float(node3["x"]), float(node3["y"])
+    x1, y1 = float(node1[0]), float(node1[1])
+    x2, y2 = float(node2[0]), float(node2[1])
+    x3, y3 = float(node3[0]), float(node3[1])
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
