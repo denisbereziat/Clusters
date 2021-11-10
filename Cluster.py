@@ -290,7 +290,7 @@ class Cluster:
                 new_path = current_drone.path_object.path[:i].copy() + path_solution.path.copy()
                 # Checking that the new path is not the same as the last one or the current one
                 if current_drone.path_object.path != new_path and new_path != previous_path:
-                    new_solution = pt.Path(current_drone.hDep, new_path.copy())
+                    new_solution = pt.Path(current_drone.dep_time, new_path.copy())
                     new_solution.previous_path = current_drone.path_object
                     new_solution.add_path(new_path.copy(), model.graph, model.graph_dual, current_drone)
                     new_solution.discretize_path(5, model.graph, current_drone)

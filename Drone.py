@@ -9,9 +9,9 @@ class Drone:
         self.speed = 10     # in m/s for now
         self.dep = dep
         self.arr = arr
-        self.hDep = hDep
+        self.dep_time = hDep
         self.type = droneType
-        # A path objct that will be used to store the drone current path, previous and discretized path
+        # A path object that will be used to store the drone current path, previous and discretized path
         self.path_object = None
 
     # TODO changer cette fonction pour appartenir a model et faire find_conflict_on_edge(drone1,drone2, edge)

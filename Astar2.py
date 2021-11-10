@@ -20,7 +20,7 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
         if current_node.id == arr_node_id:
             solution_dual_path = current_node.path()
             # Turning the path back in the normal graph path
-            shortest_path = pt.Path(drone.hDep, [node.id[1] for node in solution_dual_path[:-1]])
+            shortest_path = pt.Path(drone.dep_time, [node.id[1] for node in solution_dual_path[:-1]])
             return shortest_path
         neighbors = get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, drone, model)
         for neighbor in neighbors:

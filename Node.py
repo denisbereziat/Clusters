@@ -4,6 +4,7 @@ import math
 
 
 class Node:
+    """Class used in the A* algorithm, the id is the name of the node in the graph being explored"""
     def __init__(self, name, parent=None):
         self.id = name
         self.cost = math.inf

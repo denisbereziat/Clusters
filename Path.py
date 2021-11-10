@@ -65,7 +65,8 @@ class Path:
         self.flightTime = self.flightDistance / drone.speed
         for node in self.delay:
             self.flightTime += self.delay[node]
-            
+
+    # TODO C'est faux par rapport a l'approx qu'on fait pour les virages ?
     def discretize_path(self, dt, graph, drone):
         loop = True 
         
