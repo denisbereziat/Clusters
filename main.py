@@ -24,7 +24,7 @@ max_iteration = 100
 time_interval_discretization = 5
 constraints_nodes = {}
 bool_draw_intermediary_solutions = False
-bool_draw_final_solutions = True
+bool_draw_final_solutions = False
 # Limit how many permutations to test when solving the clusters
 # TODO add a percent of best value as stop parameter too
 max_number_of_permutations = 10
@@ -35,23 +35,22 @@ def solve_with_announce_time():
 
     # Extract the list of flight plan's deposit times (no duplicates)
     deposit_times_list = extract_deposit_times(drone_with_deposit_time_list_file_path)
-    # total_model will store the drones path during the whole simulation
-    total_drones_path = dict()
+
+    # Init a model that will be used to store all the data through the iterations
     final_model, _g, _g_dual = init_model(graph_file_path, drone_list_file_path, protection_area, "00:00:00")
     final_model.set_graph_dual(_g_dual)
-    # print(_g_dual.edges)
+    # Init the drones path
     for drone in final_model.droneList:
-        drone.path_object = Path.Path(drone.hDep, [])
+        drone.path_object = Path.Path(drone.dep_time, [])
+
     # Iterate over all the different flight plan's deposit time
     for sim_time_index, current_sim_time in enumerate(deposit_times_list):
         # Changing the time in seconds and determining the next time of the simulation
         print("\nCurrent_sim_time: ", current_sim_time)
-
-        current_sim_time_seconds = float(current_sim_time[0:2])*3600 + \
-                                   float(current_sim_time[3:5])*60 + float(current_sim_time[6:8])
+        current_sim_time_s = float(current_sim_time[0:2])*3600 + float(current_sim_time[3:5])*60 + float(current_sim_time[6:8])
         if sim_time_index+1 < len(deposit_times_list):
             next_sim_time = deposit_times_list[sim_time_index+1]
-            next_sim_time_seconds = float(next_sim_time[0:2])*3600 + float(next_sim_time[3:5])*60 + float(next_sim_time[6:8])
+            next_sim_time_s = float(next_sim_time[0:2])*3600 + float(next_sim_time[3:5])*60 + float(next_sim_time[6:8])
 
         model, graph, graph_dual = init_model(graph_file_path, drone_with_deposit_time_list_file_path,
                                               protection_area, current_sim_time)
@@ -61,15 +60,16 @@ def solve_with_announce_time():
         print("Loading drones")
         already_landed_drone_list = []
         # TODO pass constraints beetween iterations
+        # TODO don't redo all calculations of shortest path if there are no conflicts
         for drone in model.droneList:
-            index_drone = [_d.flightNumber for _d in final_model.droneList].index(drone.flightNumber)
+            index_drone = [_d.flight_number for _d in final_model.droneList].index(drone.flight_number)
             final_drone = final_model.droneList[index_drone]
             node_times = list(final_drone.path_object.path_dict.keys())
             node_times.sort()
             # If there is at least one item in th path mean that the drone was already given one in the previous time
             if len(node_times) >= 1:
-                drone.hDep = node_times[-1]
-                drone.dep = final_drone.path_object.path_dict[drone.hDep]
+                drone.dep_time = node_times[-1]
+                drone.dep = final_drone.path_object.path_dict[drone.dep_time]
                 # Check if the drone.arr = drone.dep, if it is the same the drone has already landed
                 #TODO to be accurate it needs to be equal and after the time
                 if drone.dep == drone.arr:
@@ -77,7 +77,7 @@ def solve_with_announce_time():
                     already_landed_drone_list.append(drone)
         for drone in already_landed_drone_list:
             model.droneList.remove(drone)
-        print("Drone flying at this time : ", [_d.flightNumber for _d in model.droneList])
+        print("Drone flying at this time : ", [_d.flight_number for _d in model.droneList])
 
         # SOLVE
         # Solve the problem with the current parameters
@@ -88,16 +88,14 @@ def solve_with_announce_time():
         for temp_drone in model.droneList:
             sorted_node_times = list(temp_drone.path_object.path_dict.keys())
             sorted_node_times.sort()
-            # print("SAVING : ", temp_drone.flightNumber)
-            # print(index)
             for drone in final_model.droneList:
-                if drone.flightNumber == temp_drone.flightNumber:
+                if drone.flight_number == temp_drone.flight_number:
                     for node_time in sorted_node_times:
                         if node_time not in drone.path_object.path_dict:
                             # If it isn't the last iteration, we want to add all points in between
                             # deposit_times plus the next one
                             if sim_time_index+1 < len(deposit_times_list):
-                                if node_time < next_sim_time_seconds:
+                                if node_time < next_sim_time_s:
                                     drone.path_object.path_dict[node_time] = temp_drone.path_object.path_dict[node_time]
                                     drone.path_object.path.append(drone.path_object.path_dict[node_time])
                                 else:
@@ -110,11 +108,12 @@ def solve_with_announce_time():
                                 drone.path_object.path.append(drone.path_object.path_dict[node_time])
 
     # DRAW SOLUTIONS
-    if bool_draw_final_solutions :
+    if bool_draw_final_solutions:
         for drone in final_model.droneList:
             drone.path_object.discretize_path(time_interval_discretization, graph, drone)
         draw_solution(final_model)
 
+    # Save paths in a file
     print("Saving all paths \n")
     file = open("path_with_turns.txt", "w")
     for drone in final_model.droneList:
@@ -122,14 +121,16 @@ def solve_with_announce_time():
             "\nDrone ID :" + str(final_model.droneList.index(drone)) + "\n" + str(drone.path_object.path) + "\n")
     file.close()
 
-    scenario_dict = generate_scenarios(model)
+    # Generate Bluesky scenarios
+    scenario_dict = generate_scenarios(final_model)
     bst = BlueskySCNTools.BlueskySCNTools()
     bst.Dict2Scn(scenario_path, scenario_dict)
     # Add a line to enable ASAS in Bluesky
     with open(scenario_path, 'r+') as f:
         content = f.read()
         f.seek(0, 0)
-        f.write("00:00:00>ASAS ON")
+        f.write("00:00:00>CDMETHOD STATEBASED")
+        f.write("\n00:00:00>DTLOOK 20")
         f.write("\n")
         f.write(content)
 
@@ -165,62 +166,26 @@ def solve_clusters_with_dual_and_constraints(model):
         # Sorting conflicts by time to solve the earliest ones first
         conflicts.sort(key=lambda x: x[2])
         current_conflict = conflicts.pop(0)
-        # print('####################')
-        # Display number of conflicts (+1 to take into account the one being solved that was popped)
-        # print('Number of conflicts :', len(conflicts) + 1, '\nCurrent conflict being solved :', current_conflict)
-        # print('Current conflict being solved :', current_conflict)
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(current_conflict[2], graph)
         conflicting_drones = (model.droneList[current_conflict[0]], model.droneList[current_conflict[1]])
-        # print("Conflict node = ", edge[0])
         cluster = cl.Cluster(edge[0], conflicting_drones, graph)
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
-        # print("Cluster size :", len(cluster.drones))
         # Solve the cluster
         cluster.solve_cluster_dual(model, max_number_of_permutations)
         # Redo the conflict search to take into account the modifications
         conflicts = model.find_conflicts(graph)
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
-        print('-----------------------------------------')
-        print(len(conflicts))
-        print([(d.flightNumber, d.path_object.hStart, d.hDep) for d in cluster.drones])
-    # print('##############################\n')
-    # print('Final number of conflicts:', len(conflicts))
-    # print('Number of iterations:', iteration_count)
-
-    # # 5 Compute and display results
-    # if display_metrics:
-    #     final_metrics_dict = compute_and_display_results(model, start_time)
-
-    # 6 Save solutions
-    # if bool_draw_intermediary_solutions:
-    #     draw_solution(model)
-
-
-    # # 7 Generate Bluesky scenarios
-    # scenario_dict = generate_scenarios(model)
-    # bst = BlueskySCNTools.BlueskySCNTools()
-    # bst.Dict2Scn(scenario_path, scenario_dict)
-    # # Add a line to enable ASAS in Bluesky
-    # with open(scenario_path, 'r+') as f:
-    #     content = f.read()
-    #     f.seek(0, 0)
-    #     f.write("00:00:00>ASAS ON")
-    #     f.write("\n")
-    #     f.write(content)
-    #
-    # # 8 Save all paths
-    # print("Saving all paths \n")
-    # file = open("path_with_turns.txt", "w")
-    # for drone in model.droneList:
-    #     file.write("\nDrone ID :" + str(model.droneList.index(drone)) + "\n" + str(drone.path_object.path) + "\n")
-    # file.close()
+        print('Conflicts lefts :', len(conflicts))
+        print(conflicts)
+        print([(d.flight_number, d.path_object.hStart, d.dep_time) for d in cluster.drones])
     return model
 
 
 def extract_deposit_times(filepath):
+    """Extract just the flight plans deposit times"""
     deposit_times_list = []
     with open(filepath) as f:
         for line in f.readlines():
@@ -233,8 +198,8 @@ def extract_deposit_times(filepath):
 def generate_scenarios(model):
     scenario_dict = dict()
     for drone in model.droneList:
-        drone_id = drone.flightNumber
-        scenario_dict[drone.flightNumber] = dict()
+        drone_id = drone.flight_number
+        scenario_dict[drone.flight_number] = dict()
         lats, lons, turns = extract_lat_lon_turn_bool_from_path(drone, model)
         scenario_dict[drone_id]['start_time'] = min(drone.path_object.path_dict.keys())
         # Add lats
@@ -253,7 +218,7 @@ def draw_solution(model):
     graph = model.graph
     for drone in model.droneList:
         gr.draw_solution(graph, drone, show_id=False, show_discretized=True, show_time=True, show=False)
-        plt.savefig("solutions/plt_sol_{}.png".format(drone.flightNumber), dpi=400)
+        plt.savefig("solutions/plt_sol_{}.png".format(drone.flight_number), dpi=400)
         plt.close()
 
 
@@ -266,8 +231,9 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
         node_y = graph.nodes[node]['y']
         lats.append(node_y)
         lon.append(node_x)
-    # TODO faire turn bool
     turn_bool = [False for _i in range(len(lats))]
+    for i in range(1, len(turn_bool)-1):
+        turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
     return lats, lon, turn_bool
 
 
@@ -295,17 +261,17 @@ def compute_all_shortest_paths(model, graph):
         drone_dep_dual = ("S" + drone.dep, drone.dep)
         drone_arr_dual = (drone.arr, drone.arr + "T")
         # Performing A* algorithm on the dual graph, the returned path is given using the initial graph.
-        drone_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.hDep,
-                                   primal_constraint_nodes_dict=constraints_nodes)
+        shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time,
+                                      primal_constraint_nodes_dict=constraints_nodes)
         # Adding the outputs to the drone object
         # Ici drone_path c'est un objet Path
-        drone_path.add_path(drone_path.path, graph, model.graph_dual, drone)
-        drone_path.discretize_path(5, graph, drone)
-        drone_path.flight_time_and_distance(graph, drone)
-        drone.path_object = drone_path
-        drone.time = drone_path.flightTime
-        initial_total_flight_time += drone_path.flightTime
-        initial_total_flight_distance += drone_path.flightDistance
+        shortest_path.set_path(shortest_path.path, graph, model.graph_dual, drone)
+        shortest_path.discretize_path(5, graph, drone)
+        shortest_path.flight_time_and_distance(graph, drone)
+        drone.path_object = shortest_path
+        drone.time = shortest_path.flightTime
+        initial_total_flight_time += shortest_path.flightTime
+        initial_total_flight_distance += shortest_path.flightDistance
     return model, initial_total_flight_time, initial_total_flight_distance
 
 
@@ -322,7 +288,7 @@ def compute_and_display_results(model, start_time):
         if added_flight_time == 0:
             no_added_flight_time_count += 1
         total_flight_distance += drone.path_object.flightDistance
-        delay_drone = drone.path_object.hStart - drone.hDep
+        delay_drone = drone.path_object.hStart - drone.dep_time
         for node in drone.path_object.delay:
             delay_drone += drone.path_object.delay[node]
         total_delay += delay_drone
@@ -367,9 +333,9 @@ def turn_cost_function(node1, node2, node3):
 
 
 def turn_bool_function(node1, node2, node3):
-    x1, y1 = float(node1["x"]), float(node1["y"])
-    x2, y2 = float(node2["x"]), float(node2["y"])
-    x3, y3 = float(node3["x"]), float(node3["y"])
+    x1, y1 = float(node1[0]), float(node1[1])
+    x2, y2 = float(node2[0]), float(node2[1])
+    x3, y3 = float(node3[0]), float(node3[1])
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
