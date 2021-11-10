@@ -5,7 +5,7 @@ PROTEC_ZONE = 50
 
 class Drone:
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
-        self.flightNumber = flightNumber
+        self.flight_number = flightNumber
         self.speed = 10     # in m/s for now
         self.dep = dep
         self.arr = arr

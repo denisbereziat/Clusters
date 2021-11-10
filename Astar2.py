@@ -84,7 +84,7 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
         for constrained_node in primal_constraint_nodes_dict.keys():
             for constraint in primal_constraint_nodes_dict[constrained_node]:
                 enter_time_drone2, next_constrained_node, exit_time_drone2, drone2 = constraint
-                if drone.flightNumber != drone2.flightNumber:
+                if drone.flight_number != drone2.flight_number:
                     # TODO Using the speed of the last drone that passed by the node would be more accurate
                     t_safety = model.protection_area / min(drone2.speed, drone.speed)
 
