@@ -63,7 +63,6 @@ class Cluster:
             found = False
             i = 0
             # Searching for the current node to be set as departure node
-            # TODO bof ?
             while not found:
                 if current_drone.path_object.path[i] in self.nodesList:
                     departure_node = current_drone.path_object.path[i]
@@ -99,9 +98,9 @@ class Cluster:
             # print(constraint_dict)
             return constraint_primal_dict, new_solution
 
-        # Looking for the best permutation or at least one close enough to the best time
+        # Looking for the best order to solve the drones in (this allows to find a more efficient solution and avoids
+        # some cases where one drone could be completely out of solution because of the starting conditions)
         permutation_count = 0
-        # TODO ameliorer les permutations pour tester au moins un fois chaque avion en premier
         while permutation_count < min(possible_permutations_nb, max_permutations):
             drones_list = self.drones.copy()
             random.shuffle(drones_list)
@@ -147,11 +146,12 @@ class Cluster:
         #     print("No solutions found")
 
 
-# TODO ce serait plus logique de donner un path dans tout les cas et de checker dans le code avant si il y en a un et donner direct celui du drone si besoin
 def add_constraints_dual(constraint_dict, drone, path):
-    """Take the path of drone and turn it into constraints to add to the constraint_dict
-    constraint format is { node : [[time_at_node, next_node, time_at_next_node, drone], [...]] }"""
-    # The constraint_dict is modified in here as it is mutable
+    """Take the path of drone and turn it into constraints to add to the constraint_dict of the primal graph
+    constraint format is { node : [[time_at_node, next_node, time_at_next_node, drone], [...]] }
+    The constraint_dict is modified in here as it is mutable"""
+    # If path is None, this means that the drone path hasn't been modified, so we use the drone.path_object.path as
+    # the path to create the constraints.
     if path is None:
         path_to_use = drone.path_object
     else:
@@ -193,7 +193,7 @@ def find_nodes_and_edges(conflict_node, graph):
     nodes_queue = [conflict_node]
 
     # Search recursively for the linked nodes up to a distance of DEPTH
-    def find_nodes(node_queue, list_nodes, graph, depth):
+    def find_nodes(node_queue, list_nodes, depth):
         if depth == DEPTH_CLUSTER:
             return list_nodes
         new_node_queue = []
@@ -203,9 +203,9 @@ def find_nodes_and_edges(conflict_node, graph):
             for n in graph.adj[node]:
                 if n not in list_nodes:
                     new_node_queue.append(n)
-        return find_nodes(new_node_queue.copy(), list_nodes, graph, depth + 1)
+        return find_nodes(new_node_queue.copy(), list_nodes, depth + 1)
 
-    nodes_list = find_nodes(nodes_queue, nodes_list, graph, 0)
+    nodes_list = find_nodes(nodes_queue, nodes_list, 0)
     edges_list = []
     for edge in graph.edges:
         if edge[0] in nodes_list and edge[1] in nodes_list:
@@ -377,7 +377,6 @@ def find_nodes_and_edges(conflict_node, graph):
     #
     #     constraintsNodes = {}
     #     constraintsEdges = {}
-    #     # TODO This raises an error if no path has been found in all permutations
     #     for d in bestPerm:
     #         constraintsNodes, constraintsEdges, path = new_path(d, constraintsNodes, constraintsEdges)
     #         if path != None:

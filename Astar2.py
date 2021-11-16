@@ -11,7 +11,6 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
     current_node = nd.Node(dep_node_id)
     current_node.cost = 0
     current_node.time = departure_time
-    # TODO verifier que l' heuristic regarde le noeud le plus coherent vis a vis de la distance
     current_node.heuristic = current_node.dist_to_node(arr_node_id, graph_dual)
     priority_queue = [current_node]
     while len(priority_queue) > 0:
@@ -75,7 +74,6 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
         else:
             length = graph_primal.edges[neighbor]["length"]
         # Compute the expected exit time, assuming the drone fly at constant speed
-                    # TODO ajouter le virage
         post_cost = graph_dual.edges[dual_edge]["post_turn_cost"]
         exit_time_drone1 = enter_time_drone1 + (length + post_cost)/drone.speed
 

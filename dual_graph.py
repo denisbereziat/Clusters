@@ -20,11 +20,9 @@ def create_dual(model, turn_cost_function):
     for node1 in dual_graph.nodes():
         for node2 in dual_graph.nodes():
             # This should prevent edges allowing to turn back
-            #TODO retirer les demi-tours ?
             if node1[1] == node2[0]: # and node1[0] != node2[1]:
                 dual_graph.add_edge(node1, node2)
                 # Adding the turn cost if it isn't a starting or ending edge (node starting with S or ending with T)
-                # TODO AJOUTER LES 2 MORCEAUX DU TURN COST
                 if node2[1][-1] == "T" or node1[0][0] == "S":
                     total_turn_cost, pre_turn_cost, post_turn_cost = (0, 0, 0)
                 else:
@@ -32,7 +30,7 @@ def create_dual(model, turn_cost_function):
                                                                                         digraph.nodes[node1[1]],
                                                                                         digraph.nodes[node2[1]])
                 edge_length = float(digraph.edges[node1[0], node1[1]]["length"])
-                # TODO le turn cost est ajouté de base il faut retirer le post_cost pour avoir le cout au moment ou on passe le node
+                # le turn cost est ajouté de base il faut retirer le post_cost pour avoir le cout au moment ou on passe le node
                 dual_graph.edges[node1, node2]["length"] = edge_length + total_turn_cost
                 dual_graph.edges[node1, node2]["total_turn_cost"] = total_turn_cost
                 dual_graph.edges[node1, node2]["post_turn_cost"] = post_turn_cost

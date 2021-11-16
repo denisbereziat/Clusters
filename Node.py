@@ -36,4 +36,5 @@ class Node:
         try:
             return math.acos(math.sin(y1)*math.sin(y2)+math.cos(y1)*math.cos(y2)*math.cos(x1-x2)) * earth_radius
         except ValueError:
-            return math.acos(math.cos(90-y1)*math.cos(90-y2)+math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)) * earth_radius
+            return math.acos(math.cos(90-y1)*math.cos(90-y2) +
+                             math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)) * earth_radius
