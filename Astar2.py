@@ -7,7 +7,7 @@ import tools
 def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_constraint_nodes_dict=None):
     graph_dual = model.graph_dual
     if primal_constraint_nodes_dict is None:
-        primal_constraint_nodes_dict = {}
+        primal_constraint_nodes_dict = dict()
     current_node = nd.Node(dep_node_id)
     current_node.cost = 0
     current_node.time = departure_time

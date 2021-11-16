@@ -4,10 +4,10 @@ import tools
 
 
 class Model:
+    """Class used to store the drones objects, the primal graph, the dual graph and find conflicts."""
     def __init__(self, graph, protection_area, dt=5, drones=[]):
         self.graph = init_graph(graph)
         self.graph_dual = None
-        self.time = 0   # keep track of the time in seconds
         self.timeInterval = dt
         self.droneList = drones
         self.protection_area = protection_area

@@ -66,7 +66,7 @@ def solve_with_announce_time():
             final_drone = final_model.droneList[index_drone]
             node_times = list(final_drone.path_object.path_dict.keys())
             node_times.sort()
-            # If there is at least one item in th path mean that the drone was already given one in the previous time
+            # If there is at least one item in the path means that the drone was already given one in the previous time
             if len(node_times) >= 1:
                 drone.dep_time = node_times[-1]
                 drone.dep = final_drone.path_object.path_dict[drone.dep_time]
@@ -144,7 +144,7 @@ def solve_clusters_with_dual_and_constraints(model):
     """Solve the pathing problem for the drones of the specified file on the graph using the cluster method and the A*
         algorithm on a dual graph of the given graph, which takes into account the influence of turns on drones speed"""
 
-    # 1 Initialise the model and the graph (normal and dual) from files
+    # 1 Initialise the graph (normal and dual)
     graph = model.graph
     graph_dual = model.graph_dual
 
@@ -238,14 +238,14 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
 
 
 def init_model(graphml_path, drone_list_path, protection_area_size, current_sim_time):
+    """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
+    into account the current_time so the drones announced after this time aren't loaded."""
     graph = nx.read_graphml(graphml_path)
     model = md.Model(graph, protection_area_size)
-    # Creating the directed graph and then the dual graph from the original
+    # Creating the dual graph from the primal
     graph_dual = dual_graph.create_dual(model, turn_cost_function)
-    # print("Drones before adding :", model.droneList)
     model.droneList = []
     model.add_drones_from_file(drone_list_path, current_sim_time)
-    # print("Drones after adding :", model.droneList)
     return model, graph, graph_dual
 
 
@@ -260,7 +260,7 @@ def compute_all_shortest_paths(model, graph):
         # Changing the arrival and departures nodes to the Sources and Terminals node for the dual graph
         drone_dep_dual = ("S" + drone.dep, drone.dep)
         drone_arr_dual = (drone.arr, drone.arr + "T")
-        # Performing A* algorithm on the dual graph, the returned path is given using the initial graph.
+        # Performing A* algorithm on the dual graph, the returned path is given using the primal graph.
         shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time,
                                       primal_constraint_nodes_dict=constraints_nodes)
         # Adding the outputs to the drone object
@@ -301,8 +301,6 @@ def compute_and_display_results(model, start_time):
     print("Maximum overtime:", max_added_flight_time, "and no added:", no_added_flight_time_count)
     print('Total delay:', total_delay, 'including with no delay:', no_delay_count, 'and max delay:', max_delay)
     print('Time taken by algorithm:', time.time() - start_time, 's')
-    # for drone in model.droneList:
-    #     print('Delay at departure for', drone.flightNumber, ':', drone.path.hStart - drone.hDep)
     metrics = {"total_delay": total_delay, "no_delay_count": no_delay_count, "total_flight_time": total_flight_time,
                "total_flight_distance": total_flight_distance, "max_added_flight_time": max_added_flight_time,
                "no_added_flight_time_count": no_added_flight_time_count}

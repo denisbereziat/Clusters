@@ -15,12 +15,6 @@ class Cluster:
         self.nodesList, self.edgesList = find_nodes_and_edges(conflictNode, graph)
         self.drones = []
         self.obstacles = []
-        self.initial_constraint_nodes = initial_constraint_nodes
-        if initial_constraint_nodes is None:
-            self.initial_constraint_nodes = {}
-        self.initial_constraint_edges = initial_constraint_edges
-        if initial_constraint_edges is None:
-            self.initial_constraint_edges = {}
 
     # TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
     def find_drones(self, model, t):
