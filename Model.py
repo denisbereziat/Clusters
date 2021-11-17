@@ -5,12 +5,15 @@ import tools
 
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph and find conflicts."""
-    def __init__(self, graph, protection_area, dt=5, drones=[]):
+    def __init__(self, graph, protection_area, dt=5, drones=[], initial_constraints=None):
         self.graph = init_graph(graph)
         self.graph_dual = None
         self.timeInterval = dt
         self.droneList = drones
         self.protection_area = protection_area
+        # Initial constraints contains the constraints caused by the currently
+        # flying drones when the model is initialised
+        self.initial_constraints_dict = initial_constraints
 
     def add_drone(self, drone):
         self.droneList.append(drone)

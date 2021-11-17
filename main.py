@@ -52,11 +52,17 @@ def solve_with_announce_time():
             next_sim_time = deposit_times_list[sim_time_index+1]
             next_sim_time_s = float(next_sim_time[0:2])*3600 + float(next_sim_time[3:5])*60 + float(next_sim_time[6:8])
 
+        # Initialise a dict that will be used to store the initial constraints for the model, these constraints are due
+        # to the drones currently at the moment of the model initialisation
+        model_initial_constraints_dict = dict()
+        # Initialise the model and graph that will be used
         model, graph, graph_dual = init_model(graph_file_path, drone_with_deposit_time_list_file_path,
                                               protection_area, current_sim_time)
         model.set_graph_dual(graph_dual)
 
         # LOAD DRONES THAT WERE ALREADY FLYING
+        # To load all the drones that have already taken-off, we check for each drone of the model used to save if it
+        # has a path and if he has where he is at the moment of the current_sim_time (flying or landed)
         print("Loading drones")
         already_landed_drone_list = []
         # TODO pass constraints beetween iterations
@@ -70,14 +76,18 @@ def solve_with_announce_time():
             if len(node_times) >= 1:
                 drone.dep_time = node_times[-1]
                 drone.dep = final_drone.path_object.path_dict[drone.dep_time]
-                # Check if the drone.arr = drone.dep, if it is the same the drone has already landed
-                #TODO to be accurate it needs to be equal and after the time
+                # Check if the drone.arr = drone.dep and then the time of arrival
                 if drone.dep == drone.arr:
-                    # print("Drone already arrived at this time")
                     already_landed_drone_list.append(drone)
+                    # If the time of arrival is after the current sim_time, the drone hasn't landed yet so it needs
+                    # to be added to the initial constraints for the model
+                    if drone.dep_time > current_sim_time_s:
+                        model_initial_constraints_dict[drone.dep_time] = [drone.dep, drone.dep_time, drone.dep, drone]
         for drone in already_landed_drone_list:
             model.droneList.remove(drone)
         print("Drone flying at this time : ", [_d.flight_number for _d in model.droneList])
+        for drone in model.droneList:
+            model_initial_constraints_dict[drone.dep_time] = [drone.dep, drone.dep_time, drone.dep, drone]
 
         # SOLVE
         # Solve the problem with the current parameters
