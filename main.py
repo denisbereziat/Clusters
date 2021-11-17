@@ -24,7 +24,7 @@ max_iteration = 100
 time_interval_discretization = 5
 constraints_nodes = {}
 bool_draw_intermediary_solutions = False
-bool_draw_final_solutions = False
+bool_draw_final_solutions = True
 # Limit how many permutations to test when solving the clusters
 # TODO add a percent of best value as stop parameter too
 max_number_of_permutations = 10
@@ -168,7 +168,7 @@ def solve_clusters_with_dual_and_constraints(model):
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
         print('Conflicts lefts :', len(conflicts))
-        print(conflicts)
+        print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
     return model
 
 
@@ -229,7 +229,7 @@ def draw_solution(model):
     print("Drawing solutions")
     graph = model.graph
     for drone in model.droneList:
-        gr.draw_solution(graph, drone, show_id=False, show_discretized=True, show_time=True, show=False)
+        gr.draw_solution(graph, drone, show_id=False, show_discretized=False, show_time=True, show=False)
         plt.savefig("solutions/plt_sol_{}.png".format(drone.flight_number), dpi=400)
         plt.close()
 

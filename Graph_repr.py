@@ -11,6 +11,8 @@ def draw_solution(graph, drone, show_id=True, show_discretized=False, show_time=
     draw_with_plt(graph, show_id)
     if show_discretized:
         draw_discretized_path(drone, show_time)
+    else:
+        draw_path(drone, graph)
     if show:
         plt.show()
         
@@ -76,6 +78,14 @@ def draw_discretized_path(drone, show_time=True, node_color='green'):
                     color=node_color, zorder=3)
         if show_time:
             plt.text(drone.path_object.path_dict_discretized[t][0], drone.path_object.path_dict_discretized[t][1], str(t), size=2)
+
+
+def draw_path(drone, graph, show_time=True, node_color='green'):
+    for t in drone.path_object.path_dict:
+        x, y = graph.nodes[drone.path_object.path_dict[t]]['x'], graph.nodes[drone.path_object.path_dict[t]]['y']
+        plt.scatter(x, y, 2, color=node_color, zorder=3)
+        if show_time:
+            plt.text(x, y, str(t), size=2)
     
     
 def reset_color(graph):

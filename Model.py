@@ -62,25 +62,50 @@ class Model:
             self.graph.edges[edge]['open'] = True
 
     def find_conflict_on_edge(self, drone1, drone2, graph):
-        """Detects whether the current drone is in conflict with the other given drone on any of the edges he uses"""
+        """Check all edges taken by the drones and if there is any conflicts. There is conflict on an edge if it is
+        taken both way at the same time by two drones or if is taken the same way but the 2 drones don't exist on the
+        same order, meaning they passed each other"""
         drone1_path = drone1.path_object
         drone2_path = drone2.path_object
-        # TODO Pas solide parce que ça marche que sur le pas de temps défini, les points de temps en dehors des pas de
-        #  temps exacts son pas analysés
-        for t in drone1_path.path_dict_discretized:
-            (x1, y1) = drone1_path.path_dict_discretized[t]
-            if t in drone2_path.path_dict_discretized:
-                (x2, y2) = drone2_path.path_dict_discretized[t]
-                if tools.distance(x1, y1, x2, y2) < self.protection_area:
-                    edge = drone1.find_current_edge(t, graph)
-                    edge2 = drone2.find_current_edge(t, graph)
-                    if edge == edge2 or edge == (edge2[1], edge2[0]):
-                        return t
-            else:
-                pass
-        return None
+
+        # TODO trouver la maniere la plus rapide de faire : checker si edge correspondent d'abord ? ou t ?
+        times_drone_1 = list(drone1_path.path_dict.keys())
+        times_drone_2 = list(drone2_path.path_dict.keys())
+        times_drone_1.sort()
+        times_drone_2.sort()
+        for index_t1 in range(len(times_drone_1) - 1):
+            t1_1, t1_2 = times_drone_1[index_t1], times_drone_1[index_t1 + 1]
+            for index_t2 in range(len(times_drone_2) - 1):
+                t2_1, t2_2 = times_drone_2[index_t2], times_drone_2[index_t2 + 1]
+                node1_1, node1_2 = drone1_path.path_dict[t1_1], drone1_path.path_dict[t1_2]
+                node2_1, node2_2 = drone2_path.path_dict[t2_1], drone2_path.path_dict[t2_2]
+                if node1_1 == node2_1 and node2_2 == node2_2:
+                    if t1_1 < t2_1 and not t1_2 < t2_2:
+                        return t1_1
+                    if t2_1 < t1_1 and not t2_2 < t1_2:
+                        return t2_1
+                if node1_1 == node2_2 and node1_2 == node2_1:
+                    if tools.intersection([t1_1, t1_2], [t2_1, t2_2]) is not None:
+                        return min(t1_1, t2_1)
+
+
+        # for t in drone1_path.path_dict_discretized:
+        #     (x1, y1) = drone1_path.path_dict_discretized[t]
+        #     if t in drone2_path.path_dict_discretized:
+        #         (x2, y2) = drone2_path.path_dict_discretized[t]
+        #         if tools.distance(x1, y1, x2, y2) < self.protection_area:
+        #             edge = drone1.find_current_edge(t, graph)
+        #             edge2 = drone2.find_current_edge(t, graph)
+        #             if edge == edge2 or edge == (edge2[1], edge2[0]):
+        #                 return t
+        #     else:
+        #         pass
+        # return None
 
     def find_conflict_on_node(self, drone1, drone2):
+        """Check all the nodes of the drones path and if there is conflict on any, there is a conflict if the node
+        is used twice without sufficient time in between for the first drone to have gone a sufficient distance
+        away, this distance is the protection_area"""
         drone1_path = drone1.path_object
         drone2_path = drone2.path_object
         protection_area = self.protection_area
