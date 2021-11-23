@@ -5,6 +5,8 @@ import tools
 
 
 def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_constraint_nodes_dict=None):
+    # model.countAstar += 1
+    # print(model.countAstar)
     graph_dual = model.graph_dual
     # TODO TOUT CHANGER LES COST POUR TRAVAILLER QUE AVEC DES TEMPS
     if primal_constraint_nodes_dict is None:

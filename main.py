@@ -19,15 +19,14 @@ display_metrics = False
 turn_enabled = True
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 45
-protection_area = 50
+protection_area = 50 # protection area around the drones in m
 max_iteration = 100
 time_interval_discretization = 5
 constraints_nodes = {}
 bool_draw_intermediary_solutions = False
 bool_draw_final_solutions = True
 # Limit how many permutations to test when solving the clusters
-# TODO add a percent of best value as stop parameter too
-max_number_of_permutations = 10
+max_number_of_permutations = 1
 
 
 def solve_with_announce_time():
@@ -124,7 +123,7 @@ def solve_clusters_with_dual_and_constraints(model):
     # print("Total flight distance:", initial_total_flight_distance)
 
     # 3 Find conflicts
-    conflicts = model.find_conflicts(graph)
+    conflicts = model.find_conflicts()
     print('Initial number of conflicts: ', len(conflicts))
 
     # 4 Solve
@@ -145,7 +144,7 @@ def solve_clusters_with_dual_and_constraints(model):
         cluster.solve_cluster_dual(model, max_number_of_permutations)
         # Redo the conflict search to take into account the modifications
         #TODO ON A PAS BESOIN DE CHERCHER TOUT LES CONFLITS, JUSTE LE PREMIER QUI ARRIVE
-        conflicts = model.find_conflicts(graph)
+        conflicts = model.find_conflicts()
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
         print('Conflicts lefts :', len(conflicts))

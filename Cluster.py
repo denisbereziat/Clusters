@@ -95,6 +95,7 @@ class Cluster:
         # Looking for the best order to solve the drones in (this allows to find a more efficient solution and avoids
         # some cases where one drone could be completely out of solution because of the starting conditions)
         permutation_count = 0
+        #TODO a priori on a un pb avec les permutations c'est trop long bizarre
         while permutation_count < min(possible_permutations_nb, max_permutations):
             drones_list = self.drones.copy()
             random.shuffle(drones_list)
