@@ -5,13 +5,17 @@ import tools
 
 
 def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_constraint_nodes_dict=None):
+    # model.countAstar += 1
+    # print(model.countAstar)
     graph_dual = model.graph_dual
+    # TODO TOUT CHANGER LES COST POUR TRAVAILLER QUE AVEC DES TEMPS
     if primal_constraint_nodes_dict is None:
-        primal_constraint_nodes_dict = {}
+        primal_constraint_nodes_dict = dict()
     current_node = nd.Node(dep_node_id)
     current_node.cost = 0
+    # Everytime a node time is mentioned it's equivalent to the time at the first node of the dual node in the primal
+    # graph
     current_node.time = departure_time
-    # TODO verifier que l' heuristic regarde le noeud le plus coherent vis a vis de la distance
     current_node.heuristic = current_node.dist_to_node(arr_node_id, graph_dual)
     priority_queue = [current_node]
     while len(priority_queue) > 0:
@@ -25,6 +29,8 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
         neighbors = get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, drone, model)
         for neighbor in neighbors:
             edge = (current_node.id, neighbor)
+            # If current node was AB and neighbor is BC, the time we set here is the arrival time at B taking into
+            # account pre and post turn added cost
             new_time = current_node.time + graph_dual.edges[edge]["length"] / drone.speed
             new_cost = current_node.cost + graph_dual.edges[edge]["length"]
             neighbor_in_priority_queue, neighbor = node_in_list(neighbor, priority_queue)
@@ -66,117 +72,44 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
         if current_node.id[0][0] == "S":
             enter_time_drone1 = current_node.time
         else:
-            _cost = graph_dual.edges[dual_edge]["length"] - graph_dual.edges[dual_edge]["pre_turn_cost"]
+            _cost = graph_dual.edges[dual_edge]["length"] - graph_dual.edges[dual_edge]["post_turn_cost"]
+            # This is the arrival time at B following the previous example
             enter_time_drone1 = current_node.time + _cost/drone.speed
-        # Finding the neighbor length for cost later
-        # TODO ici on peut pas savoir exactement a quelle heure sort le drone du neighbor si il l' emprunte
-        if neighbor_enter_node[0] == "S" or neighbor_exit_node[-1] == "T":
-            length = 0
-        else:
-            length = graph_primal.edges[neighbor]["length"]
-        # Compute the expected exit time, assuming the drone fly at constant speed
-                    # TODO ajouter le virage
-        post_cost = graph_dual.edges[dual_edge]["post_turn_cost"]
-        exit_time_drone1 = enter_time_drone1 + (length + post_cost)/drone.speed
+            #TODO vis a vis des distances de secu il faudra prendre en compte le post turn cost pour attendre qu'on se soit eloigné assew
 
-        # Checking all constrained node
-        # Constraint format = {node : [time_node, next_node, time_next_node, drone]}
-        for constrained_node in primal_constraint_nodes_dict.keys():
-            for constraint in primal_constraint_nodes_dict[constrained_node]:
+        # Pour s'engager sur BC on veut verifier que B est libre et qu'on a pas croisé ou depassé de drones sur AB
+
+        node_primal_1, node_primal_2 = current_node.id[0], current_node.id[1]
+
+        if node_primal_2 in primal_constraint_nodes_dict:
+            for constraint in primal_constraint_nodes_dict[node_primal_2]:
                 enter_time_drone2, next_constrained_node, exit_time_drone2, drone2 = constraint
                 if drone.flight_number != drone2.flight_number:
-                    # TODO Using the speed of the last drone that passed by the node would be more accurate
                     t_safety = model.protection_area / min(drone2.speed, drone.speed)
 
-                    # A drone enter at the current node
-                    if constrained_node == neighbor[0]:
-                        # Check that the drone only use it when the other drone has had time to leave
-                        if enter_time_drone2 - t_safety < enter_time_drone1 < enter_time_drone2 + t_safety:
-                            neighbor_to_be_added = False
+                    # Check that the node is available
+                    if abs(enter_time_drone2 - enter_time_drone1) < t_safety:
+                        neighbor_to_be_added = False
 
-                    # A drone exit at the current node
-                    if next_constrained_node == neighbor[0]:
-                        # Check that the drone only use it when the other drone has had time to leave
-                        if exit_time_drone2 - t_safety < enter_time_drone1 < exit_time_drone2 + t_safety:
-                            neighbor_to_be_added = False
-                    # TODO On a des pb vis a vis des temps de passage sur les noeuds de sortie car on connait pas encore le next node pour le drone actuel
-                    # A drone uses the same street the same way
-                    if constrained_node == neighbor[0] and next_constrained_node == neighbor[1]:
-                        # Check that they exit in the same order and not too close
-                        if exit_time_drone2 - t_safety < exit_time_drone1 < exit_time_drone2 + t_safety:
-                            neighbor_to_be_added = False
-                        # # If entering first but exiting last
-                        if enter_time_drone1 < enter_time_drone2 and exit_time_drone1 > exit_time_drone2:
-                            neighbor_to_be_added = False
-                        # If entering last but exiting first
-                        if enter_time_drone1 > enter_time_drone2 and exit_time_drone1 < exit_time_drone2:
-                            neighbor_to_be_added = False
-
-                    # A drone uses the same street but the other way
-                    if constrained_node == neighbor[1] and next_constrained_node == neighbor[0]:
-                        # Check that they don't cross
-                        interval1 = [enter_time_drone1 - t_safety, exit_time_drone1 + t_safety]
-                        interval2 = [enter_time_drone2 - t_safety, exit_time_drone2 + t_safety]
+                    # Check the drone didn't cross another one the edge
+                    if node_primal_1 == next_constrained_node:
+                        interval1 = [current_node.time, enter_time_drone1]
+                        interval2 = [enter_time_drone2, exit_time_drone2]
                         if tools.intersection(interval1, interval2) is not None:
+                            neighbor_to_be_added = False
+
+        # Check the drone didn't pass another on the edge
+        if node_primal_1 in primal_constraint_nodes_dict:
+            for constraint in primal_constraint_nodes_dict[node_primal_1]:
+                enter_time_drone2, next_constrained_node, exit_time_drone2, drone2 = constraint
+                if drone.flight_number != drone2.flight_number:
+                    if next_constrained_node == node_primal_2:
+                        if current_node.time < enter_time_drone2 and not enter_time_drone1 < exit_time_drone2:
+                            neighbor_to_be_added = False
+                        if enter_time_drone2 < current_node.time and not exit_time_drone2 < enter_time_drone1 :
                             neighbor_to_be_added = False
 
         if neighbor_to_be_added:
             neighbors.append(neighbor)
     return neighbors
-
-
-# def get_neighbors(currentNode, constraintsNodes, constraintsEdges, drone, graph):
-#     neighbors = []
-#     for neighbor in graph.adj[currentNode.id]:
-#         edgeAvailable = True
-#         nodeAvailable = True
-#
-#         edge = (currentNode.id, neighbor)
-#         currentTime = currentNode.time
-#         newTime = currentTime + graph.edges[edge]["length"] / drone.speed
-#
-#         # Availability of edge
-#         if (edge[1], edge[0]) in constraintsEdges or edge in constraintsEdges:
-#             for (timeStartConstraint, timeEndConstraint) in constraintsEdges[edge]:
-#                 if timeStartConstraint <= currentTime <= timeEndConstraint or timeStartConstraint <= newTime <= timeEndConstraint:
-#                     edgeAvailable = False
-#
-#         # Availability of the node
-#         if neighbor in constraintsNodes:
-#             for (timeStartConstraint, timeEndConstraint) in constraintsNodes[neighbor]:
-#                 if timeStartConstraint <= newTime <= timeEndConstraint:
-#                     nodeAvailable = False
-#
-#         if edgeAvailable and nodeAvailable:
-#             neighbors.append(neighbor)
-#     return neighbors
-#
-#
-# def Astar(graph:nx.Graph, depId:str, arrId:str, drone, timeDep, constraintsNodes={}, constraintsEdges={}):
-#     currentNode = nd.Node(depId)
-#     currentNode.cost = 0
-#     currentNode.time = timeDep
-#     currentNode.heuristic = currentNode.dist_to_node(arrId, graph)
-#     priorityQueue = [currentNode]
-#     while len(priorityQueue) > 0:
-#         currentNode = priorityQueue.pop(0)
-#         if currentNode.id == arrId:
-#             sol = currentNode.path()
-#             path = pt.Path(drone.hDep, [node.id for node in sol])
-#             # print("non dual",path.path)
-#             return path
-#         neighbors = get_neighbors(currentNode, constraintsNodes, constraintsEdges, drone, graph)
-#         for v in neighbors:
-#             edge = (currentNode.id, v)
-#             newTime = currentNode.time + graph.edges[edge]["length"] / drone.speed
-#             newCost = currentNode.cost + graph.edges[edge]["length"]
-#             vInPriorityQueue, v = node_in_list(v, priorityQueue)
-#             if not vInPriorityQueue:
-#                 priorityQueue.append(v)
-#             if v.time >= newTime:
-#                 v.time = newTime
-#                 v.cost = newCost
-#                 v.heuristic = v.dist_to_node(arrId, graph)
-#                 v.parent = currentNode
-#         priorityQueue.sort(key=lambda x: x.f())
 

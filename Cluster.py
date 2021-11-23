@@ -3,8 +3,8 @@ import random
 import Astar2 as a2
 import Path as pt
 
-INTERVAL = 30
-DEPTH_CLUSTER = 3
+INTERVAL = 50
+DEPTH_CLUSTER = 5
 
 
 class Cluster:
@@ -15,12 +15,6 @@ class Cluster:
         self.nodesList, self.edgesList = find_nodes_and_edges(conflictNode, graph)
         self.drones = []
         self.obstacles = []
-        self.initial_constraint_nodes = initial_constraint_nodes
-        if initial_constraint_nodes is None:
-            self.initial_constraint_nodes = {}
-        self.initial_constraint_edges = initial_constraint_edges
-        if initial_constraint_edges is None:
-            self.initial_constraint_edges = {}
 
     # TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
     def find_drones(self, model, t):
@@ -63,7 +57,6 @@ class Cluster:
             found = False
             i = 0
             # Searching for the current node to be set as departure node
-            # TODO bof ?
             while not found:
                 if current_drone.path_object.path[i] in self.nodesList:
                     departure_node = current_drone.path_object.path[i]
@@ -99,14 +92,18 @@ class Cluster:
             # print(constraint_dict)
             return constraint_primal_dict, new_solution
 
-        # Looking for the best permutation or at least one close enough to the best time
+        # Looking for the best order to solve the drones in (this allows to find a more efficient solution and avoids
+        # some cases where one drone could be completely out of solution because of the starting conditions)
         permutation_count = 0
-        # TODO ameliorer les permutations pour tester au moins un fois chaque avion en premier
+        #TODO a priori on a un pb avec les permutations c'est trop long bizarre
         while permutation_count < min(possible_permutations_nb, max_permutations):
             drones_list = self.drones.copy()
             random.shuffle(drones_list)
             permutation_count += 1
-            constraint_dict = {}
+            if model.initial_constraints_dict is not None:
+                constraint_dict = model.initial_constraints_dict
+            else:
+                constraint_dict = dict()
             paths_changed = []
             paths_unchanged = []
             # Computing the best path for each drone sequentially (each drone take the already computed ones as
@@ -137,7 +134,10 @@ class Cluster:
 
         # After iterating over the permutations we use the best found permutation and do the process
         # one last time to save the best paths found
-        constraint_dict = {}
+        if model.initial_constraints_dict is not None:
+            constraint_dict = model.initial_constraints_dict
+        else:
+            constraint_dict = dict()
         if best_permutation is not None:
             for drone in best_permutation:
                 constraint_dict, path = new_path_dual(drone, constraint_dict)
@@ -147,11 +147,12 @@ class Cluster:
         #     print("No solutions found")
 
 
-# TODO ce serait plus logique de donner un path dans tout les cas et de checker dans le code avant si il y en a un et donner direct celui du drone si besoin
 def add_constraints_dual(constraint_dict, drone, path):
-    """Take the path of drone and turn it into constraints to add to the constraint_dict
-    constraint format is { node : [[time_at_node, next_node, time_at_next_node, drone], [...]] }"""
-    # The constraint_dict is modified in here as it is mutable
+    """Take the path of drone and turn it into constraints to add to the constraint_dict of the primal graph
+    constraint format is { node : [[time_at_node, next_node, time_at_next_node, drone], [...]] }
+    The constraint_dict is modified in here as it is mutable"""
+    # If path is None, this means that the drone path hasn't been modified, so we use the drone.path_object.path as
+    # the path to create the constraints.
     if path is None:
         path_to_use = drone.path_object
     else:
@@ -193,7 +194,7 @@ def find_nodes_and_edges(conflict_node, graph):
     nodes_queue = [conflict_node]
 
     # Search recursively for the linked nodes up to a distance of DEPTH
-    def find_nodes(node_queue, list_nodes, graph, depth):
+    def find_nodes(node_queue, list_nodes, depth):
         if depth == DEPTH_CLUSTER:
             return list_nodes
         new_node_queue = []
@@ -203,9 +204,9 @@ def find_nodes_and_edges(conflict_node, graph):
             for n in graph.adj[node]:
                 if n not in list_nodes:
                     new_node_queue.append(n)
-        return find_nodes(new_node_queue.copy(), list_nodes, graph, depth + 1)
+        return find_nodes(new_node_queue.copy(), list_nodes, depth + 1)
 
-    nodes_list = find_nodes(nodes_queue, nodes_list, graph, 0)
+    nodes_list = find_nodes(nodes_queue, nodes_list, 0)
     edges_list = []
     for edge in graph.edges:
         if edge[0] in nodes_list and edge[1] in nodes_list:
@@ -213,173 +214,3 @@ def find_nodes_and_edges(conflict_node, graph):
             graph.edges[edge]['color'] = 'yellow'
 
     return nodes_list, edges_list
-
-
-    # def solve_cluster_delay(self, model):
-    #     perms = list(itertools.permutations(self.drones))
-    #     best_time = 10000000
-    #
-    #     def new_path(drone, constraints_nodes, constraints_edges):
-    #         found = False
-    #         i = 0
-    #         drone_path = drone.path
-    #         while not found:
-    #             if drone_path.path[i] in self.nodesList:
-    #                 dep = drone_path.path[i]
-    #                 found = True
-    #             else:
-    #                 i += 1
-    #         pathSol = None
-    #         iDict = list(drone_path.pathDict.values()).index(dep)
-    #         timeDep = list(drone_path.pathDict.keys())[iDict]
-    #         delay = -5
-    #         while pathSol == None and delay < 60:
-    #             delay += 5
-    #             pathSol = a2.Astar(model.graph, dep, drone.arr, drone, timeDep + delay, constraints_nodes, constraints_edges)
-    #
-    #         newSol = None
-    #
-    #         newPath = drone.path.path[:i].copy() + pathSol.path.copy()
-    #         try:
-    #             pDelay = drone.path.delay[dep]
-    #         except:
-    #             pDelay = 0
-    #         try:
-    #             ppDelay = drone.path.previousPath.delay[dep]
-    #         except:
-    #             ppDelay = 0
-    #         try:
-    #             previousPath = drone.path.previousPath.path
-    #         except:
-    #             previousPath = []
-    #
-    #         if (drone.path.path != newPath or (drone.path.path == newPath and pDelay != delay)) and (newPath != previousPath or (newPath == previousPath and ppDelay != delay)):
-    #             try:
-    #                 hDep = drone.path.hStart
-    #             except:
-    #                 hDep = drone.hDep
-    #             newSol = pt.Path(hDep, newPath.copy())
-    #             newSol.delay = drone.path.delay.copy()
-    #             for node in newSol.delay.copy():
-    #                 if node not in newPath:
-    #                     newSol.delay.pop(node)
-    #             if delay != 0:
-    #                 try:
-    #                     newSol.delay[dep] += delay
-    #                 except KeyError:
-    #                     newSol.delay[dep] = delay
-    #             if dep == drone.dep and delay != 0:
-    #                 newSol.hStart += delay
-    #                 newSol.delay.pop(dep)
-    #             newSol.previousPath = drone.path
-    #             newSol.add_path(newPath.copy(), model.graph, drone)
-    #             newSol.discretize_path(5, model.graph, drone)
-    #             newSol.flight_time_and_distance(model.graph, drone)
-    #             newSol.flightTime += newSol.hStart - drone.hDep
-    #
-    #         constraints_nodes, constraints_edges = self.add_constraints(constraints_nodes, constraints_edges, drone, newSol)
-    #
-    #         return constraints_nodes, constraints_edges, newSol, delay
-    #
-    #     for dronesList in perms:
-    #         constraintsNodes = self.initial_constraint_nodes
-    #         constraintsEdges = self.initial_constraint_edges
-    #     # constraintsNodes = {}
-    #     # constraintsEdges = {}
-    #         pathsChanged = []
-    #         pathsUnchanged = []
-    #         for d in dronesList:
-    #             constraintsNodes, constraintsEdges, path, delay = new_path(d, constraintsNodes, constraintsEdges)
-    #             if path != None :
-    #                 # d.path = path
-    #                 pathsChanged.append(path)
-    #             else:
-    #                 pathsUnchanged.append(d.path)
-    #
-    #         totalTime = 0
-    #         if len(pathsChanged) >= 1:
-    #             for p in pathsChanged:
-    #                 totalTime += p.flightTime
-    #             for p in pathsUnchanged:
-    #                 totalTime += p.flightTime
-    #         else:
-    #             totalTime = best_time + 10
-    #         if totalTime <= best_time:
-    #             best_time = totalTime
-    #             bestPerm = dronesList
-    #
-    #     constraintsNodes = {}
-    #     constraintsEdges = {}
-    #     for d in bestPerm:
-    #         constraintsNodes, constraintsEdges, path, delay = new_path(d, constraintsNodes, constraintsEdges)
-    #         if path != None:
-    #             d.path = path
-    #
-    # def solve_cluster(self, model):
-    #     perms = list(itertools.permutations(self.drones))
-    #     print("number of permutations ", len(perms))
-    #     bestTime = 100000
-    #
-    #     def new_path(drone, constraint_nodes, constraints_edges):
-    #         found = False
-    #         i = 0
-    #         while not found:
-    #             if drone.path.path[i] in self.nodesList:
-    #                 dep = drone.path.path[i]
-    #                 found = True
-    #             else:
-    #                 i += 1
-    #
-    #         i = list(drone.path.pathDict.values()).index(dep)
-    #         timeDep = list(drone.path.pathDict.keys())[i]
-    #
-    #         path_solution = a2.Astar(model.graph, dep, drone.arr, drone, timeDep, constraint_nodes, constraints_edges)
-    #         new_solution = None
-    #         if path_solution is not None:
-    #             if not drone.path.previousPath == []:
-    #                 previous_path = drone.path.previousPath.path
-    #             else :
-    #                 previous_path = []
-    #             # print(drone)
-    #             # previous_path = drone.path.previousPath.path
-    #             new_path = drone.path.path[:i].copy() + path_solution.path.copy()
-    #             if drone.path.path != new_path and new_path != previous_path:
-    #                 new_solution = pt.Path(drone.hDep, new_path.copy())
-    #                 new_solution.previousPath = drone.path
-    #                 new_solution.add_path(new_path.copy(), model.graph, drone)
-    #                 new_solution.discretize_path(5, model.graph, drone)
-    #                 new_solution.flight_time_and_distance(model.graph, drone)
-    #         constraint_nodes, constraints_edges = self.add_constraints(constraint_nodes, constraints_edges, drone, new_solution)
-    #         return constraint_nodes, constraints_edges, new_solution
-    #
-    #     for dronesList in perms:
-    #         constraintsNodes = {}
-    #         constraintsEdges = {}
-    #         pathsChanged = []
-    #         pathsUnchanged = []
-    #         for d in dronesList:
-    #             constraintsNodes, constraintsEdges, path = new_path(d, constraintsNodes, constraintsEdges)
-    #             if path != None:
-    #                 pathsChanged.append(path)
-    #             else:
-    #                 pathsUnchanged.append(d.path)
-    #         totalTime = 0
-    #         if len(pathsChanged) != 0:
-    #             for p in pathsChanged:
-    #                 totalTime += p.flightTime
-    #             for p in pathsUnchanged:
-    #                 totalTime += p.flightTime
-    #         else:
-    #             totalTime = bestTime + 10
-    #         if totalTime <= bestTime:
-    #             bestTime = totalTime
-    #             bestPerm = dronesList
-    #
-    #     constraintsNodes = {}
-    #     constraintsEdges = {}
-    #     # TODO This raises an error if no path has been found in all permutations
-    #     for d in bestPerm:
-    #         constraintsNodes, constraintsEdges, path = new_path(d, constraintsNodes, constraintsEdges)
-    #         if path != None:
-    #             d.path = path
-    #         # print(" Final paths : ", d.path.path)

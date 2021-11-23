@@ -1,7 +1,8 @@
 class Drone:
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
         self.flight_number = flightNumber
-        self.speed = 10     # in m/s for now
+        self.speed = 15.4333     # in m/s for now
+        self.turn_speed = 5.1444
         self.dep = dep
         self.arr = arr
         self.dep_time = hDep
