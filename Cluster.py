@@ -3,8 +3,8 @@ import random
 import Astar2 as a2
 import Path as pt
 
-INTERVAL = 30
-DEPTH_CLUSTER = 3
+INTERVAL = 50
+DEPTH_CLUSTER = 5
 
 
 class Cluster:

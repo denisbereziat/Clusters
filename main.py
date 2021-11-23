@@ -64,27 +64,8 @@ def solve_with_announce_time():
         # To load all the drones that have already taken-off, we check for each drone of the model used to save if it
         # has a path, and if he has, where he is at the moment of the current_sim_time (flying or landed)
         print("Loading drones")
-        already_landed_drone_list = []
-        # TODO don't redo all calculations of shortest path if there are no conflicts
-        for drone in model.droneList:
-            index_drone = [_d.flight_number for _d in final_model.droneList].index(drone.flight_number)
-            final_drone = final_model.droneList[index_drone]
-            node_times = list(final_drone.path_object.path_dict.keys())
-            node_times.sort()
-            # If there is at least one item in the path, it means that the drone was already given one
-            # in the previous simulation time
-            if len(node_times) >= 1:
-                drone.dep_time = node_times[-1]
-                drone.dep = final_drone.path_object.path_dict[drone.dep_time]
-                # Check if the drone.arr = drone.dep and then the time of arrival
-                if drone.dep == drone.arr:
-                    already_landed_drone_list.append(drone)
-                    # If the time of arrival is after the current sim_time, the drone hasn't landed yet so it needs
-                    # to be added to the initial constraints for the model
-                    if drone.dep_time > current_sim_time_s:
-                        model_initial_constraints_dict[drone.dep_time] = [drone.dep, drone.dep_time, drone.dep, drone]
-        for drone in already_landed_drone_list:
-            model.droneList.remove(drone)
+        load_drones(model, final_model, current_sim_time_s, model_initial_constraints_dict)
+
         print("Drone flying at this time : ", [_d.flight_number for _d in model.droneList])
         for drone in model.droneList:
             model_initial_constraints_dict[drone.dep_time] = [drone.dep, drone.dep_time, drone.dep, drone]
@@ -94,7 +75,6 @@ def solve_with_announce_time():
         # SAVE DRONES
         # Save the solutions found up to just one node after the next simulation time
         save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim_time_s)
-
 
     # DRAW SOLUTIONS
     if bool_draw_final_solutions:
@@ -164,12 +144,37 @@ def solve_clusters_with_dual_and_constraints(model):
         # Solve the cluster
         cluster.solve_cluster_dual(model, max_number_of_permutations)
         # Redo the conflict search to take into account the modifications
+        #TODO ON A PAS BESOIN DE CHERCHER TOUT LES CONFLITS, JUSTE LE PREMIER QUI ARRIVE
         conflicts = model.find_conflicts(graph)
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
         print('Conflicts lefts :', len(conflicts))
         print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
     return model
+
+
+def load_drones(model, final_model, current_sim_time_s, model_initial_constraints_dict):
+    already_landed_drone_list = []
+    # TODO don't redo all calculations of shortest path if there are no conflicts
+    for drone in model.droneList:
+        index_drone = [_d.flight_number for _d in final_model.droneList].index(drone.flight_number)
+        final_drone = final_model.droneList[index_drone]
+        node_times = list(final_drone.path_object.path_dict.keys())
+        node_times.sort()
+        # If there is at least one item in the path, it means that the drone was already given one
+        # in the previous simulation time
+        if len(node_times) >= 1:
+            drone.dep_time = node_times[-1]
+            drone.dep = final_drone.path_object.path_dict[drone.dep_time]
+            # Check if the drone.arr = drone.dep and then the time of arrival
+            if drone.dep == drone.arr:
+                already_landed_drone_list.append(drone)
+                # If the time of arrival is after the current sim_time, the drone hasn't landed yet so it needs
+                # to be added to the initial constraints for the model
+                if drone.dep_time > current_sim_time_s:
+                    model_initial_constraints_dict[drone.dep_time] = [drone.dep, drone.dep_time, drone.dep, drone]
+    for drone in already_landed_drone_list:
+        model.droneList.remove(drone)
 
 
 def extract_deposit_times(filepath):
@@ -349,7 +354,7 @@ def turn_bool_function(node1, node2, node3):
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
-    if angle > minimum_angle_to_apply_added_weight:
+    if angle > minimum_angle_to_apply_added_weight and turn_enabled:
         return True
     else:
         return False
