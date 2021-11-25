@@ -31,22 +31,25 @@ max_number_of_permutations = 1
 
 
 def solve_with_announce_time():
-    start_time = time.time()
+    """Iterates over all the flight plans deposit times and process the drones flight plans to reduce conflicts
+    taking into account at which time the drone flight plan was given"""
 
+    #####
+    # INITIALISATION
+    start_time = time.time()
     # Extract the list of flight plan's deposit times (no duplicates)
     deposit_times_list = extract_deposit_times(drone_with_deposit_time_list_file_path)
-
     # Init a model that will be used to store all the data through the iterations
     final_model, _g, _g_dual = init_model(graph_file_path, drone_list_file_path, protection_area, "00:00:00")
     final_model.set_graph_dual(_g_dual)
-
     # Init the drones path
     for drone in final_model.droneList:
         drone.path_object = Path.Path(drone.dep_time, [])
 
+    #####
+    # PROCESSING
     # Iterate over all the different flight plan's deposit time
     for sim_time_index, current_sim_time in enumerate(deposit_times_list):
-
         # Changing the time in seconds and determining the next time of the simulation
         print("\nCurrent_sim_time: ", current_sim_time)
         current_sim_time_s = float(current_sim_time[0:2])*3600 + float(current_sim_time[3:5])*60 + float(current_sim_time[6:8])
@@ -79,15 +82,17 @@ def solve_with_announce_time():
         # Save the solutions found up to just one node after the next simulation time
         print("Saving drones")
         save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim_time_s)
-
     print("\nProcess finished")
+
+    #####
+    # OUTPUTS
     # DRAW SOLUTIONS
+    # Plot each drones trajectory
     if bool_draw_final_solutions:
         for drone in final_model.droneList:
             drone.path_object.set_path(drone.path_object.path, graph, graph_dual, drone)
             drone.path_object.discretize_path(time_interval_discretization, graph, drone)
         draw_solution(final_model)
-
     # Save paths in a file
     print("Saving all paths \n")
     file = open("path_with_turns.txt", "w")
@@ -95,7 +100,6 @@ def solve_with_announce_time():
         file.write(
             "\nDrone ID :" + str(final_model.droneList.index(drone)) + "\n" + str(drone.path_object.path) + "\n")
     file.close()
-
     # Generate Bluesky scenarios
     scenario_dict = generate_scenarios(final_model)
     bst = BlueskySCNTools.BlueskySCNTools()
@@ -108,7 +112,6 @@ def solve_with_announce_time():
         f.write("\n00:00:00>DTLOOK 20")
         f.write("\n")
         f.write(content)
-
     # model, graph, graph_dual = init_model(graph_file_path, drone_list_file_path, protection_area, "00:00:00")
     # model.set_graph_dual(graph_dual)
     # solve_clusters_with_dual_and_constraints(model)
