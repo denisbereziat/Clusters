@@ -3,6 +3,7 @@ import random
 import Astar2 as a2
 import Path as pt
 
+# TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
 INTERVAL = 50
 DEPTH_CLUSTER = 5
 
@@ -16,7 +17,6 @@ class Cluster:
         self.drones = []
         self.obstacles = []
 
-    # TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
     def find_drones(self, model, t):
         """Finds all the drones part of the given model that pass through the cluster
         between time t-INTERVALL and t+INTERVALL, with t a time given in seconds."""
@@ -96,6 +96,7 @@ class Cluster:
         # some cases where one drone could be completely out of solution because of the starting conditions)
         permutation_count = 0
         #TODO a priori on a un pb avec les permutations c'est trop long bizarre
+        #TODO retirer toute les pemut
         while permutation_count < min(possible_permutations_nb, max_permutations):
             drones_list = self.drones.copy()
             random.shuffle(drones_list)
@@ -134,17 +135,22 @@ class Cluster:
 
         # After iterating over the permutations we use the best found permutation and do the process
         # one last time to save the best paths found
-        if model.initial_constraints_dict is not None:
-            constraint_dict = model.initial_constraints_dict
-        else:
-            constraint_dict = dict()
+
         if best_permutation is not None:
+            if model.initial_constraints_dict is not None:
+                constraint_dict = model.initial_constraints_dict
+            else:
+                constraint_dict = dict()
             for drone in best_permutation:
                 constraint_dict, path = new_path_dual(drone, constraint_dict)
                 if path is not None:
                     drone.path_object = path
-        # else:
-        #     print("No solutions found")
+        else:
+            print("No solutions found")
+            # for d in self.drones:
+            #     print("Flight number", d.flight_number)
+            #     print("Path", d.path_object.path_dict)
+            # print("constraints", constraint_dict)
 
 
 def add_constraints_dual(constraint_dict, drone, path):
