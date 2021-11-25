@@ -22,7 +22,7 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
 
     while len(priority_queue) > 0:
         current_node = priority_queue.pop(0)
-        # closed_nodes_list.append(current_node.id)
+        closed_nodes_list.append(current_node.id)
         # if len(closed_nodes_list) > len(set(closed_nodes_list)):
         #     print("tuluktuluk")
         # for node in priority_queue:
@@ -54,7 +54,7 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
             neighbor_in_priority_queue, neighbor = node_in_list(neighbor, priority_queue)
             # TODO la on verifie que c'est pas deja dans la liste mais il faudrait verifier qu'on a pas deja exploré le noeud non ?
             # On a effectivement des noeuds qui sont a nouveaux ajoutés a la priority queue alors qu'ils ont deja ete explores normalement
-            if not neighbor_in_priority_queue : #and neighbor.id not in closed_nodes_list:
+            if not neighbor_in_priority_queue and neighbor.id not in closed_nodes_list:
                 priority_queue.append(neighbor)
             # EFFET DE BORD pour modifier la valeur de neighbor dans la liste priority_queue
             if neighbor.time >= new_time:

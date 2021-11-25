@@ -22,7 +22,7 @@ turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
 protection_area = 50 # protection area around the drones in m
-max_iteration = 100
+max_iteration = 10
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
 bool_draw_final_solutions = False
@@ -132,8 +132,8 @@ def solve_clusters_with_dual_and_constraints(model):
     # 3 Find conflicts
     conflicts = model.find_conflicts()
     print('Initial number of conflicts: ', len(conflicts))
-    if len(conflicts) != 0:
-        print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
+    # if len(conflicts) != 0:
+    #     print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
 
     # 4 Solve
     iteration_count = 0

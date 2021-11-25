@@ -145,8 +145,8 @@ class Cluster:
                 constraint_dict, path = new_path_dual(drone, constraint_dict)
                 if path is not None:
                     drone.path_object = path
-        else:
-            print("No solutions found")
+        # else:
+        #     print("No solutions found")
             # for d in self.drones:
             #     print("Flight number", d.flight_number)
             #     print("Path", d.path_object.path_dict)
