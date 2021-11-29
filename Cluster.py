@@ -40,6 +40,8 @@ class Cluster:
                             break
 
     def solve_cluster_dual(self, model, max_permutations):
+        # TODO Si on ne resoud pas le cluster on peut avoir plus de conflits a la fin qu'au debut ...
+        # TODO ajouter les delays au depart testes de maniere iterative jusqu'a avoir quelque chose qui marche
         """Solve the cluster by solving the problem sequentially over all possible permutations or at least a certain
         number"""
         # Contain all possible permutations of drones order
@@ -117,7 +119,6 @@ class Cluster:
                 else:
                     paths_unchanged.append(drone.path_object)
             total_time = 0
-
             # Compute the total flight time using this permutation
             if len(paths_changed) != 0:
                 for p in paths_changed:

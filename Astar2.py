@@ -9,7 +9,6 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
     # print(model.countAstar)
     graph_dual = model.graph_dual
     closed_nodes_list = []
-    # TODO TOUT CHANGER LES COST POUR TRAVAILLER QUE AVEC DES TEMPS
     if primal_constraint_nodes_dict is None:
         primal_constraint_nodes_dict = dict()
     current_node = nd.Node(dep_node_id)
@@ -52,8 +51,6 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
             # TODO la ça va plus a v constant
             new_cost = current_node.cost + graph_dual.edges[edge]["length"]
             neighbor_in_priority_queue, neighbor = node_in_list(neighbor, priority_queue)
-            # TODO la on verifie que c'est pas deja dans la liste mais il faudrait verifier qu'on a pas deja exploré le noeud non ?
-            # On a effectivement des noeuds qui sont a nouveaux ajoutés a la priority queue alors qu'ils ont deja ete explores normalement
             if not neighbor_in_priority_queue and neighbor.id not in closed_nodes_list:
                 priority_queue.append(neighbor)
             # EFFET DE BORD pour modifier la valeur de neighbor dans la liste priority_queue
@@ -101,7 +98,6 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
         else:
             _cost = graph_dual.edges[dual_edge]["length"] - graph_dual.edges[dual_edge]["post_turn_cost"]
             # This is the arrival time at B following the previous example
-            # TODO TURN SPEED
             enter_time_drone1 = current_node.time + _cost/speed_drone1
             #TODO vis a vis des distances de secu il faudra prendre en compte le post turn cost pour attendre qu'on se soit eloigné assew
 
@@ -115,7 +111,6 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
                 if drone.flight_number != drone2.flight_number:
                     # Set the right speeds for both drones
                     speed_drone2 = drone2.cruise_speed
-                    # TODO c4EST LA ?
                     # print("timestamps ", drone2.path_object.speed_time_stamps)
                     # print("path ", drone2.path_object.path_dict)
                     # print("constraint", constraint)
@@ -128,7 +123,6 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
                         if graph_dual.edges[current_node.parent.id, current_node.id]["is_turn"]:
                             speed_drone2 = drone2.turn_speed
 
-                    # TODO TURN SPEED
                     t_safety = model.protection_area / min(speed_drone2, speed_drone1)
 
                     # Check that the node is available

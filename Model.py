@@ -1,6 +1,7 @@
 import Drone as dr
 import math
 import tools
+import networkx as nx
 
 
 class Model:
@@ -127,17 +128,6 @@ class Model:
                         drone2_speed = self.get_current_drone_speed(drone2_next_time_stamp, drone2)
                         if t_drone2 - t_drone1 < protection_area/drone2_speed:
                             return t_drone2
-                #
-                # drone2_nodes = list(drone2_path.path_dict.values())
-                # if node in drone2_nodes:
-                #     node_index_drone2 = drone2_nodes.index(node)
-                #     t_drone2 = list(drone2_path.path_dict.keys())[node_index_drone2]
-                #     # Check who goes first and that it had time to leave entirely
-                #     # To check if the drone had time to leave far enough we need the drone speed after passing the node
-                #     # So we need to know if the node was a turning point or if the next one is
-                #     # Check if drone1 is turning :
-                #     # If either the last node or this node is a turning point, he is at turn speed until the node
-                #     # TODO C'est la exit speed la qu'il faut
         return None
 
     def get_current_drone_speed(self, current_t, drone):
@@ -175,21 +165,19 @@ class Model:
         # return drone.cruise_speed
 
 
-
-
-
-
-
-
-
-def init_graph(graph):
+def init_graph(graph : nx.Graph):
+    #TODO maintenant qu'on a qu'un graph pas besoin de l'init plein de fois
     for edge in graph.edges:
         edge_dict = graph.edges[edge]
         edge_dict['open'] = True
         edge_dict['length'] = float(edge_dict['length'])
-        edge_dict['geometry'] = edge_dict['geometry'].strip(')').split('(')[1].split()
-        for i, coord in enumerate(edge_dict['geometry']):
-            edge_dict['geometry'][i] = float(coord.strip(','))
+        try:
+            edge_dict['geometry'] = edge_dict['geometry'].strip(')').split('(')[1].split()
+            for i, coord in enumerate(edge_dict['geometry']):
+                edge_dict['geometry'][i] = float(coord.strip(','))
+        except AttributeError:
+            # Exception here if the list has already been processed
+            pass
     for node in graph.nodes:
         node_dict = graph.nodes[node]
         node_dict['x'] = float(node_dict['x'])

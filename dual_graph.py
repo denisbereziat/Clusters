@@ -11,9 +11,9 @@ def create_digraph_with_source_and_terminal(graph):
     return digraph
 
 
-def create_dual(model, turn_cost_function):
+def create_dual(graph, turn_cost_function):
     """Create a Dual Graph from a directed graph with added weights depending on the turns"""
-    digraph = create_digraph_with_source_and_terminal(model.graph)
+    digraph = create_digraph_with_source_and_terminal(graph)
     dual_graph = nx.DiGraph()
     # Each edge in the primal graph creates a node in the dual graph
     for edge in digraph.edges():

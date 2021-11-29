@@ -12,6 +12,7 @@ import Path
 
 # PARAMETERS
 graph_file_path = "graph_files/processed_graphM2.graphml"
+# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
 drone_with_deposit_time_list_file_path = 'graph_files/drones_with_deposit_times.txt'
 scenario_path = r'M2_Test_Scenario_new.scn'
@@ -39,9 +40,15 @@ def solve_with_announce_time():
     start_time = time.time()
     # Extract the list of flight plan's deposit times (no duplicates)
     deposit_times_list = extract_deposit_times(drone_with_deposit_time_list_file_path)
+    # Initialise both graph that will be used
+    graph = nx.read_graphml(graph_file_path)
+    # Dual graph
+    graph_dual = dual_graph.create_dual(graph, turn_cost_function)
     # Init a model that will be used to store all the data through the iterations
-    final_model, _g, _g_dual = init_model(graph_file_path, drone_list_file_path, protection_area, "00:00:00")
+    print("Initialise the final model")
+    final_model, _g, _g_dual = init_model(graph, graph_dual, drone_list_file_path, protection_area, "00:00:00")
     final_model.set_graph_dual(_g_dual)
+    print("Initialised")
     # Init the drones path
     for drone in final_model.droneList:
         drone.path_object = Path.Path(drone.dep_time, [])
@@ -61,7 +68,7 @@ def solve_with_announce_time():
         # to the drones currently at the moment of the model initialisation
         model_initial_constraints_dict = dict()
         # Initialise the model and graph that will be used
-        model, graph, graph_dual = init_model(graph_file_path, drone_with_deposit_time_list_file_path,
+        model, graph, graph_dual = init_model(graph, graph_dual, drone_with_deposit_time_list_file_path,
                                               protection_area, current_sim_time)
         model.set_graph_dual(graph_dual)
 
@@ -161,7 +168,7 @@ def solve_clusters_with_dual_and_constraints(model):
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
         print('Conflicts lefts :', len(conflicts))
-        print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
+        # print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
     return model
 
 
@@ -266,13 +273,14 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
     return lats, lon, turn_bool
 
 
-def init_model(graphml_path, drone_list_path, protection_area_size, current_sim_time):
+def init_model(graph, graph_dual, drone_list_path, protection_area_size, current_sim_time):
     """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
     into account the current_time so the drones announced after this time aren't loaded."""
-    graph = nx.read_graphml(graphml_path)
+
+    # print("nb edges :", len(list(graph.edges)), "nb nodes :", len(list(graph.nodes)))
     model = md.Model(graph, protection_area_size)
     # Creating the dual graph from the primal
-    graph_dual = dual_graph.create_dual(model, turn_cost_function)
+    # print("nb edges :", len(list(graph_dual.edges)), "nb nodes :", len(list(graph_dual.nodes)))
     model.droneList = []
     model.add_drones_from_file(drone_list_path, current_sim_time)
     return model, graph, graph_dual
