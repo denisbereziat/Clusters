@@ -9,12 +9,14 @@ import dual_graph
 import tools
 import BlueskySCNTools
 import Path
+import os.path
 
 # PARAMETERS
-graph_file_path = "graph_files/processed_graphM2.graphml"
-# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
+# graph_file_path = "graph_files/processed_graphM2.graphml"
+graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
-drone_with_deposit_time_list_file_path = 'graph_files/drones_with_deposit_times.txt'
+# drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
+# path_graph_dual = "graph_files/dual_graph.graphml"
 scenario_path = r'M2_Test_Scenario_new.scn'
 display_metrics = False
 added_turn_cost_enabled = False
@@ -39,11 +41,29 @@ def solve_with_announce_time():
     # INITIALISATION
     start_time = time.time()
     # Extract the list of flight plan's deposit times (no duplicates)
-    deposit_times_list = extract_deposit_times(drone_with_deposit_time_list_file_path)
+    deposit_times_list = extract_deposit_times(drone_list_file_path)
     # Initialise both graph that will be used
-    graph = nx.read_graphml(graph_file_path)
+    print("Init graph")
+    raw_graph = nx.read_graphml(graph_file_path)
+    graph = nx.Graph()
+    # Creating a new graph without what's not needed
+    for node in raw_graph.nodes:
+        graph.add_node(node)
+        graph.nodes[node]["x"] = raw_graph.nodes[node]["x"]
+        graph.nodes[node]["y"] = raw_graph.nodes[node]["y"]
+    for edge in raw_graph.edges:
+        graph.add_edge(edge[0], edge[1])
+        graph.edges[edge[0], edge[1]]["length"] = raw_graph.edges[edge]["length"]
+        graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
     # Dual graph
+    # print("Init dual")
+    # if os.path.isfile(path_graph_dual):
+    #     print(" Loading dual")
+    #     graph_dual = nx.read_graphml(path_graph_dual)
+    # else:
+    print(" Creating dual")
     graph_dual = dual_graph.create_dual(graph, turn_cost_function)
+        # nx.write_graphml(graph_dual, path_graph_dual)
     # Init a model that will be used to store all the data through the iterations
     print("Initialise the final model")
     final_model, _g, _g_dual = init_model(graph, graph_dual, drone_list_file_path, protection_area, "00:00:00")
@@ -60,6 +80,8 @@ def solve_with_announce_time():
         # Changing the time in seconds and determining the next time of the simulation
         print("\nCurrent_sim_time: ", current_sim_time)
         current_sim_time_s = float(current_sim_time[0:2])*3600 + float(current_sim_time[3:5])*60 + float(current_sim_time[6:8])
+        # TODO trouver formulation au propre
+        next_sim_time_s = 0
         if sim_time_index+1 < len(deposit_times_list):
             next_sim_time = deposit_times_list[sim_time_index+1]
             next_sim_time_s = float(next_sim_time[0:2])*3600 + float(next_sim_time[3:5])*60 + float(next_sim_time[6:8])
@@ -68,7 +90,7 @@ def solve_with_announce_time():
         # to the drones currently at the moment of the model initialisation
         model_initial_constraints_dict = dict()
         # Initialise the model and graph that will be used
-        model, graph, graph_dual = init_model(graph, graph_dual, drone_with_deposit_time_list_file_path,
+        model, graph, graph_dual = init_model(graph, graph_dual, drone_list_file_path,
                                               protection_area, current_sim_time)
         model.set_graph_dual(graph_dual)
 
@@ -89,6 +111,8 @@ def solve_with_announce_time():
         # Save the solutions found up to just one node after the next simulation time
         print("Saving drones")
         save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim_time_s)
+        # for drone in final_model.droneList:
+        #     print("Drones path :", drone.flight_number, drone.path_object.path)
     print("\nProcess finished")
 
     #####
@@ -108,6 +132,7 @@ def solve_with_announce_time():
             "\nDrone ID :" + str(final_model.droneList.index(drone)) + "\n" + str(drone.path_object.path) + "\n")
     file.close()
     # Generate Bluesky scenarios
+    print("Generating Bluesky SCN")
     scenario_dict = generate_scenarios(final_model)
     bst = BlueskySCNTools.BlueskySCNTools()
     bst.Dict2Scn(scenario_path, scenario_dict)
@@ -157,7 +182,11 @@ def solve_clusters_with_dual_and_constraints(model):
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(current_conflict[2], graph)
         conflicting_drones = (model.droneList[current_conflict[0]], model.droneList[current_conflict[1]])
-        cluster = cl.Cluster(edge[0], conflicting_drones, graph)
+        try:
+            cluster = cl.Cluster(edge[0], conflicting_drones, graph)
+        except:
+            print(edge, conflicting_drones[0].dep, conflicting_drones[1].dep)
+            raise Exception
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
         # Solve the cluster

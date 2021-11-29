@@ -17,5 +17,11 @@ class Drone:
             if tt <= current_t:
                 from_node = self.path_object.path_dict[tt]
             if tt > current_t:
-                return from_node, self.path_object.path_dict[tt]
+                if from_node != '':
+                    return from_node, self.path_object.path_dict[tt]
+        # if conflict time is before take off time or beetween first and second node
+        #TODO est ce que c'est ok ?
+        print("Conflict before take off time")
+        return self.path_object.path[0], self.path_object.path[1]
+
             
