@@ -51,8 +51,8 @@ class Model:
         for i, drone in enumerate(self.droneList):
             if i != len(self.droneList)-1:
                 for j in range(i+1, len(self.droneList)):
-                    t_edge = self.find_conflict_on_edge(drone, self.droneList[j])
-                    t_node = self.find_conflict_on_node(drone, self.droneList[j])
+                    t_edge = find_conflict_on_edge(drone, self.droneList[j])
+                    t_node = find_conflict_on_node(drone, self.droneList[j], self.protection_area)
                     if t_edge is not None:
                         if t_node is not None:
                             if t_edge <= t_node:
@@ -67,102 +67,105 @@ class Model:
         for edge in self.graph.edges:
             self.graph.edges[edge]['open'] = True
 
-    def find_conflict_on_edge(self, drone1, drone2):
-        """Check all edges taken by the drones and if there is any conflicts. There is conflict on an edge if it is
-        taken both way at the same time by two drones or if is taken the same way but the 2 drones don't exist on the
-        same order, meaning they passed each other"""
-        drone1_path = drone1.path_object
-        drone2_path = drone2.path_object
 
-        # TODO trouver la maniere la plus rapide de faire : checker si edge correspondent d'abord ? ou t ?
-        times_drone_1 = list(drone1_path.path_dict.keys())
-        times_drone_2 = list(drone2_path.path_dict.keys())
-        times_drone_1.sort()
-        times_drone_2.sort()
-        for index_t1 in range(len(times_drone_1) - 1):
-            t1_1, t1_2 = times_drone_1[index_t1], times_drone_1[index_t1 + 1]
-            for index_t2 in range(len(times_drone_2) - 1):
-                t2_1, t2_2 = times_drone_2[index_t2], times_drone_2[index_t2 + 1]
-                node1_1, node1_2 = drone1_path.path_dict[t1_1], drone1_path.path_dict[t1_2]
-                node2_1, node2_2 = drone2_path.path_dict[t2_1], drone2_path.path_dict[t2_2]
-                # Going the same way on the edge
-                if node1_1 == node2_1 and node2_2 == node2_2:
-                    if t1_1 < t2_1 and not t1_2 < t2_2:
-                        return t2_1
-                    if t2_1 < t1_1 and not t2_2 < t1_2:
-                        return t1_1
-                # Going opposite way on the edge
-                if node1_1 == node2_2 and node1_2 == node2_1:
-                    if tools.intersection([t1_1, t1_2], [t2_1, t2_2]) is not None:
-                        return max(t1_1, t2_1)
+def find_conflict_on_edge(drone1, drone2):
+    """Check all edges taken by the drones and if there is any conflicts. There is conflict on an edge if it is
+    taken both way at the same time by two drones or if is taken the same way but the 2 drones don't exist on the
+    same order, meaning they passed each other"""
+    drone1_path = drone1.path_object
+    drone2_path = drone2.path_object
 
-    def find_conflict_on_node(self, drone1, drone2):
-        """Check all the nodes of the drones path and if there is conflict on any, there is a conflict if the node
-        is used twice without sufficient time in between for the first drone to have gone a sufficient distance
-        away, this distance is the protection_area"""
-        drone1_path = drone1.path_object
-        drone2_path = drone2.path_object
-        protection_area = self.protection_area
-        for t_drone1 in drone1_path.path_dict:
-            for t_drone2 in drone2_path.path_dict:
-                if drone2_path.path_dict[t_drone2] == drone1_path.path_dict[t_drone1]:
+    # TODO trouver la maniere la plus rapide de faire : checker si edge correspondent d'abord ? ou t ?
+    times_drone_1 = list(drone1_path.path_dict.keys())
+    times_drone_2 = list(drone2_path.path_dict.keys())
+    times_drone_1.sort()
+    times_drone_2.sort()
+    for index_t1 in range(len(times_drone_1) - 1):
+        t1_1, t1_2 = times_drone_1[index_t1], times_drone_1[index_t1 + 1]
+        for index_t2 in range(len(times_drone_2) - 1):
+            t2_1, t2_2 = times_drone_2[index_t2], times_drone_2[index_t2 + 1]
+            node1_1, node1_2 = drone1_path.path_dict[t1_1], drone1_path.path_dict[t1_2]
+            node2_1, node2_2 = drone2_path.path_dict[t2_1], drone2_path.path_dict[t2_2]
+            # Going the same way on the edge
+            if node1_1 == node2_1 and node2_2 == node2_2:
+                if t1_1 < t2_1 and not t1_2 < t2_2:
+                    return t2_1
+                if t2_1 < t1_1 and not t2_2 < t1_2:
+                    return t1_1
+            # Going opposite way on the edge
+            if node1_1 == node2_2 and node1_2 == node2_1:
+                if tools.intersection([t1_1, t1_2], [t2_1, t2_2]) is not None:
+                    return max(t1_1, t2_1)
 
-                    if t_drone1 > t_drone2:
-                        # We need the drone next time stamp to know his speed after the node
-                        drone1_time_stamps = sorted(drone1_path.path_dict.keys())
-                        if not t_drone1 == drone1_time_stamps[-1]:
-                            drone1_next_time_stamp = drone1_time_stamps[drone1_time_stamps.index(t_drone1) + 1]
-                        else:
-                            drone1_next_time_stamp = t_drone1
-                        drone1_speed = self.get_current_drone_speed(drone1_next_time_stamp, drone1)
-                        if t_drone1 - t_drone2 < protection_area/drone1_speed:
-                            return t_drone1
 
-                    if t_drone2 > t_drone1:
-                        # We need the drone next time stamp to know his speed after the node
-                        drone2_time_stamps = sorted(drone2_path.path_dict.keys())
-                        if not t_drone2 == drone2_time_stamps[-1]:
-                            drone2_next_time_stamp = drone2_time_stamps[drone2_time_stamps.index(t_drone2) + 1]
-                        else:
-                            drone2_next_time_stamp = t_drone2
-                        drone2_speed = self.get_current_drone_speed(drone2_next_time_stamp, drone2)
-                        if t_drone2 - t_drone1 < protection_area/drone2_speed:
-                            return t_drone2
-        return None
+def find_conflict_on_node(drone1, drone2, protection_area):
+    """Check all the nodes of the drones path and if there is conflict on any, there is a conflict if the node
+    is used twice without sufficient time in between for the first drone to have gone a sufficient distance
+    away, this distance is the protection_area"""
+    drone1_path = drone1.path_object
+    drone2_path = drone2.path_object
+    protection_area = protection_area
+    for t_drone1 in drone1_path.path_dict:
+        for t_drone2 in drone2_path.path_dict:
+            if drone2_path.path_dict[t_drone2] == drone1_path.path_dict[t_drone1]:
 
-    def get_current_drone_speed(self, current_t, drone):
-        """Return the current drone speed at the specified node"""
-        current_edge, previous_edge, next_edge = None, None, None
-        path_dict = drone.path_object.path_dict
-        node_time_list = list(path_dict.keys())
-        node_time_list.sort()
-        #TODO cas particulier pour les noeuds d'arrive
-        for node_index, t in enumerate(node_time_list):
-            if current_t == t:
-                if node_index == 0:
-                    return drone.path_object.speed_time_stamps[0][1]
-                else:
-                    return drone.path_object.speed_time_stamps[node_index-1][1]
+                if t_drone1 > t_drone2:
+                    # We need the drone next time stamp to know his speed after the node
+                    drone1_time_stamps = sorted(drone1_path.path_dict.keys())
+                    if not t_drone1 == drone1_time_stamps[-1]:
+                        drone1_next_time_stamp = drone1_time_stamps[drone1_time_stamps.index(t_drone1) + 1]
+                    else:
+                        drone1_next_time_stamp = t_drone1
+                    drone1_speed = get_current_drone_speed(drone1_next_time_stamp, drone1)
+                    if t_drone1 - t_drone2 < protection_area/drone1_speed:
+                        return t_drone1
 
-                # if node_index > 1:
-                #     current_edge = (path_dict[node_index - 1], path_dict[node_time_list[node_index]])
-                # if len(path_dict) - 1 > node_index + 2:
-                #     next_edge = (path_dict[node_time_list[node_index + 1]], path_dict[node_time_list[node_index + 2]])
-                # if node_index > 0:
-                #     previous_edge = (path_dict[node_time_list[node_index-1]], path_dict[current_t])
-                # if len(path_dict) - 1 > index + 1:
-                #     current_edge = (path_dict[current_t], path_dict[node_time_list[index + 1]])
-                #     if len(path_dict) - 1 > index + 2:
-                #         next_edge = (path_dict[node_time_list[index + 1]], path_dict[node_time_list[index + 2]])
-                # if index > 0:
-                #     previous_edge = (path_dict[node_time_list[index-1]], path_dict[current_t])
-        # if current_edge is not None and previous_edge is not None:
-        #     if self.graph_dual.edges[previous_edge, current_edge]["is_turn"]:
-        #         return drone.turn_speed
-        # if current_edge is not None and next_edge is not None:
-        #     if self.graph_dual.edges[current_edge, next_edge]["is_turn"]:
-        #         return drone.turn_speed
-        # return drone.cruise_speed
+                if t_drone2 > t_drone1:
+                    # We need the drone next time stamp to know his speed after the node
+                    drone2_time_stamps = sorted(drone2_path.path_dict.keys())
+                    if not t_drone2 == drone2_time_stamps[-1]:
+                        drone2_next_time_stamp = drone2_time_stamps[drone2_time_stamps.index(t_drone2) + 1]
+                    else:
+                        drone2_next_time_stamp = t_drone2
+                    drone2_speed = get_current_drone_speed(drone2_next_time_stamp, drone2)
+                    if t_drone2 - t_drone1 < protection_area/drone2_speed:
+                        return t_drone2
+    return None
+
+
+def get_current_drone_speed(current_t, drone):
+    """Return the current drone speed at the specified node"""
+    current_edge, previous_edge, next_edge = None, None, None
+    path_dict = drone.path_object.path_dict
+    node_time_list = list(path_dict.keys())
+    node_time_list.sort()
+    #TODO cas particulier pour les noeuds d'arrive
+    for node_index, t in enumerate(node_time_list):
+        if current_t == t:
+            if node_index == 0:
+                return drone.path_object.speed_time_stamps[0][1]
+            else:
+                return drone.path_object.speed_time_stamps[node_index-1][1]
+
+            # if node_index > 1:
+            #     current_edge = (path_dict[node_index - 1], path_dict[node_time_list[node_index]])
+            # if len(path_dict) - 1 > node_index + 2:
+            #     next_edge = (path_dict[node_time_list[node_index + 1]], path_dict[node_time_list[node_index + 2]])
+            # if node_index > 0:
+            #     previous_edge = (path_dict[node_time_list[node_index-1]], path_dict[current_t])
+            # if len(path_dict) - 1 > index + 1:
+            #     current_edge = (path_dict[current_t], path_dict[node_time_list[index + 1]])
+            #     if len(path_dict) - 1 > index + 2:
+            #         next_edge = (path_dict[node_time_list[index + 1]], path_dict[node_time_list[index + 2]])
+            # if index > 0:
+            #     previous_edge = (path_dict[node_time_list[index-1]], path_dict[current_t])
+    # if current_edge is not None and previous_edge is not None:
+    #     if self.graph_dual.edges[previous_edge, current_edge]["is_turn"]:
+    #         return drone.turn_speed
+    # if current_edge is not None and next_edge is not None:
+    #     if self.graph_dual.edges[current_edge, next_edge]["is_turn"]:
+    #         return drone.turn_speed
+    # return drone.cruise_speed
 
 
 def init_graph(graph : nx.Graph):
