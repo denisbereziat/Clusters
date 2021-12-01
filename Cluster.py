@@ -2,8 +2,10 @@ import math
 import random
 import Astar2 as a2
 import Path as pt
+import main
 
-INTERVAL = 50
+# TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
+INTERVAL = 30
 DEPTH_CLUSTER = 5
 
 
@@ -16,7 +18,6 @@ class Cluster:
         self.drones = []
         self.obstacles = []
 
-    # TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
     def find_drones(self, model, t):
         """Finds all the drones part of the given model that pass through the cluster
         between time t-INTERVALL and t+INTERVALL, with t a time given in seconds."""
@@ -40,15 +41,18 @@ class Cluster:
                             break
 
     def solve_cluster_dual(self, model, max_permutations):
+        # TODO Si on ne resoud pas le cluster on peut avoir plus de conflits a la fin qu'au debut ...
+        # TODO ajouter les delays au depart testes de maniere iterative jusqu'a avoir quelque chose qui marche
         """Solve the cluster by solving the problem sequentially over all possible permutations or at least a certain
         number"""
         # Contain all possible permutations of drones order
         possible_permutations_nb = math.factorial(len(self.drones))
         # print("number of permutations ", possible_permutations_nb)
-        best_time = 100000
+        best_time = 10000000
 
         # Compute the new best path for the drone taking into account the other drones paths as constraints
         def new_path_dual(current_drone, constraint_primal_dict):
+            # TODO QUand on cree le cluster il doit prendre comme contrainte toutes les traj des avions non inclus jusqu'a la date de creation du cluster (voir jusqu'au noeud juste apres)
             """Find the new shortest path for the current drone, taking into account the constraints added
             by the already previously computed drones
             constraint_primal_dict = {dual_node : [arrival_time, next_node, next_node_time, drone]}
@@ -96,8 +100,11 @@ class Cluster:
         # some cases where one drone could be completely out of solution because of the starting conditions)
         permutation_count = 0
         #TODO a priori on a un pb avec les permutations c'est trop long bizarre
+        #TODO retirer toute les pemut
         while permutation_count < min(possible_permutations_nb, max_permutations):
+            # print([d.flight_number for d in self.drones])
             drones_list = self.drones.copy()
+            # TODO remettre un système de permut ?
             random.shuffle(drones_list)
             permutation_count += 1
             if model.initial_constraints_dict is not None:
@@ -116,7 +123,6 @@ class Cluster:
                 else:
                     paths_unchanged.append(drone.path_object)
             total_time = 0
-
             # Compute the total flight time using this permutation
             if len(paths_changed) != 0:
                 for p in paths_changed:
@@ -131,20 +137,29 @@ class Cluster:
                 best_permutation = drones_list
             else:
                 best_permutation = None
+                print("No solutions found")
+                # for d in drones_list:
+                #     main.draw_solution_drone(d, model.graph, "conflicts/plt_sol_{}.png".format(d.flight_number))
+
 
         # After iterating over the permutations we use the best found permutation and do the process
         # one last time to save the best paths found
-        if model.initial_constraints_dict is not None:
-            constraint_dict = model.initial_constraints_dict
-        else:
-            constraint_dict = dict()
         if best_permutation is not None:
+            if model.initial_constraints_dict is not None:
+                constraint_dict = model.initial_constraints_dict
+            else:
+                constraint_dict = dict()
             for drone in best_permutation:
                 constraint_dict, path = new_path_dual(drone, constraint_dict)
                 if path is not None:
                     drone.path_object = path
         # else:
-        #     print("No solutions found")
+            # print("No solutions found")
+            # TODO plot la situation non resolue
+            # for d in self.drones:
+            #     print("Flight number", d.flight_number)
+            #     print("Path", d.path_object.path_dict)
+            # print("constraints", constraint_dict)
 
 
 def add_constraints_dual(constraint_dict, drone, path):
@@ -154,8 +169,10 @@ def add_constraints_dual(constraint_dict, drone, path):
     # If path is None, this means that the drone path hasn't been modified, so we use the drone.path_object.path as
     # the path to create the constraints.
     if path is None:
+        # print("PATH IS NONE")
         path_to_use = drone.path_object
     else:
+        # print("NEW PATH USED")
         path_to_use = path
     time_list = list(path_to_use.path_dict)
     for index, time in enumerate(time_list):
@@ -171,6 +188,7 @@ def add_constraints_dual(constraint_dict, drone, path):
             constraint_dict[node].append(constraint)
         else:
             constraint_dict[node] = [constraint]
+    # print("DRONE PATH",drone.flight_number, "ADDED TO CONSTRAINT ",path_to_use.path_dict)
     return constraint_dict
 
 

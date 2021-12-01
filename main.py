@@ -9,44 +9,79 @@ import dual_graph
 import tools
 import BlueskySCNTools
 import Path
+import os.path
 
 # PARAMETERS
-graph_file_path = "graph_files/processed_graphM2.graphml"
+# graph_file_path = "graph_files/processed_graphM2.graphml"
+graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
-drone_with_deposit_time_list_file_path = 'graph_files/drones_with_deposit_times.txt'
+# drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
+# path_graph_dual = "graph_files/dual_graph.graphml"
 scenario_path = r'M2_Test_Scenario_new.scn'
 display_metrics = False
-turn_enabled = True
+added_turn_cost_enabled = False
+turn_bool_enabled = False
 turn_weight = 20
-minimum_angle_to_apply_added_weight = 45
-protection_area = 50 # protection area around the drones in m
+minimum_angle_to_apply_added_weight = 25
+# TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
+protection_area = 30 # protection area around the drones in m
 max_iteration = 100
 time_interval_discretization = 5
-constraints_nodes = {}
 bool_draw_intermediary_solutions = False
-bool_draw_final_solutions = True
+bool_draw_final_solutions = False
 # Limit how many permutations to test when solving the clusters
 max_number_of_permutations = 1
 
 
 def solve_with_announce_time():
+    """Iterates over all the flight plans deposit times and process the drones flight plans to reduce conflicts
+    taking into account at which time the drone flight plan was given"""
+
+    #####
+    # INITIALISATION
     start_time = time.time()
-
     # Extract the list of flight plan's deposit times (no duplicates)
-    deposit_times_list = extract_deposit_times(drone_with_deposit_time_list_file_path)
-
+    deposit_times_list = extract_deposit_times(drone_list_file_path)
+    # Initialise both graph that will be used
+    print("Init graph")
+    raw_graph = nx.read_graphml(graph_file_path)
+    graph = nx.Graph()
+    # Creating a new graph without what's not needed
+    for node in raw_graph.nodes:
+        graph.add_node(node)
+        graph.nodes[node]["x"] = raw_graph.nodes[node]["x"]
+        graph.nodes[node]["y"] = raw_graph.nodes[node]["y"]
+    for edge in raw_graph.edges:
+        graph.add_edge(edge[0], edge[1])
+        graph.edges[edge[0], edge[1]]["length"] = raw_graph.edges[edge]["length"]
+        graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
+    # Dual graph
+    # print("Init dual")
+    # if os.path.isfile(path_graph_dual):
+    #     print(" Loading dual")
+    #     graph_dual = nx.read_graphml(path_graph_dual)
+    # else:
+    print(" Creating dual")
+    graph_dual = dual_graph.create_dual(graph, turn_cost_function)
+        # nx.write_graphml(graph_dual, path_graph_dual)
     # Init a model that will be used to store all the data through the iterations
-    final_model, _g, _g_dual = init_model(graph_file_path, drone_list_file_path, protection_area, "00:00:00")
+    print("Initialise the final model")
+    final_model, _g, _g_dual = init_model(graph, graph_dual, drone_list_file_path, protection_area, deposit_times_list[-1])
     final_model.set_graph_dual(_g_dual)
+    print("Initialised")
     # Init the drones path
     for drone in final_model.droneList:
         drone.path_object = Path.Path(drone.dep_time, [])
 
+    #####
+    # PROCESSING
     # Iterate over all the different flight plan's deposit time
     for sim_time_index, current_sim_time in enumerate(deposit_times_list):
         # Changing the time in seconds and determining the next time of the simulation
         print("\nCurrent_sim_time: ", current_sim_time)
         current_sim_time_s = float(current_sim_time[0:2])*3600 + float(current_sim_time[3:5])*60 + float(current_sim_time[6:8])
+        # TODO trouver formulation au propre
+        next_sim_time_s = 0
         if sim_time_index+1 < len(deposit_times_list):
             next_sim_time = deposit_times_list[sim_time_index+1]
             next_sim_time_s = float(next_sim_time[0:2])*3600 + float(next_sim_time[3:5])*60 + float(next_sim_time[6:8])
@@ -55,7 +90,7 @@ def solve_with_announce_time():
         # to the drones currently at the moment of the model initialisation
         model_initial_constraints_dict = dict()
         # Initialise the model and graph that will be used
-        model, graph, graph_dual = init_model(graph_file_path, drone_with_deposit_time_list_file_path,
+        model, graph, graph_dual = init_model(graph, graph_dual, drone_list_file_path,
                                               protection_area, current_sim_time)
         model.set_graph_dual(graph_dual)
 
@@ -64,23 +99,31 @@ def solve_with_announce_time():
         # has a path, and if he has, where he is at the moment of the current_sim_time (flying or landed)
         print("Loading drones")
         load_drones(model, final_model, current_sim_time_s, model_initial_constraints_dict)
-
         print("Drone flying at this time : ", [_d.flight_number for _d in model.droneList])
         for drone in model.droneList:
             model_initial_constraints_dict[drone.dep_time] = [drone.dep, drone.dep_time, drone.dep, drone]
+
         # SOLVE
         # Solve the problem with the current parameters
         model = solve_clusters_with_dual_and_constraints(model)
+
         # SAVE DRONES
         # Save the solutions found up to just one node after the next simulation time
+        print("Saving drones")
         save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim_time_s)
+        # for drone in final_model.droneList:
+        #     print("Drones path :", drone.flight_number, drone.path_object.path)
+    print("\nProcess finished")
 
+    #####
+    # OUTPUTS
     # DRAW SOLUTIONS
+    # Plot each drones trajectory
     if bool_draw_final_solutions:
         for drone in final_model.droneList:
+            drone.path_object.set_path(drone.path_object.path, graph, graph_dual, drone)
             drone.path_object.discretize_path(time_interval_discretization, graph, drone)
         draw_solution(final_model)
-
     # Save paths in a file
     print("Saving all paths \n")
     file = open("path_with_turns.txt", "w")
@@ -88,8 +131,8 @@ def solve_with_announce_time():
         file.write(
             "\nDrone ID :" + str(final_model.droneList.index(drone)) + "\n" + str(drone.path_object.path) + "\n")
     file.close()
-
     # Generate Bluesky scenarios
+    print("Generating Bluesky SCN")
     scenario_dict = generate_scenarios(final_model)
     bst = BlueskySCNTools.BlueskySCNTools()
     bst.Dict2Scn(scenario_path, scenario_dict)
@@ -101,7 +144,6 @@ def solve_with_announce_time():
         f.write("\n00:00:00>DTLOOK 20")
         f.write("\n")
         f.write(content)
-
     # model, graph, graph_dual = init_model(graph_file_path, drone_list_file_path, protection_area, "00:00:00")
     # model.set_graph_dual(graph_dual)
     # solve_clusters_with_dual_and_constraints(model)
@@ -125,10 +167,13 @@ def solve_clusters_with_dual_and_constraints(model):
     # 3 Find conflicts
     conflicts = model.find_conflicts()
     print('Initial number of conflicts: ', len(conflicts))
+    # if len(conflicts) != 0:
+    #     print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
 
     # 4 Solve
     iteration_count = 0
     while len(conflicts) != 0 and iteration_count < max_iteration:
+        # print("Conflicts lefts :", len(conflicts))
         iteration_count += 1
         gr.reset_color(graph)
         # Sorting conflicts by time to solve the earliest ones first
@@ -137,10 +182,15 @@ def solve_clusters_with_dual_and_constraints(model):
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(current_conflict[2], graph)
         conflicting_drones = (model.droneList[current_conflict[0]], model.droneList[current_conflict[1]])
-        cluster = cl.Cluster(edge[0], conflicting_drones, graph)
+        try:
+            cluster = cl.Cluster(edge[0], conflicting_drones, graph)
+        except:
+            print(edge, conflicting_drones[0].dep, conflicting_drones[1].dep)
+            raise Exception
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
         # Solve the cluster
+        print("Iter :", iteration_count, "conflict_time :", current_conflict[2], "Cluster size :", len(cluster.drones))
         cluster.solve_cluster_dual(model, max_number_of_permutations)
         # Redo the conflict search to take into account the modifications
         #TODO ON A PAS BESOIN DE CHERCHER TOUT LES CONFLITS, JUSTE LE PREMIER QUI ARRIVE
@@ -148,7 +198,7 @@ def solve_clusters_with_dual_and_constraints(model):
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
         print('Conflicts lefts :', len(conflicts))
-        print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
+        # print([[model.droneList[c[0]].flight_number, model.droneList[c[1]].flight_number, c[2]] for c in conflicts])
     return model
 
 
@@ -238,6 +288,13 @@ def draw_solution(model):
         plt.close()
 
 
+def draw_solution_drone(drone, graph, path):
+    print("Drawing drone :", drone.flight_number)
+    gr.draw_solution(graph, drone, show_id=False, show_discretized=False, show_time=True, show=False)
+    plt.savefig(path, dpi=400)
+    plt.close()
+
+
 def extract_lat_lon_turn_bool_from_path(drone, model):
     lats = []
     lon = []
@@ -253,13 +310,14 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
     return lats, lon, turn_bool
 
 
-def init_model(graphml_path, drone_list_path, protection_area_size, current_sim_time):
+def init_model(graph, graph_dual, drone_list_path, protection_area_size, current_sim_time):
     """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
     into account the current_time so the drones announced after this time aren't loaded."""
-    graph = nx.read_graphml(graphml_path)
+
+    # print("nb edges :", len(list(graph.edges)), "nb nodes :", len(list(graph.nodes)))
     model = md.Model(graph, protection_area_size)
     # Creating the dual graph from the primal
-    graph_dual = dual_graph.create_dual(model, turn_cost_function)
+    # print("nb edges :", len(list(graph_dual.edges)), "nb nodes :", len(list(graph_dual.nodes)))
     model.droneList = []
     model.add_drones_from_file(drone_list_path, current_sim_time)
     return model, graph, graph_dual
@@ -270,15 +328,12 @@ def compute_all_shortest_paths(model, graph):
     on the given model using the graph and the dual graph"""
     initial_total_flight_time = 0
     initial_total_flight_distance = 0
-    drone_path_calculated = 0
     for drone in model.droneList:
-        drone_path_calculated += 1
         # Changing the arrival and departures nodes to the Sources and Terminals node for the dual graph
         drone_dep_dual = ("S" + drone.dep, drone.dep)
         drone_arr_dual = (drone.arr, drone.arr + "T")
         # Performing A* algorithm on the dual graph, the returned path is given using the primal graph.
-        shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time,
-                                      primal_constraint_nodes_dict=constraints_nodes)
+        shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time)
         # Adding the outputs to the drone object
         # Ici drone_path c'est un objet Path
         shortest_path.set_path(shortest_path.path, graph, model.graph_dual, drone)
@@ -329,21 +384,23 @@ def turn_cost_function(node1, node2, node3):
     and acceleration) and the total added cost in time"""
     # TODO as of now we consider only one speed profile, we can either make a graph per drone, or
     #  just return the turn angle and do calculations each time
-    if not turn_enabled:
-        return 0, 0, 0
     x1, y1 = float(node1["x"]), float(node1["y"])
     x2, y2 = float(node2["x"]), float(node2["y"])
     x3, y3 = float(node3["x"]), float(node3["y"])
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
-    if angle > minimum_angle_to_apply_added_weight:
+    if angle > minimum_angle_to_apply_added_weight and turn_bool_enabled:
         pre_turn_cost = (turn_weight * angle/180)/2
         post_turn_cost = (turn_weight * angle/180)/2
         total_turn_cost = pre_turn_cost + post_turn_cost
-        return total_turn_cost, pre_turn_cost, post_turn_cost
+        if added_turn_cost_enabled:
+            return total_turn_cost, pre_turn_cost, post_turn_cost, True
+        else:
+            return 0, 0, 0, True
+
     else:
-        return 0, 0, 0
+        return 0, 0, 0, False
 
 
 def turn_bool_function(node1, node2, node3):
@@ -353,7 +410,7 @@ def turn_bool_function(node1, node2, node3):
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
-    if angle > minimum_angle_to_apply_added_weight and turn_enabled:
+    if angle > minimum_angle_to_apply_added_weight and turn_bool_enabled:
         return True
     else:
         return False

@@ -1,8 +1,9 @@
 class Drone:
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
         self.flight_number = flightNumber
-        self.speed = 15.4333     # in m/s for now
-        self.turn_speed = 5.1444
+        self.cruise_speed = 5.144 #15.4333     # in m/s for now
+        self.turn_speed = 5.144
+        self.braking_distance = 30
         self.dep = dep
         self.arr = arr
         self.dep_time = hDep
@@ -17,5 +18,11 @@ class Drone:
             if tt <= current_t:
                 from_node = self.path_object.path_dict[tt]
             if tt > current_t:
-                return from_node, self.path_object.path_dict[tt]
+                if from_node != '':
+                    return from_node, self.path_object.path_dict[tt]
+        # if conflict time is before take off time or beetween first and second node
+        #TODO est ce que c'est ok ?
+        # print("Conflict before take off time")
+        return self.path_object.path[0], self.path_object.path[1]
+
             
