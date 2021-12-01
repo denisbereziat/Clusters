@@ -39,37 +39,65 @@ class Path:
             # To have the speed on the edge we need to know if the last node was a turn and if the next one is
             previous_edge, current_edge, next_edge = None, None, None
             drone_speed = drone.cruise_speed
+            # Edge dual is used to add the pre and post turn cost
+            edge_dual = ((new_path[node_index-1], new_path[node_index]),
+                         (new_path[node_index], new_path[node_index+1]))
+            # Determine travel cost to the node (remove the post turn cost)
+            cost = graph_dual.edges[edge_dual]["length"] - graph_dual.edges[edge_dual]["post_turn_cost"]
+
+            # If the edge length is more than turn_distance then we have to take into account the deceleration
+            # and the phase where the drone was going at his normal speed
             if node_index > 2:
                 previous_edge = (new_path[node_index-2], new_path[node_index-1])
             if node_index > 1:
                 current_edge = (new_path[node_index-1], new_path[node_index])
             if node_index + 1 < len(new_path) - 1:
                 next_edge = (new_path[node_index], new_path[node_index+1])
-
+            # TODO ajouter le cas du fly by
+            # If the last node passed was a turn point
             if current_edge is not None and previous_edge is not None:
                 if graph_dual.edges[previous_edge, current_edge]["is_turn"]:
                     drone_speed = drone.turn_speed
-            if current_edge is not None and next_edge is not None:
+                    t += cost / drone_speed
+                elif current_edge is not None and next_edge is not None:
+                    if graph_dual.edges[current_edge, next_edge]["is_turn"]:
+                        drone_speed = drone.turn_speed
+                        if graph.edges[next_edge]["length"] < 30:
+                            t += cost / drone_speed
+                        else:
+                            t += (graph.edges[next_edge]["length"] - 30) / drone.cruise_speed
+                            # Adding the added time with constant deceleration
+                            t += 30 / ((drone.cruise_speed - drone_speed) / 2)
+                    else:
+                        t += cost / drone.cruise_speed
+                else:
+                    t += cost / drone.cruise_speed
+            # Else if the next node is a turning point
+            elif current_edge is not None and next_edge is not None:
                 if graph_dual.edges[current_edge, next_edge]["is_turn"]:
                     drone_speed = drone.turn_speed
+                    if graph.edges[next_edge]["length"] < 30:
+                        t += cost / drone_speed
+                    else:
+                        t += (graph.edges[next_edge]["length"] - 30) / drone.cruise_speed
+                        # Adding the added time with constant deceleration
+                        t += 30 / ((drone.cruise_speed - drone_speed) / 2)
+                else:
+                    t += cost / drone.cruise_speed
+            # Else if there is no turning before or after
+            else:
+                t += cost/drone.cruise_speed
 
-
-            # Edge dual is used to add the pre and post turn cost
-            edge_dual = ((new_path[node_index-1], new_path[node_index]),
-                         (new_path[node_index], new_path[node_index+1]))
-            # Determine travel cost to the node (remove the post turn cost)
-            cost = graph_dual.edges[edge_dual]["length"] - graph_dual.edges[edge_dual]["post_turn_cost"]
-            t += cost/drone_speed
             self.path_dict[t] = new_path[node_index]
             # Add back the post turn cost
             t += graph_dual.edges[edge_dual]["post_turn_cost"]/drone_speed
-            #TODO verifier si c'est precis d'ajouter a ce moment le time stamp
             self.speed_time_stamps.append([t, drone_speed])
         # Last node :
         cost = graph.edges[new_path[-2], new_path[-1]]["length"]
         t += cost/drone_speed
         self.speed_time_stamps.append([t, drone_speed])
         self.path_dict[t] = new_path[-1]
+        drone.path_object = self
         
     def flight_time_and_distance(self, graph, drone):
         self.flightDistance = 0

@@ -20,12 +20,12 @@ drone_list_file_path = 'graph_files/drones.txt'
 scenario_path = r'M2_Test_Scenario_new.scn'
 display_metrics = False
 added_turn_cost_enabled = False
-turn_bool_enabled = True
+turn_bool_enabled = False
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
-protection_area = 50 # protection area around the drones in m
-max_iteration = 10
+protection_area = 30 # protection area around the drones in m
+max_iteration = 100
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
 bool_draw_final_solutions = False
@@ -66,7 +66,7 @@ def solve_with_announce_time():
         # nx.write_graphml(graph_dual, path_graph_dual)
     # Init a model that will be used to store all the data through the iterations
     print("Initialise the final model")
-    final_model, _g, _g_dual = init_model(graph, graph_dual, drone_list_file_path, protection_area, "00:00:00")
+    final_model, _g, _g_dual = init_model(graph, graph_dual, drone_list_file_path, protection_area, deposit_times_list[-1])
     final_model.set_graph_dual(_g_dual)
     print("Initialised")
     # Init the drones path
@@ -190,6 +190,7 @@ def solve_clusters_with_dual_and_constraints(model):
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
         # Solve the cluster
+        print("Iter :", iteration_count, "conflict_time :", current_conflict[2], "Cluster size :", len(cluster.drones))
         cluster.solve_cluster_dual(model, max_number_of_permutations)
         # Redo the conflict search to take into account the modifications
         #TODO ON A PAS BESOIN DE CHERCHER TOUT LES CONFLITS, JUSTE LE PREMIER QUI ARRIVE
@@ -287,6 +288,13 @@ def draw_solution(model):
         plt.close()
 
 
+def draw_solution_drone(drone, graph, path):
+    print("Drawing drone :", drone.flight_number)
+    gr.draw_solution(graph, drone, show_id=False, show_discretized=False, show_time=True, show=False)
+    plt.savefig(path, dpi=400)
+    plt.close()
+
+
 def extract_lat_lon_turn_bool_from_path(drone, model):
     lats = []
     lon = []
@@ -382,7 +390,7 @@ def turn_cost_function(node1, node2, node3):
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
-    if angle > minimum_angle_to_apply_added_weight:
+    if angle > minimum_angle_to_apply_added_weight and turn_bool_enabled:
         pre_turn_cost = (turn_weight * angle/180)/2
         post_turn_cost = (turn_weight * angle/180)/2
         total_turn_cost = pre_turn_cost + post_turn_cost
