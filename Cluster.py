@@ -10,13 +10,14 @@ DEPTH_CLUSTER = 5
 
 
 class Cluster:
-    def __init__(self, conflictNode, conflictDrones, graph,
+    def __init__(self, conflictNode, conflictDrones, graph, conflict_time,
                  initial_constraint_nodes=None, initial_constraint_edges=None):
         self.conflict = conflictNode
         self.conflictDrones = conflictDrones
         self.nodesList, self.edgesList = find_nodes_and_edges(conflictNode, graph)
         self.drones = []
         self.obstacles = []
+        self.conflict_time = conflict_time
 
     def find_drones(self, model, t):
         """Finds all the drones part of the given model that pass through the cluster
@@ -107,10 +108,19 @@ class Cluster:
             # TODO remettre un système de permut ?
             random.shuffle(drones_list)
             permutation_count += 1
+
+            # Initialize the constraint dict
             if model.initial_constraints_dict is not None:
                 constraint_dict = model.initial_constraints_dict
             else:
                 constraint_dict = dict()
+            # Add all the constraint of the flights that aren't included in the cluster up to conflict_time +1 node
+            for drone_to_add in model.droneList:
+                # Only add the drones that aren't in the cluster
+                if drone_to_add.flight_number not in [d.flight_number for d in self.drones]:
+                    # Only add the drones path up to one node after the conflict_time
+                    constraint_dict = add_initial_constraints_dual(constraint_dict, drone_to_add, drone_to_add.path_object, self.conflict_time)
+
             paths_changed = []
             paths_unchanged = []
             # Computing the best path for each drone sequentially (each drone take the already computed ones as
@@ -149,6 +159,12 @@ class Cluster:
                 constraint_dict = model.initial_constraints_dict
             else:
                 constraint_dict = dict()
+            # Add all the constraint of the flights that aren't included in the cluster up to conflict_time +1 node
+            for drone_to_add in model.droneList:
+                # Only add the drones that aren't in the cluster
+                if drone_to_add.flight_number not in [d.flight_number for d in self.drones]:
+                    # Only add the drones path up to one node after the conflict_time
+                    constraint_dict = add_initial_constraints_dual(constraint_dict, drone_to_add, drone_to_add.path_object, self.conflict_time)
             for drone in best_permutation:
                 constraint_dict, path = new_path_dual(drone, constraint_dict)
                 if path is not None:
@@ -188,6 +204,32 @@ def add_constraints_dual(constraint_dict, drone, path):
             constraint_dict[node].append(constraint)
         else:
             constraint_dict[node] = [constraint]
+    # print("DRONE PATH",drone.flight_number, "ADDED TO CONSTRAINT ",path_to_use.path_dict)
+    return constraint_dict
+
+
+def add_initial_constraints_dual(constraint_dict, drone, path_object, conflict_time):
+    """Take the path of drone and turn it into constraints to add to the constraint_dict of the primal graph
+    constraint format is { node : [[time_at_node, next_node, time_at_next_node, drone], [...]] }
+    The constraint_dict is modified in here as it is mutable"""
+    # If path is None, this means that the drone path hasn't been modified, so we use the drone.path_object.path as
+    # the path to create the constraints.
+    time_list = list(path_object.path_dict)
+    for index, time in enumerate(time_list):
+        node = path_object.path_dict[time]
+        # Check if the node is actually the arrival node, if it is the case next_node = node
+        if index + 1 < len(time_list):
+            next_time = time_list[index + 1]
+            next_node = path_object.path_dict[next_time]
+            constraint = [time, next_node, next_time, drone]
+        else:
+            constraint = [time, node, time, drone]
+        if node in constraint_dict:
+            constraint_dict[node].append(constraint)
+        else:
+            constraint_dict[node] = [constraint]
+        if time > conflict_time:
+            break
     # print("DRONE PATH",drone.flight_number, "ADDED TO CONSTRAINT ",path_to_use.path_dict)
     return constraint_dict
 

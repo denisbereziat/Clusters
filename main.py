@@ -12,8 +12,8 @@ import Path
 import os.path
 
 # PARAMETERS
-# graph_file_path = "graph_files/processed_graphM2.graphml"
-graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
+graph_file_path = "graph_files/processed_graphM2.graphml"
+# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
 # path_graph_dual = "graph_files/dual_graph.graphml"
@@ -179,14 +179,11 @@ def solve_clusters_with_dual_and_constraints(model):
         # Sorting conflicts by time to solve the earliest ones first
         conflicts.sort(key=lambda x: x[2])
         current_conflict = conflicts.pop(0)
+        conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
-        edge = drone.find_current_edge(current_conflict[2], graph)
+        edge = drone.find_current_edge(conflict_time, graph)
         conflicting_drones = (model.droneList[current_conflict[0]], model.droneList[current_conflict[1]])
-        try:
-            cluster = cl.Cluster(edge[0], conflicting_drones, graph)
-        except:
-            print(edge, conflicting_drones[0].dep, conflicting_drones[1].dep)
-            raise Exception
+        cluster = cl.Cluster(edge[0], conflicting_drones, graph, conflict_time)
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
         # Solve the cluster
