@@ -42,24 +42,6 @@ class Cluster:
                         self.drones.append(drone)
                         break
 
-
-                # if t-INTERVAL <= h <= t+INTERVAL:
-                #     dronePath = drone.path_object
-                #     node = dronePath.path_dict[h]
-                #     i = dronePath.path.index(node)
-                #     # TODO C'est quoi l'exception la ?
-                #     try:
-                #         if (dronePath.path[i], dronePath.path[i + 1]) in self.edgesList or (dronePath.path[i + 1], dronePath.path[i]) in self.edgesList:
-                #             self.drones.append(drone)
-                #             break
-                #         elif (dronePath.path[i - 1], dronePath.path[i]) in self.edgesList or (dronePath.path[i], dronePath.path[i - 1]) in self.edgesList:
-                #             self.drones.append(drone)
-                #             break
-                #     except Exception:
-                #         if (dronePath.path[i - 1], dronePath.path[i]) in self.edgesList or (dronePath.path[i], dronePath.path[i - 1]) in self.edgesList:
-                #             self.drones.append(drone)
-                #             break
-
     def solve_cluster_dual(self, model, max_permutations):
         # TODO Si on ne resoud pas le cluster on peut avoir plus de conflits a la fin qu'au debut ...
         # TODO ajouter les delays au depart testes de maniere iterative jusqu'a avoir quelque chose qui marche
@@ -72,7 +54,6 @@ class Cluster:
 
         # Compute the new best path for the drone taking into account the other drones paths as constraints
         def new_path_dual(current_drone, constraint_primal_dict):
-            # TODO QUand on cree le cluster il doit prendre comme contrainte toutes les traj des avions non inclus jusqu'a la date de creation du cluster (voir jusqu'au noeud juste apres)
             """Find the new shortest path for the current drone, taking into account the constraints added
             by the already previously computed drones
             constraint_primal_dict = {dual_node : [arrival_time, next_node, next_node_time, drone]}
