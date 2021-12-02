@@ -1,7 +1,8 @@
 class Drone:
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
         self.flight_number = flightNumber
-        self.cruise_speed = 5.144 #15.4333     # in m/s for now
+        self.cruise_speed = 15.4333     # in m/s for now
+        # Todo ajouter les turn speed pour diff angle de virage
         self.turn_speed = 5.144
         self.braking_distance = 30
         self.dep = dep

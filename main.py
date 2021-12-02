@@ -12,15 +12,15 @@ import Path
 import os.path
 
 # PARAMETERS
-# graph_file_path = "graph_files/processed_graphM2.graphml"
-graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_network/cleaned.graphml"
+graph_file_path = "graph_files/processed_graphM2.graphml"
+# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
 # path_graph_dual = "graph_files/dual_graph.graphml"
 scenario_path = r'M2_Test_Scenario_new.scn'
 display_metrics = False
 added_turn_cost_enabled = False
-turn_bool_enabled = False
+turn_bool_enabled = True
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
@@ -63,7 +63,7 @@ def solve_with_announce_time():
     # else:
     print(" Creating dual")
     graph_dual = dual_graph.create_dual(graph, turn_cost_function)
-        # nx.write_graphml(graph_dual, path_graph_dual)
+    # nx.write_graphml(graph_dual, path_graph_dual)
     # Init a model that will be used to store all the data through the iterations
     print("Initialise the final model")
     final_model, _g, _g_dual = init_model(graph, graph_dual, drone_list_file_path, protection_area, deposit_times_list[-1])
@@ -179,14 +179,11 @@ def solve_clusters_with_dual_and_constraints(model):
         # Sorting conflicts by time to solve the earliest ones first
         conflicts.sort(key=lambda x: x[2])
         current_conflict = conflicts.pop(0)
+        conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
-        edge = drone.find_current_edge(current_conflict[2], graph)
+        edge = drone.find_current_edge(conflict_time, graph)
         conflicting_drones = (model.droneList[current_conflict[0]], model.droneList[current_conflict[1]])
-        try:
-            cluster = cl.Cluster(edge[0], conflicting_drones, graph)
-        except:
-            print(edge, conflicting_drones[0].dep, conflicting_drones[1].dep)
-            raise Exception
+        cluster = cl.Cluster(edge[0], conflicting_drones, graph, conflict_time)
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
         # Solve the cluster

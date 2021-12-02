@@ -96,13 +96,13 @@ def check_conflict_on_edge(node1_1, node1_2, node2_1, node2_2, t1_1, t1_2, t2_1,
     # Going the same way on the edge
     if node1_1 == node2_1 and node2_2 == node2_2:
         if t1_1 < t2_1 and not t1_2 < t2_2:
-            return t2_1
+            return t2_2
         if t2_1 < t1_1 and not t2_2 < t1_2:
-            return t1_1
+            return t1_2
     # Going opposite way on the edge
     if node1_1 == node2_2 and node1_2 == node2_1:
         if tools.intersection([t1_1, t1_2], [t2_1, t2_2]) is not None:
-            return max(t1_1, t2_1)
+            return max(t1_2, t2_2)
 
 
 def find_conflict_on_nodes(drone1, drone2, protection_area, graph_dual, graph):
