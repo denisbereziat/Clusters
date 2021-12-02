@@ -1,3 +1,5 @@
+import random
+
 import networkx as nx
 import Astar2 as a2
 import Graph_repr as gr
@@ -31,6 +33,8 @@ bool_draw_intermediary_solutions = False
 bool_draw_final_solutions = False
 # Limit how many permutations to test when solving the clusters
 max_number_of_permutations = 1
+
+
 
 
 def solve_with_announce_time():
@@ -154,6 +158,10 @@ def solve_clusters_with_dual_and_constraints(model):
     """Solve the pathing problem for the drones of the specified file on the graph using the cluster method and the A*
         algorithm on a dual graph of the given graph, which takes into account the influence of turns on drones speed"""
 
+    # Cluster initial parameters
+    cluster_time_interval = 30
+    cluster_depth = 5
+
     # 1 Initialise the graph (normal and dual)
     graph = model.graph
     graph_dual = model.graph_dual
@@ -172,6 +180,7 @@ def solve_clusters_with_dual_and_constraints(model):
 
     # 4 Solve
     iteration_count = 0
+    last_conflict_time = None
     while len(conflicts) != 0 and iteration_count < max_iteration:
         # print("Conflicts lefts :", len(conflicts))
         iteration_count += 1
@@ -180,10 +189,15 @@ def solve_clusters_with_dual_and_constraints(model):
         conflicts.sort(key=lambda x: x[2])
         current_conflict = conflicts.pop(0)
         conflict_time = current_conflict[2]
+        # Varying cluster parameters to try and avoid getting stuck
+        if last_conflict_time == conflict_time:
+            cluster_time_interval = random.randint(30, 50)
+            cluster_depth = random.randint(3, 5)
+        last_conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(conflict_time, graph)
         conflicting_drones = (model.droneList[current_conflict[0]], model.droneList[current_conflict[1]])
-        cluster = cl.Cluster(edge[0], conflicting_drones, graph, conflict_time)
+        cluster = cl.Cluster(edge[0], conflicting_drones, graph, conflict_time, cluster_time_interval, cluster_depth)
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
         # Solve the cluster

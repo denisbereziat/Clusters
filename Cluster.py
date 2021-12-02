@@ -5,41 +5,60 @@ import Path as pt
 import main
 
 # TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
-INTERVAL = 30
-DEPTH_CLUSTER = 5
+# INTERVAL = 30
+# DEPTH_CLUSTER = 5
 
 
 class Cluster:
-    def __init__(self, conflictNode, conflictDrones, graph, conflict_time,
-                 initial_constraint_nodes=None, initial_constraint_edges=None):
+    def __init__(self, conflictNode, conflictDrones, graph, conflict_time, time_interval, cluster_depth):
         self.conflict = conflictNode
         self.conflictDrones = conflictDrones
-        self.nodesList, self.edgesList = find_nodes_and_edges(conflictNode, graph)
+        self.nodesList, self.edgesList = find_nodes_and_edges(conflictNode, graph, cluster_depth)
         self.drones = []
         self.obstacles = []
         self.conflict_time = conflict_time
+        self.time_interval = time_interval
+        self.cluster_depth = cluster_depth
 
-    def find_drones(self, model, t):
+    def find_drones(self, model, conflict_time):
         """Finds all the drones part of the given model that pass through the cluster
         between time t-INTERVALL and t+INTERVALL, with t a time given in seconds."""
         for drone in model.droneList:
-            for h in drone.path_object.path_dict:
-                if t-INTERVAL <= h <= t+INTERVAL:
-                    dronePath = drone.path_object
-                    node = dronePath.path_dict[h]
-                    i = dronePath.path.index(node)
-                    # TODO C'est quoi l'exception la ?
-                    try:
-                        if (dronePath.path[i], dronePath.path[i + 1]) in self.edgesList or (dronePath.path[i + 1], dronePath.path[i]) in self.edgesList:
-                            self.drones.append(drone)
-                            break
-                        elif (dronePath.path[i - 1], dronePath.path[i]) in self.edgesList or (dronePath.path[i], dronePath.path[i - 1]) in self.edgesList:
-                            self.drones.append(drone)
-                            break
-                    except Exception:
-                        if (dronePath.path[i - 1], dronePath.path[i]) in self.edgesList or (dronePath.path[i], dronePath.path[i - 1]) in self.edgesList:
-                            self.drones.append(drone)
-                            break
+            time_stamps = sorted(drone.path_object.path_dict.keys())
+            for index, time in enumerate(time_stamps):
+                if conflict_time - self.time_interval <= time <= conflict_time + self.time_interval:
+                    node = drone.path_object.path_dict[time]
+                    node_minus_1, node_plus_1 = None, None
+                    edge_before, edge_after = None, None
+                    if index > 0:
+                        node_minus_1 = drone.path_object.path_dict[time_stamps[index-1]]
+                        edge_before = (node_minus_1, node)
+                    if index+1 < len(time_stamps)-1:
+                        node_plus_1 = drone.path_object.path_dict[time_stamps[index-1]]
+                        edge_after = (node, node_plus_1)
+                    # if node in self.nodesList:
+                    #     self.drones.append(drone)
+                    if edge_after in self.edgesList or edge_before in self.edgesList:
+                        self.drones.append(drone)
+                        break
+
+
+                # if t-INTERVAL <= h <= t+INTERVAL:
+                #     dronePath = drone.path_object
+                #     node = dronePath.path_dict[h]
+                #     i = dronePath.path.index(node)
+                #     # TODO C'est quoi l'exception la ?
+                #     try:
+                #         if (dronePath.path[i], dronePath.path[i + 1]) in self.edgesList or (dronePath.path[i + 1], dronePath.path[i]) in self.edgesList:
+                #             self.drones.append(drone)
+                #             break
+                #         elif (dronePath.path[i - 1], dronePath.path[i]) in self.edgesList or (dronePath.path[i], dronePath.path[i - 1]) in self.edgesList:
+                #             self.drones.append(drone)
+                #             break
+                #     except Exception:
+                #         if (dronePath.path[i - 1], dronePath.path[i]) in self.edgesList or (dronePath.path[i], dronePath.path[i - 1]) in self.edgesList:
+                #             self.drones.append(drone)
+                #             break
 
     def solve_cluster_dual(self, model, max_permutations):
         # TODO Si on ne resoud pas le cluster on peut avoir plus de conflits a la fin qu'au debut ...
@@ -100,12 +119,10 @@ class Cluster:
         # Looking for the best order to solve the drones in (this allows to find a more efficient solution and avoids
         # some cases where one drone could be completely out of solution because of the starting conditions)
         permutation_count = 0
-        #TODO a priori on a un pb avec les permutations c'est trop long bizarre
-        #TODO retirer toute les pemut
+        #TODO retirer ou faire les permut
         while permutation_count < min(possible_permutations_nb, max_permutations):
             # print([d.flight_number for d in self.drones])
             drones_list = self.drones.copy()
-            # TODO remettre un système de permut ?
             random.shuffle(drones_list)
             permutation_count += 1
 
@@ -247,7 +264,7 @@ def get_time(d, cluster):
             i += 1
 
 
-def find_nodes_and_edges(conflict_node, graph):
+def find_nodes_and_edges(conflict_node, graph, cluster_depth):
     """Finds all the nodes and edges present in the cluster, which starts at the given
     conflict node (str). Also defines the size of the cluster with the first "for" loop (Depth).
     Sets the color of the edges and nodes within the cluster to represent them on the graphical map."""
@@ -256,7 +273,7 @@ def find_nodes_and_edges(conflict_node, graph):
 
     # Search recursively for the linked nodes up to a distance of DEPTH
     def find_nodes(node_queue, list_nodes, depth):
-        if depth == DEPTH_CLUSTER:
+        if depth == cluster_depth:
             return list_nodes
         new_node_queue = []
         for node in node_queue:

@@ -14,7 +14,7 @@ class Node:
     
     def f(self):
         """Returns the sum of the heuristic and the cost of the associated node. """
-        return self.heuristic + self.cost
+        return self.heuristic + self.time
     
     def path(self):
         """Finds and returns the path to the node from the start."""
