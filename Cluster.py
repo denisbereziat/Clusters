@@ -115,6 +115,7 @@ class Cluster:
             else:
                 constraint_dict = dict()
             # Add all the constraint of the flights that aren't included in the cluster up to conflict_time +1 node
+            # TODO Il faudrait ajouter les noeuds jusqu'a t + depth cluster ou au moins assez longtemps apres pour que meme en recreant un cluster au ras on peut pas modifier en retour dans le temps
             for drone_to_add in model.droneList:
                 # Only add the drones that aren't in the cluster
                 if drone_to_add.flight_number not in [d.flight_number for d in self.drones]:
