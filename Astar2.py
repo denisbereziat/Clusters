@@ -51,6 +51,7 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
             if neighbor.time >= new_time:
                 neighbor.time = new_time
                 neighbor.cost = new_cost
+                # TODO on peut ajouter le cout du neighbor avec le virage a l'heuristic
                 neighbor.heuristic = neighbor.dist_to_node(arr_node_id, graph_dual)
                 neighbor.parent = current_node
         priority_queue.sort(key=lambda x: x.f())
