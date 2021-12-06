@@ -72,7 +72,8 @@ class BlueskySCNTools():
         # First, we need to create the drone, Matrice 600 going 30 kts for now.
         # Let's calculate its required heading.
         qdr = self.qdrdist(lats[0], lons[0], lats[1], lons[1], 'qdr')
-        cre_text = f'CRE {drone_id} M600 {lats[0]} {lons[0]} {qdr} 25 {turn_speed}\n'
+        #        cre_text = f'CRE {drone_id} M600 {lats[0]} {lons[0]} {qdr} 25 {turn_speed}\n'
+        cre_text = f'CRE {drone_id} M600 {lats[0]} {lons[0]} {qdr} 25 {cruise_speed}\n'
         lines.append(start_time_txt + cre_text)
         
         # Then we need to for loop through all the lats

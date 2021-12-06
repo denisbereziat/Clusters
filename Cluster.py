@@ -4,7 +4,6 @@ import Astar2 as a2
 import Path as pt
 import main
 
-# TODO Definition de la zone du cluster pour le moment juste taille = 3? Pareil pour INTERVAL
 # INTERVAL = 30
 # DEPTH_CLUSTER = 5
 
@@ -43,8 +42,7 @@ class Cluster:
                         break
 
     def solve_cluster_dual(self, model, max_permutations):
-        # TODO Si on ne resoud pas le cluster on peut avoir plus de conflits a la fin qu'au debut ...
-        # TODO ajouter les delays au depart testes de maniere iterative jusqu'a avoir quelque chose qui marche
+        # RQ Si on ne resoud pas le cluster on peut avoir plus de conflits a la fin qu'au debut ...
         """Solve the cluster by solving the problem sequentially over all possible permutations or at least a certain
         number"""
         # Contain all possible permutations of drones order
@@ -68,8 +66,37 @@ class Cluster:
                     found = True
                 else:
                     i += 1
+
+            # Find the departure node in the cluster and the time interval
+            # Find first node in the cluster
+            # move forward to be as close to interval as possible
+            # d_time_stamps = sorted(current_drone.path_object.path_dict.keys())
+            # for t_stamps_index, time in enumerate(d_time_stamps):
+            #     node = current_drone.path_object.path_dict[time]
+            #     if node in self.nodesList:
+            #         departure_node = node
+            #         departure_time = time
+            #         if time > self.conflict_time - self.time_interval:
+            #             break
+            #         if t_stamps_index + 1 < len(d_time_stamps)-1:
+            #             if d_time_stamps[t_stamps_index + 1] == self.conflict:
+            #                 break
+            #         else:
+            #             break
+            #
+            # for time in current_drone.path_object.path_dict:
+            #     if self.conflict_time - self.time_interval <= time or self.conflict_time + self.time_interval:
+            #         if current_drone.path_object.path_dict[time] in self.nodesList:
+            #             departure_node = current_drone.path_object.path_dict[time]
+            #             # print("dep ", departure_node)
+            #             # print("conflit ", self.conflict)
+            #             # if self.conflict in current_drone.path_object.path:
+            #             #     print("dep index ", current_drone.path_object.path.index(departure_node), "conf index ", current_drone.path_object.path.index(self.conflict))
+            #             break
+
             i = list(current_drone.path_object.path_dict.values()).index(departure_node)
             departure_time = list(current_drone.path_object.path_dict.keys())[i]
+
             # Create the dual departure and arrival for the A* dual algorithm
             dep_dual = ("S" + departure_node, departure_node)
             arr_dual = (drone.arr, drone.arr + "T")
@@ -113,7 +140,6 @@ class Cluster:
             else:
                 constraint_dict = dict()
             # Add all the constraint of the flights that aren't included in the cluster up to conflict_time +1 node
-            # TODO Il faudrait ajouter les noeuds jusqu'a t + depth cluster ou au moins assez longtemps apres pour que meme en recreant un cluster au ras on peut pas modifier en retour dans le temps
             for drone_to_add in model.droneList:
                 # Only add the drones that aren't in the cluster
                 if drone_to_add.flight_number not in [d.flight_number for d in self.drones]:
@@ -170,7 +196,6 @@ class Cluster:
                     drone.path_object = path
         # else:
             # print("No solutions found")
-            # TODO plot la situation non resolue
             # for d in self.drones:
             #     print("Flight number", d.flight_number)
             #     print("Path", d.path_object.path_dict)
