@@ -9,10 +9,10 @@ import main
 
 
 class Cluster:
-    def __init__(self, conflictNode, conflictDrones, graph, conflict_time, time_interval, cluster_depth):
-        self.conflict = conflictNode
-        self.conflictDrones = conflictDrones
-        self.nodesList, self.edgesList = find_nodes_and_edges(conflictNode, graph, cluster_depth)
+    def __init__(self, conflict_node, conflict_drones, graph, conflict_time, time_interval, cluster_depth):
+        self.conflict_node = conflict_node
+        self.conflictDrones = conflict_drones
+        self.nodesList, self.edgesList = find_nodes_and_edges(conflict_node, graph, cluster_depth)
         self.drones = []
         self.obstacles = []
         self.conflict_time = conflict_time
