@@ -14,8 +14,8 @@ import Path
 import os.path
 
 # PARAMETERS
-graph_file_path = "graph_files/processed_graphM2.graphml"
-# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
+# graph_file_path = "graph_files/processed_graphM2.graphml"
+graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
 # path_graph_dual = "graph_files/dual_graph.graphml"
@@ -65,6 +65,8 @@ def solve_with_announce_time():
     # else:
     print(" Creating dual")
     graph_dual = dual_graph.create_dual(graph, turn_cost_function)
+    print(len(list(graph_dual.edges)))
+    print(len(list(graph_dual.nodes)))
     # nx.write_graphml(graph_dual, path_graph_dual)
     # Init a model that will be used to store all the data through the iterations
     print("Initialise the final model")
