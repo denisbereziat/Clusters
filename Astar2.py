@@ -41,17 +41,16 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
             # If current node was AB and neighbor is BC, the time we set here is the arrival time at B taking into
             # account pre and post turn added cost
             new_time = current_node.time + graph_dual.edges[edge]["length"] / speed_on_neighbor
-            # TODO la ça va plus a v constant
             new_cost = current_node.cost + graph_dual.edges[edge]["length"]
             neighbor_in_priority_queue, neighbor = node_in_list(neighbor, priority_queue)
-            # Todo le fait de pas etre dans closed nodes onpourrait le faire avant les calculs de neighbor
+            # RQ : le fait de pas etre dans closed nodes onpourrait le faire avant les calculs de neighbor
             if not neighbor_in_priority_queue and neighbor.id not in closed_nodes_list:
                 priority_queue.append(neighbor)
             # EFFET DE BORD pour modifier la valeur de neighbor dans la liste priority_queue
             if neighbor.time >= new_time:
                 neighbor.time = new_time
                 neighbor.cost = new_cost
-                # TODO on peut ajouter le cout du neighbor avec le virage a l'heuristic
+                # RQ on peut ajouter le cout du neighbor avec le virage a l'heuristic
                 neighbor.heuristic = neighbor.dist_to_node(arr_node_id, graph_dual)
                 neighbor.parent = current_node
         priority_queue.sort(key=lambda x: x.f())

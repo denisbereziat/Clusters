@@ -14,8 +14,8 @@ import Path
 import os.path
 
 # PARAMETERS
-graph_file_path = "graph_files/processed_graphM2.graphml"
-# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
+# graph_file_path = "graph_files/processed_graphM2.graphml"
+graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
 # path_graph_dual = "graph_files/dual_graph.graphml"
@@ -27,14 +27,12 @@ turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
 protection_area = 30 # protection area around the drones in m
-max_iteration = 100
+max_iteration = 300
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
 bool_draw_final_solutions = False
 # Limit how many permutations to test when solving the clusters
 max_number_of_permutations = 1
-
-
 
 
 def solve_with_announce_time():
@@ -84,7 +82,6 @@ def solve_with_announce_time():
         # Changing the time in seconds and determining the next time of the simulation
         print("\nCurrent_sim_time: ", current_sim_time)
         current_sim_time_s = float(current_sim_time[0:2])*3600 + float(current_sim_time[3:5])*60 + float(current_sim_time[6:8])
-        # TODO trouver formulation au propre
         next_sim_time_s = 0
         if sim_time_index+1 < len(deposit_times_list):
             next_sim_time = deposit_times_list[sim_time_index+1]
@@ -130,11 +127,54 @@ def solve_with_announce_time():
         draw_solution(final_model)
     # Save paths in a file
     print("Saving all paths \n")
-    file = open("path_with_turns.txt", "w")
     for drone in final_model.droneList:
-        file.write(
-            "\nDrone ID :" + str(final_model.droneList.index(drone)) + "\n" + str(drone.path_object.path) + "\n")
-    file.close()
+        with open("drones_paths/"+drone.flight_number, "w") as file:
+            index = 0
+            for t_stamps in drone.path_object.path_dict:
+                file.write(str(index) + " : " + str(int(t_stamps//60)) + ":" + str(int(t_stamps % 60)) + "\n")
+                index += 1
+        file.close()
+    # Computing time spent at each speed for each drone :
+    # edges_at_turning_speed = dict()
+    # edges_at_normal_speed = dict()
+    # mean = 0
+    # for drone in final_model.droneList:
+    #     edges_at_turning_speed[drone.flight_number]=[]
+    #     edges_at_normal_speed[drone.flight_number]=[]
+    #     time_stamps = sorted(drone.path_object.path_dict.keys())
+    #     path_dict = drone.path_object.path_dict
+    #     for index, time_stamp in enumerate(time_stamps):
+    #         length = 0
+    #         previous_edge, next_edge, next_next_edge = None, None, None
+    #         turn = False
+    #         node = path_dict[time_stamps[index]]
+    #         if index > 0:
+    #             previous_edge = (path_dict[time_stamps[index-1]], node)
+    #             nodes_minus_1 = path_dict[time_stamps[index-1]]
+    #         if index+1 < len(path_dict) - 1:
+    #             next_edge = (node, path_dict[time_stamps[index+1]])
+    #             length = float(graph.edges[next_edge]["length"])
+    #             node_plus1 = path_dict[time_stamps[index+1]]
+    #         if index+2 < len(path_dict) - 1:
+    #             next_next_edge = (path_dict[time_stamps[index+1]], path_dict[time_stamps[index+2]])
+    #             node_plus2 = path_dict[time_stamps[index+2]]
+    #             graph = final_model.graph
+    #         if previous_edge is not None and next_edge is not None:
+    #             turn = turn_cost_function(graph.nodes[nodes_minus_1], graph.nodes[node], graph.nodes[node_plus1], turn_enabled=True)[3]
+    #         if next_edge is not None and next_next_edge is not None:
+    #             turn = turn_cost_function(graph.nodes[node], graph.nodes[node_plus1], graph.nodes[node_plus2], turn_enabled=True)[3]
+    #         if turn:
+    #             edges_at_turning_speed[drone.flight_number].append(length)
+    #         else:
+    #             edges_at_normal_speed[drone.flight_number].append(length)
+    #     total_length = sum(edges_at_normal_speed[drone.flight_number]) + sum(edges_at_turning_speed[drone.flight_number])
+    #     length_at_turn_speed = sum(edges_at_turning_speed[drone.flight_number])
+    #     percent = length_at_turn_speed/total_length
+    #     mean += percent
+    #     print("Drone ", drone.flight_number, "flew ", 100*percent, "%", "at turning speed (",length_at_turn_speed, "/", total_length, ")")
+    # print("On average all drones flew ", 100*mean/len(final_model.droneList), "% at turning speed")
+
+
     # Generate Bluesky scenarios
     print("Generating Bluesky SCN")
     scenario_dict = generate_scenarios(final_model)
@@ -159,7 +199,7 @@ def solve_clusters_with_dual_and_constraints(model):
         algorithm on a dual graph of the given graph, which takes into account the influence of turns on drones speed"""
 
     # Cluster initial parameters
-    cluster_time_interval = 30
+    cluster_time_interval = 60
     cluster_depth = 5
 
     # 1 Initialise the graph (normal and dual)
@@ -189,10 +229,11 @@ def solve_clusters_with_dual_and_constraints(model):
         conflicts.sort(key=lambda x: x[2])
         current_conflict = conflicts.pop(0)
         conflict_time = current_conflict[2]
+
         # Varying cluster parameters to try and avoid getting stuck
-        if last_conflict_time == conflict_time:
-            cluster_time_interval = random.randint(30, 50)
-            cluster_depth = random.randint(3, 5)
+        # if last_conflict_time == conflict_time:
+        # #     # cluster_time_interval = random.randint(50, 300)
+        #     cluster_depth = random.randint(2, 13)
         last_conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(conflict_time, graph)
@@ -200,6 +241,7 @@ def solve_clusters_with_dual_and_constraints(model):
         cluster = cl.Cluster(edge[0], conflicting_drones, graph, conflict_time, cluster_time_interval, cluster_depth)
         # Find the drones passing through the cluster
         cluster.find_drones(model, current_conflict[2])
+
         # Solve the cluster
         print("Iter :", iteration_count, "conflict_time :", current_conflict[2], "Cluster size :", len(cluster.drones))
         cluster.solve_cluster_dual(model, max_number_of_permutations)
@@ -389,19 +431,21 @@ def compute_and_display_results(model, start_time):
     return metrics
 
 
-def turn_cost_function(node1, node2, node3):
+def turn_cost_function(node1, node2, node3, turn_enabled=None):
     """The function used to determine the cost to add to the edge in the dual graph to take into account the effect
     of turns on the drone speed and flight_time, it returns the 2 parts of the added cost of the turn (deceleration
     and acceleration) and the total added cost in time"""
     # TODO as of now we consider only one speed profile, we can either make a graph per drone, or
     #  just return the turn angle and do calculations each time
+    if turn_enabled is None:
+        turn_enabled = turn_bool_enabled
     x1, y1 = float(node1["x"]), float(node1["y"])
     x2, y2 = float(node2["x"]), float(node2["y"])
     x3, y3 = float(node3["x"]), float(node3["y"])
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
-    if angle > minimum_angle_to_apply_added_weight and turn_bool_enabled:
+    if angle > minimum_angle_to_apply_added_weight and turn_enabled:
         pre_turn_cost = (turn_weight * angle/180)/2
         post_turn_cost = (turn_weight * angle/180)/2
         total_turn_cost = pre_turn_cost + post_turn_cost
@@ -414,14 +458,16 @@ def turn_cost_function(node1, node2, node3):
         return 0, 0, 0, False
 
 
-def turn_bool_function(node1, node2, node3):
+def turn_bool_function(node1, node2, node3, turn_enabled=None):
+    if turn_enabled is None:
+         turn_enabled = turn_bool_enabled
     x1, y1 = float(node1[0]), float(node1[1])
     x2, y2 = float(node2[0]), float(node2[1])
     x3, y3 = float(node3[0]), float(node3[1])
     v1 = (x2 - x1, y2 - y1)
     v2 = (x3 - x2, y3 - y2)
     angle = tools.angle_btw_vectors(v1, v2)
-    if angle > minimum_angle_to_apply_added_weight and turn_bool_enabled:
+    if angle > minimum_angle_to_apply_added_weight and turn_enabled:
         return True
     else:
         return False
