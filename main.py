@@ -14,8 +14,8 @@ import Path
 import os.path
 
 # PARAMETERS
-# graph_file_path = "graph_files/processed_graphM2.graphml"
-graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
+graph_file_path = "graph_files/processed_graphM2.graphml"
+# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/drones_with_deposit_times.txt'
 # path_graph_dual = "graph_files/dual_graph.graphml"
@@ -26,7 +26,7 @@ turn_bool_enabled = True
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
-protection_area = 30 # protection area around the drones in m
+protection_area = 45 # protection area around the drones in m
 max_iteration = 300
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
@@ -65,8 +65,8 @@ def solve_with_announce_time():
     # else:
     print(" Creating dual")
     graph_dual = dual_graph.create_dual(graph, turn_cost_function)
-    print(len(list(graph_dual.edges)))
-    print(len(list(graph_dual.nodes)))
+    # print(len(list(graph_dual.edges)))
+    # print(len(list(graph_dual.nodes)))
     # nx.write_graphml(graph_dual, path_graph_dual)
     # Init a model that will be used to store all the data through the iterations
     print("Initialise the final model")
@@ -234,8 +234,8 @@ def solve_clusters_with_dual_and_constraints(model):
 
         # Varying cluster parameters to try and avoid getting stuck
         # if last_conflict_time == conflict_time:
-        # #     # cluster_time_interval = random.randint(50, 300)
-        #     cluster_depth = random.randint(2, 13)
+        #     # cluster_time_interval = random.randint(50, 300)
+        #     cluster_depth = random.randint(2, 6)
         last_conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(conflict_time, graph)
@@ -248,7 +248,7 @@ def solve_clusters_with_dual_and_constraints(model):
         print("Iter :", iteration_count, "conflict_time :", current_conflict[2], "Cluster size :", len(cluster.drones))
         cluster.solve_cluster_dual(model, max_number_of_permutations)
         # Redo the conflict search to take into account the modifications
-        #TODO ON A PAS BESOIN DE CHERCHER TOUT LES CONFLITS, JUSTE LE PREMIER QUI ARRIVE
+        # ON A PAS BESOIN DE CHERCHER TOUT LES CONFLITS, JUSTE LE PREMIER QUI ARRIVE
         conflicts = model.find_conflicts()
     # Display the conflicts left if there are any
     if len(conflicts) != 0:
