@@ -97,7 +97,7 @@ class Path:
         t += cost/drone_speed
         self.speed_time_stamps.append([t, drone_speed])
         self.path_dict[t] = new_path[-1]
-        drone.path_object = self
+        # drone.path_object = self
         
     def flight_time_and_distance(self, graph, drone):
         self.flightDistance = 0
