@@ -26,7 +26,7 @@ turn_bool_enabled = True
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
-protection_area = 10 # protection area around the drones in m
+protection_area = 30 # protection area around the drones in m
 max_iteration = 300
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
