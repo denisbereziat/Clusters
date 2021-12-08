@@ -26,7 +26,7 @@ turn_bool_enabled = True
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
-protection_area = 45 # protection area around the drones in m
+protection_area = 30 # protection area around the drones in m
 max_iteration = 300
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
@@ -201,7 +201,7 @@ def solve_clusters_with_dual_and_constraints(model):
         algorithm on a dual graph of the given graph, which takes into account the influence of turns on drones speed"""
 
     # Cluster initial parameters
-    cluster_time_interval = 60
+    cluster_time_interval = 100
     cluster_depth = 5
 
     # 1 Initialise the graph (normal and dual)
@@ -234,8 +234,8 @@ def solve_clusters_with_dual_and_constraints(model):
 
         # Varying cluster parameters to try and avoid getting stuck
         # if last_conflict_time == conflict_time:
-        #     # cluster_time_interval = random.randint(50, 300)
-        #     cluster_depth = random.randint(2, 6)
+        #     cluster_time_interval = random.randint(50, 300)
+        #     cluster_depth = random.randint(2, 10)
         last_conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(conflict_time, graph)
