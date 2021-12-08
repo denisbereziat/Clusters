@@ -26,7 +26,7 @@ turn_bool_enabled = True
 turn_weight = 20
 minimum_angle_to_apply_added_weight = 25
 # TODO protection area assez large pour inclure les accelerations au niveau des nodes apres les turn point
-protection_area = 30 # protection area around the drones in m
+protection_area = 10 # protection area around the drones in m
 max_iteration = 300
 time_interval_discretization = 5
 bool_draw_intermediary_solutions = False
@@ -233,9 +233,9 @@ def solve_clusters_with_dual_and_constraints(model):
         conflict_time = current_conflict[2]
 
         # Varying cluster parameters to try and avoid getting stuck
-        # if last_conflict_time == conflict_time:
-        #     cluster_time_interval = random.randint(50, 300)
-        #     cluster_depth = random.randint(2, 10)
+        if last_conflict_time == conflict_time:
+            # cluster_time_interval = random.randint(50, 300)
+            cluster_depth = random.randint(2, 10)
         last_conflict_time = current_conflict[2]
         drone = model.droneList[current_conflict[0]]
         edge = drone.find_current_edge(conflict_time, graph)

@@ -115,16 +115,16 @@ class Cluster:
             # If a solution has been found
             if path_solution is not None:
                 # Checking if there is a previous path already saved
-                if not current_drone.path_object.previous_path == []:
-                    previous_path = current_drone.path_object.previous_path.path
-                else:
-                    previous_path = []
+                # if not current_drone.path_object.previous_path == []:
+                #     previous_path = current_drone.path_object.previous_path.path
+                # else:
+                #     previous_path = []
                 # The path is modified starting from the first waypoint taken into account in the cluster
                 new_path = current_drone.path_object.path[:i].copy() + path_solution.path.copy()
                 # Checking that the new path is not the same as the last one or the current one
-                if current_drone.path_object.path != new_path and new_path != previous_path:
+                if current_drone.path_object.path != new_path :
                     new_solution = pt.Path(current_drone.dep_time, new_path.copy())
-                    new_solution.previous_path = current_drone.path_object
+                    # new_solution.previous_path = current_drone.path_object
                     new_solution.set_path(new_path.copy(), model.graph, model.graph_dual, current_drone)
                     new_solution.discretize_path(5, model.graph, current_drone)
                     new_solution.flight_time_and_distance(model.graph, current_drone)
