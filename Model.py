@@ -45,14 +45,56 @@ class Model:
                 if deposit_time_in_seconds <= time_in_seconds:
                     self.add_drone(drone)
 
+    def add_drones_from_file_without_deposit_time(self, filename):
+        """Extract the information of drones from the given file and add them to the model"""
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip().split('\t')
+                dep_coordinates = line[4].strip('()').split(',')
+                arr_coordinates = line[5].strip('()').split(',')
+                dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
+                arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
+                deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
+                dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
+                drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
+                self.add_drone(drone)
+
     def find_conflicts(self):
-        """Detect conflicts on the graph by using the distances between each drones at any time"""
+        """Detect conflicts on the graph"""
         conflict_list = []
         for i, drone in enumerate(self.droneList):
             if i != len(self.droneList)-1:
                 for j in range(i+1, len(self.droneList)):
                     t_edge = find_conflict_on_edges(drone, self.droneList[j])
                     t_node = find_conflict_on_nodes(drone, self.droneList[j], self.protection_area, self.graph_dual,
+                                                    self.graph)
+                    if t_edge is not None:
+                        if t_node is not None:
+                            if t_edge <= t_node:
+                                conflict_list.append((i, j, t_edge))
+                            else:
+                                conflict_list.append((i, j, t_node))
+                    elif t_node is not None:
+                        conflict_list.append((i, j, t_node))
+        return conflict_list
+
+    def find_conflicts_on_specified_drones(self, drones_to_check_flight_numbers):
+        """Detect conflicts on the graph"""
+        conflict_list = []
+        drones_to_check = []
+        # Chaque drone n'est ajouté qu'une fois comme ça
+        for drone in self.droneList:
+            if drone.flight_number in drones_to_check_flight_numbers:
+                drones_to_check.append(drone)
+        for i, drone in enumerate(drones_to_check):
+            # print(len(drones_to_check))
+            if i != len(drones_to_check)-1:
+                print("tuttu")
+                for j in range(i+1, len(drones_to_check)):
+                    print("pouet")
+                    print(drone.path_object)
+                    t_edge = find_conflict_on_edges(drone, drones_to_check[j])
+                    t_node = find_conflict_on_nodes(drone, drones_to_check[j], self.protection_area, self.graph_dual,
                                                     self.graph)
                     if t_edge is not None:
                         if t_node is not None:
