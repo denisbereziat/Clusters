@@ -35,7 +35,10 @@ class Node:
         x1, y1 = graph.nodes[self.id]['x']*math.pi/180, graph.nodes[self.id]['y']*math.pi/180
         x2, y2 = graph.nodes[node]['x']*math.pi/180, graph.nodes[node]['y']*math.pi/180
         try:
+            # print(math.acos(math.sin(y1)*math.sin(y2)+math.cos(y1)*math.cos(y2)*math.cos(x1-x2)) * earth_radius)
             return math.acos(math.sin(y1)*math.sin(y2)+math.cos(y1)*math.cos(y2)*math.cos(x1-x2)) * earth_radius
         except ValueError:
+            # print(math.acos(math.cos(90-y1)*math.cos(90-y2) +
+            #                  math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)) * earth_radius)
             return math.acos(math.cos(90-y1)*math.cos(90-y2) +
                              math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)) * earth_radius

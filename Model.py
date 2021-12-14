@@ -2,6 +2,7 @@ import Drone as dr
 import math
 import tools
 import networkx as nx
+import csv
 
 
 class Model:
@@ -28,36 +29,65 @@ class Model:
         self.graph_dual = graph_dual
 
     def add_drones_from_file(self, filename, time):
+        if filename[-4:] == ".csv":
+            self.add_drones_from_csv_file(filename, time)
+        else:
+            self.add_drones_from_file_old(filename, time)
+
+    def add_drones_from_file_old(self, filename, time):
         """Extract the information of drones from the given file and add them to the model"""
-        time_in_seconds = float(time[0:2])*3600 + float(time[3:5])*60 + float(time[6:8])
-        with open(filename, 'r') as f:
-            for line in f:
-                line = line.strip().split('\t')
-                dep_coordinates = line[4].strip('()').split(',')
-                arr_coordinates = line[5].strip('()').split(',')
-                dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
-                arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
-                deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
-                # print("Deposit time :", line)
-                # print("Deposit time :", deposit_time_in_seconds)
-                dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
-                drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
-                if deposit_time_in_seconds <= time_in_seconds:
+        print("Loading from old format")
+        if time is not None:
+            time_in_seconds = float(time[0:2])*3600 + float(time[3:5])*60 + float(time[6:8])
+            with open(filename, 'r') as f:
+                for line in f:
+                    line = line.strip().split('\t')
+                    dep_coordinates = line[4].strip('()').split(',')
+                    arr_coordinates = line[5].strip('()').split(',')
+                    dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
+                    arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
+                    deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
+                    # print("Deposit time :", line)
+                    # print("Deposit time :", deposit_time_in_seconds)
+                    dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
+                    drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
+                    if deposit_time_in_seconds <= time_in_seconds:
+                        self.add_drone(drone)
+        else:
+            with open(filename, 'r') as f:
+                for line in f:
+                    line = line.strip().split('\t')
+                    dep_coordinates = line[4].strip('()').split(',')
+                    arr_coordinates = line[5].strip('()').split(',')
+                    dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
+                    arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
+                    deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
+                    # print("Deposit time :", line)
+                    # print("Deposit time :", deposit_time_in_seconds)
+                    dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
+                    drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
                     self.add_drone(drone)
 
-    def add_drones_from_file_without_deposit_time(self, filename):
+    def add_drones_from_csv_file(self, filename, time):
         """Extract the information of drones from the given file and add them to the model"""
-        with open(filename, 'r') as f:
-            for line in f:
-                line = line.strip().split('\t')
-                dep_coordinates = line[4].strip('()').split(',')
-                arr_coordinates = line[5].strip('()').split(',')
-                dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
-                arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
-                deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
+        print("Loading from CSV file")
+        with open(filename, newline='') as csv_file:
+            reader = csv.reader(csv_file, delimiter=',', quotechar='|')
+            for line in reader:
+                #
+                dep_vertiport_coordinates = (float(line[5].strip("\")")), float(line[4].strip("\"(")))
+                arr_vertiport_coordinates = (float(line[7].strip("\")")), float(line[6].strip("\"(")))
+                dep = get_closest_node(float(dep_vertiport_coordinates[1]), float(dep_vertiport_coordinates[0]), self.graph)
+                arr = get_closest_node(float(arr_vertiport_coordinates[1]), float(arr_vertiport_coordinates[0]), self.graph)
                 dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
-                drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
+                drone_type = line[2][-1]
+                flight_number = line[1]
+                # print(line)
+                drone = dr.Drone(flight_number, dep, arr, dep_time, drone_type)
+                drone.departure_vertiport = dep_vertiport_coordinates
+                drone.arrival_vertiport = arr_vertiport_coordinates
                 self.add_drone(drone)
+
 
     def find_conflicts(self):
         """Detect conflicts on the graph"""
@@ -78,24 +108,23 @@ class Model:
                         conflict_list.append((i, j, t_node))
         return conflict_list
 
-    def find_conflicts_on_specified_drones(self, drones_to_check_flight_numbers):
+    def find_conflicts_on_specified_drones(self, drones_to_check):
         """Detect conflicts on the graph"""
         conflict_list = []
-        drones_to_check = []
-        # Chaque drone n'est ajouté qu'une fois comme ça
-        for drone in self.droneList:
-            if drone.flight_number in drones_to_check_flight_numbers:
-                drones_to_check.append(drone)
+        # drones_to_check = []
+        # # Chaque drone n'est ajouté qu'une fois comme ça
+        # for drone in self.droneList:
+        #     if drone.flight_number in drones_to_check_flight_numbers:
+        #         drones_to_check.append(drone)
         for i, drone in enumerate(drones_to_check):
-            # print(len(drones_to_check))
             if i != len(drones_to_check)-1:
-                print("tuttu")
                 for j in range(i+1, len(drones_to_check)):
-                    print("pouet")
-                    print(drone.path_object)
+                    # print(drone.flight_number, drones_to_check[j].flight_number)
+                    # print(drone.path_object.path_dict, "\n", drones_to_check[j].path_object.path_dict)
                     t_edge = find_conflict_on_edges(drone, drones_to_check[j])
                     t_node = find_conflict_on_nodes(drone, drones_to_check[j], self.protection_area, self.graph_dual,
                                                     self.graph)
+                    # print(t_edge, t_node)
                     if t_edge is not None:
                         if t_node is not None:
                             if t_edge <= t_node:
@@ -249,10 +278,10 @@ def find_conflict_on_nodes(drone1, drone2, protection_area, graph_dual, graph):
 
 def check_conflict_on_node(t_drone1, t_drone2, d1_speed_after, d2_speed_after, protection_area):
     """Check for conflict on a node in the constrained airspace"""
-    if t_drone1 > t_drone2:
+    if t_drone1 >= t_drone2:
         if t_drone1 - t_drone2 < protection_area / d1_speed_after:
             return t_drone1
-    if t_drone2 > t_drone1:
+    if t_drone2 >= t_drone1:
         if t_drone2 - t_drone1 < protection_area / d2_speed_after:
             return t_drone2
 

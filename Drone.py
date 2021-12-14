@@ -11,6 +11,8 @@ class Drone:
         self.arr = arr
         self.dep_time = hDep
         self.type = droneType
+        self.departure_vertiport = None
+        self.arrival_vertiport = None
         # A path object that will be used to store the drone current path, previous and discretized path
         self.path_object = None
 
