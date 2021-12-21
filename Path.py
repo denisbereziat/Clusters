@@ -13,6 +13,7 @@ class Path:
         self.previous_path = []
         # Path dict contain a path with the time as keys and the node as value
         self.path_dict = {}
+        self.edge_path = []
         # This list contain the speed and time_stamps, the speed for each time stamp is the speed before reaching it
         # (in between the last one and the current one)
         self.speed_time_stamps = []
@@ -34,6 +35,9 @@ class Path:
         self.path_dict[t] = new_path[0]
         # TODO implement case where path length = 2
         drone_speed = drone.cruise_speed
+        self.edge_path = []
+        for node_index in range(len(new_path)-1):
+            self.edge_path.append((new_path[node_index], new_path[node_index+1]))
         for node_index in range(1, len(new_path)-1):
             # print(new_path)
             # To have the speed on the edge we need to know if the last node was a turn and if the next one is
@@ -43,7 +47,11 @@ class Path:
             edge_dual = ((new_path[node_index-1], new_path[node_index]),
                          (new_path[node_index], new_path[node_index+1]))
             # Determine travel cost to the node (remove the post turn cost)
-            cost = graph_dual.edges[edge_dual]["length"] - graph_dual.edges[edge_dual]["post_turn_cost"]
+            try:
+                cost = graph_dual.edges[edge_dual]["length"] - graph_dual.edges[edge_dual]["post_turn_cost"]
+            except:
+                print(new_path)
+                raise Exception
 
             # If the edge length is more than turn_distance then we have to take into account the deceleration
             # and the phase where the drone was going at his normal speed
@@ -93,7 +101,11 @@ class Path:
             t += graph_dual.edges[edge_dual]["post_turn_cost"]/drone_speed
             self.speed_time_stamps.append([t, drone_speed])
         # Last node :
-        cost = graph.edges[new_path[-2], new_path[-1]]["length"]
+        try:
+            cost = graph.edges[new_path[-2], new_path[-1]]["length"]
+        except:
+            print(len(new_path))
+            raise Exception
         t += cost/drone_speed
         self.speed_time_stamps.append([t, drone_speed])
         self.path_dict[t] = new_path[-1]

@@ -14,6 +14,7 @@ class Model:
         self.timeInterval = dt
         self.droneList = drones
         self.protection_area = protection_area
+        self.vertical_protection = 7.62  # 25 ft
         # Initial constraints contains the constraints caused by the currently
         # flying drones when the model is initialised
         self.initial_constraints_dict = initial_constraints
@@ -74,11 +75,12 @@ class Model:
         with open(filename, newline='') as csv_file:
             reader = csv.reader(csv_file, delimiter=',', quotechar='|')
             for line in reader:
-                #
-                dep_vertiport_coordinates = (float(line[5].strip("\")")), float(line[4].strip("\"(")))
-                arr_vertiport_coordinates = (float(line[7].strip("\")")), float(line[6].strip("\"(")))
-                dep = get_closest_node(float(dep_vertiport_coordinates[1]), float(dep_vertiport_coordinates[0]), self.graph)
-                arr = get_closest_node(float(arr_vertiport_coordinates[1]), float(arr_vertiport_coordinates[0]), self.graph)
+                dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
+                arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
+                dep = get_closest_node(float(dep_vertiport_coordinates[0]), float(dep_vertiport_coordinates[1]), self.graph)
+                arr = get_closest_node(float(arr_vertiport_coordinates[0]), float(arr_vertiport_coordinates[1]), self.graph)
+                # print(dep_vertiport_coordinates)
+                # print(self.graph.nodes[dep])
                 dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
                 drone_type = line[2][-1]
                 flight_number = line[1]
@@ -87,7 +89,6 @@ class Model:
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
                 self.add_drone(drone)
-
 
     def find_conflicts(self):
         """Detect conflicts on the graph"""
