@@ -165,10 +165,7 @@ for node in nodes_to_be_removed:
 
 for edge in unconstrained_graph.edges:
     unconstrained_graph.edges[edge]["length"] = str(hex_radius)
-    unconstrained_graph.edges[edge]["geometry"] = ("LINESTRING (" + str(unconstrained_graph.nodes[edge[0]]["x"]) + " "
-                                                                       + str(unconstrained_graph.nodes[edge[0]]["y"]) + ", "
-                                                                       + str(unconstrained_graph.nodes[edge[1]]["x"]) + " "
-                                                                       + str(unconstrained_graph.nodes[edge[1]]["y"])) + ")"
+    unconstrained_graph.edges[edge]["geometry"] = ("LINESTRING (" + str(unconstrained_graph.nodes[edge[0]]["x"]) + " " + str(unconstrained_graph.nodes[edge[0]]["y"]) + ", "+ str(unconstrained_graph.nodes[edge[1]]["x"]) + " "+ str(unconstrained_graph.nodes[edge[1]]["y"])) + ")"
 
 
 nodes_to_be_removed = []
@@ -205,14 +202,8 @@ for node_to_connect in nodes_to_be_reconnected:
             closest_node = node
     if closest_node is not None and closest_node not in already_connected_nodes:
         total_graph.add_edge(node_to_connect, closest_node)
-        total_graph.edges[(node_to_connect, closest_node)]["length"] = str(tools.distance(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"],
-                                                                   total_graph.nodes[(node_to_connect, closest_node)[0]]["y"],
-                                                                   total_graph.nodes[(node_to_connect, closest_node)[1]]["x"],
-                                                                   total_graph.nodes[(node_to_connect, closest_node)[1]]["y"]))
-        total_graph.edges[(node_to_connect, closest_node)]["geometry"] = ("LINESTRING ("+ str(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"])
-                                                                   + " " + str(total_graph.nodes[(node_to_connect, closest_node)[0]]["y"])
-                                                                   + ", " + str(total_graph.nodes[(node_to_connect, closest_node)[1]]["x"])
-                                                                   + " " + str(total_graph.nodes[(node_to_connect, closest_node)[1]]["y"])) +")"
+        total_graph.edges[(node_to_connect, closest_node)]["length"] = str(tools.distance(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"],total_graph.nodes[(node_to_connect, closest_node)[0]]["y"],total_graph.nodes[(node_to_connect, closest_node)[1]]["x"],total_graph.nodes[(node_to_connect, closest_node)[1]]["y"]))
+        total_graph.edges[(node_to_connect, closest_node)]["geometry"] = ("LINESTRING ("+ str(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"])+ " " + str(total_graph.nodes[(node_to_connect, closest_node)[0]]["y"])+ ", " + str(total_graph.nodes[(node_to_connect, closest_node)[1]]["x"])+ " " + str(total_graph.nodes[(node_to_connect, closest_node)[1]]["y"])) +")"
         # print(total_graph.edges[(node_to_connect, closest_node)]["geometry"])
         # print(total_graph.edges[(node_to_connect, closest_node)]["geometry"])
         # print( total_graph.edges[(node_to_connect, closest_node)]["length"])
@@ -271,7 +262,7 @@ for node in total_graph.nodes:
 plt.scatter(all_points_y, all_points_x, marker="*")
 
 for edge in total_graph.edges:
-    if not edge in graph.edges:
+    if edge not in graph.edges:
         plt.plot([total_graph.nodes[edge[0]]["x"], total_graph.nodes[edge[1]]["x"]], [total_graph.nodes[edge[0]]["y"], total_graph.nodes[edge[1]]["y"]])
 plt.show()
 
@@ -281,7 +272,6 @@ final_graph.graph["crs"] = "epsg:4326"
 
 for node in total_graph.nodes:
     final_graph.add_node(node)
-
     final_graph.nodes[node]["x"] = str(total_graph.nodes[node]["x"])
     final_graph.nodes[node]["y"] = str(total_graph.nodes[node]["y"])
 
@@ -290,7 +280,7 @@ for edge in total_graph.edges:
     final_graph.edges[edge]["geometry"] = total_graph.edges[edge]["geometry"]
     final_graph.edges[edge]["length"] = str(total_graph.edges[edge]["length"])
     final_graph.edges[edge]["osmid"] = str(total_graph.edges[edge]["osmid"])
-#
+
 nx.write_graphml(final_graph, graph_save_path)
 #
 # with open(graph_save_path, "r") as f:

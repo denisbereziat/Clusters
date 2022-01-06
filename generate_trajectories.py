@@ -12,13 +12,12 @@ import numpy as np
 import osmnx
 import time
 
-
 # graph_file_path = "graph_files/processed_graphM2.graphml"
 graph_file_path = "graph_files/total_graph.graphml"
 # graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 # drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/test_flight_intention.csv'
-drone_list_file_path = 'graph_files/100_intention.csv'
+drone_list_file_path = 'graph_files/Intentions/100_flight_intention.csv'
 
 protection_area = 30
 # vertical_protection_area = 7.62 # 25 ft
@@ -74,6 +73,7 @@ def main():
     print("Generating trajectories")
 
     # Have the trajectory pass by multiple points close to the shortest one
+    # TODO POUR LES TRAJ TRES COURTES (2 POINTS ON A UN PB)
     multiple_point_bool = True
     if multiple_point_bool:
         for drone in model.droneList[:nb_flights_to_process]:
@@ -258,6 +258,11 @@ def main():
     #         drone_shared_nodes_tab[i][j] = drone_shared_nodes_tab[j][i]
 
     ####
+    # Get all drones vertiports (arrival and departure)
+    print("Searching for departure and arrival edges for each drone")
+    dep_edge_dict, arrival_edge_dict = get_all_dep_and_arr_edges(model, raw_graph)
+
+    ####
     # Horizontal/Vertical shared nodes
     # TODO est ce qu'on veut les deux i,j j,i ou que un des deux suffit
     print("Check for vertically shared nodes with horizontal route")
@@ -268,12 +273,14 @@ def main():
         flight_number1 = trajectories_to_fn_dict[i]
         drone1 = return_drone_from_flight_number(model, flight_number1)
         drone1.path_object = drone_trajectories_dict[flight_number1][i][2]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            dep_edge = osmnx.get_nearest_edge(raw_graph, (drone1.departure_vertiport[1], drone1.departure_vertiport[0]))[0:2]
-            dep_edge = (str(dep_edge[0]), str(dep_edge[1]))
-            arr_edge = osmnx.get_nearest_edge(raw_graph, (drone1.arrival_vertiport[1], drone1.arrival_vertiport[0]))[0:2]
-            arr_edge = (str(arr_edge[0]), str(arr_edge[1]))
+        dep_edge = dep_edge_dict[drone1.flight_number]
+        arr_edge = arrival_edge_dict[drone1.flight_number]
+        # with warnings.catch_warnings():
+        #     warnings.simplefilter("ignore")
+        #     dep_edge = osmnx.get_nearest_edge(raw_graph, (drone1.departure_vertiport[1], drone1.departure_vertiport[0]))[0:2]
+        #     dep_edge = (str(dep_edge[0]), str(dep_edge[1]))
+        #     arr_edge = osmnx.get_nearest_edge(raw_graph, (drone1.arrival_vertiport[1], drone1.arrival_vertiport[0]))[0:2]
+        #     arr_edge = (str(arr_edge[0]), str(arr_edge[1]))
         # print(dep_edge, arr_edge)
         # print(drone1.path_object.edge_path)
         for j in range(size):
@@ -311,6 +318,7 @@ def main():
     # print("Verti/Horiz shared nodes\n", vertically_shared_edges_list)
     ####
     # Verti/verti nodes
+    print("Check for verti/verti shared nodes")
     climb_climb_list = []
     descent_descent_list = []
     # TODO remove duplicates
@@ -472,12 +480,32 @@ def main():
                 compatibility_matrix[i, j] = compatibility_matrix[j, i]
     print("Total time = ", time.time() - t_start)
 
+
+def get_all_dep_and_arr_edges(model, raw_graph):
+    dep_edge_dict = dict()
+    arrival_edge_dict = dict()
+    count=0
+    for drone in model.droneList:
+        print(count)
+        count+=1
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            dep_edge = osmnx.get_nearest_edge(raw_graph, (drone.departure_vertiport[1], drone.departure_vertiport[0]))[0:2]
+            dep_edge = (str(dep_edge[0]), str(dep_edge[1]))
+            dep_edge_dict[drone.flight_number] = dep_edge
+            arr_edge = osmnx.get_nearest_edge(raw_graph, (drone.arrival_vertiport[1], drone.arrival_vertiport[0]))[0:2]
+            arr_edge = (str(arr_edge[0]), str(arr_edge[1]))
+            arrival_edge_dict[drone.flight_number] = arr_edge
+    return dep_edge_dict, arrival_edge_dict
+
+
 def get_drone_index_in_model_list(drone_to_search_fn, model):
     index = 0
     for drone in model.droneList:
         if drone_to_search_fn == drone.flight_number:
             return index
         index += 1
+
 
 def get_drone_speed_after_node(drone, graph, graph_dual, node):
     # Find the other drone speed when passing the entry node of the edge

@@ -318,10 +318,14 @@ def save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim
 
 def generate_scenarios(model, alts=None):
     scenario_dict = dict()
+
     def get_dep_time(d):
         return d.dep_time
     sorted_drone_list = sorted(model.droneList, key=get_dep_time)
     for drone in sorted_drone_list:
+        if drone.path_object is None:
+            print("SKIPPED A DRONE : ", drone.flight_number)
+            continue
         drone_id = drone.flight_number
         scenario_dict[drone.flight_number] = dict()
         lats, lons, turns = extract_lat_lon_turn_bool_from_path(drone, model)
@@ -360,6 +364,8 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
     lats = []
     lon = []
     graph = model.graph
+    # print(drone.flight_number)
+    # print(drone.path_object)
     for node in drone.path_object.path:
         node_x = graph.nodes[node]['x']
         node_y = graph.nodes[node]['y']
