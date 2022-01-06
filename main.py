@@ -316,21 +316,27 @@ def save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim
                             drone.path_object.path.append(drone.path_object.path_dict[node_time])
 
 
-def generate_scenarios(model):
+def generate_scenarios(model, alts=None):
     scenario_dict = dict()
-    for drone in model.droneList:
+    def get_dep_time(d):
+        return d.dep_time
+    sorted_drone_list = sorted(model.droneList, key=get_dep_time)
+    for drone in sorted_drone_list:
         drone_id = drone.flight_number
         scenario_dict[drone.flight_number] = dict()
         lats, lons, turns = extract_lat_lon_turn_bool_from_path(drone, model)
-        scenario_dict[drone_id]['start_time'] = min(drone.path_object.path_dict.keys())
+        # scenario_dict[drone_id]['start_time'] = min(drone.path_object.path_dict.keys())
+        scenario_dict[drone_id]['start_time'] = drone.dep_time
         # Add lats
         scenario_dict[drone_id]['lats'] = lats
         # Add lons
         scenario_dict[drone_id]['lons'] = lons
         # Add turnbool
         scenario_dict[drone_id]['turnbool'] = turns
-        # Add alts, everyone flies at 25 feet altitude for now
-        scenario_dict[drone_id]['alts'] = [25] * len(lats)
+        if alts is None:
+            scenario_dict[drone_id]['alts'] = [25] * len(lats)
+        else:
+            scenario_dict[drone_id]['alts'] = alts[drone_id]
     return scenario_dict
 
 

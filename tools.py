@@ -1,5 +1,5 @@
 import math
-
+from shapely.geometry import LineString
 
 def intersection(interval1, interval2):
     if interval2[0] > interval1[1] or interval1[0] > interval2[1]:
@@ -31,6 +31,27 @@ def distance(x1, y1, x2, y2):
         return math.acos(math.sin(y1)*math.sin(y2)+math.cos(y1)*math.cos(y2)*math.cos(x1-x2))* 6371009
     except ValueError:  
         return math.acos(math.cos(90-y1)*math.cos(90-y2)+math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2))* 6371009
+
+
+def edges_intersect(edge1, edge2, graph):
+    l1 = LineString((graph.nodes[edge1[0]]["x"], graph.nodes[edge1[0]]["y"]), (graph.nodes[edge1[1]]["x"], graph.nodes[edge1[1]]["y"]))
+    l2 = LineString((graph.nodes[edge2[0]]["x"], graph.nodes[edge2[0]]["y"]), (graph.nodes[edge2[1]]["x"], graph.nodes[edge2[1]]["y"]))
+    return l1.intersects(l2)
+
+
+def m_displacement_to_lat_lon(pt, dn, de):
+    lat = pt[1]
+    lon = pt[0]
+
+    R = 6378137
+
+    dLat = dn/R
+    dLon = de/(R*math.cos(math.pi*lat/180))
+
+    latO = lat + dLat * 180/math.pi
+    lonO = lon + dLon * 180/math.pi
+
+    return lonO, latO
 
 
 def point_on_edge(x, y, edge, graph):

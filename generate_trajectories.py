@@ -13,16 +13,20 @@ import osmnx
 import time
 
 
-graph_file_path = "graph_files/processed_graphM2.graphml"
+# graph_file_path = "graph_files/processed_graphM2.graphml"
+graph_file_path = "graph_files/total_graph.graphml"
 # graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 # drone_list_file_path = 'graph_files/drones.txt'
-drone_list_file_path = 'graph_files/test_flight_intention.csv'
+# drone_list_file_path = 'graph_files/test_flight_intention.csv'
+drone_list_file_path = 'graph_files/100_intention.csv'
+
 protection_area = 30
 # vertical_protection_area = 7.62 # 25 ft
 nb_FL = 10
 FL_sep = 7.62
 max_delta_fl = nb_FL-1
 delay_max = 60
+temps_sep_vertiport = 5
 
 
 def main():
@@ -66,7 +70,7 @@ def main():
 
     ####
     # Generate
-    nb_flights_to_process = 100
+    nb_flights_to_process = 10000
     print("Generating trajectories")
 
     # Have the trajectory pass by multiple points close to the shortest one
@@ -173,7 +177,7 @@ def main():
     # Check for shared nodes between trajectories
     print("Check for shared nodes on horizontal route")
     # For each trajectory, list of shared nodes
-    drone_shared_nodes_tab = [[[] for i in range(size)] for j in range(size)]
+    # drone_shared_nodes_tab = [[[] for i in range(size)] for j in range(size)]
     horizontal_shared_nodes_list = []
     for i in range(size):
         for j in range(i+1, size):
@@ -203,7 +207,7 @@ def main():
                     v1 = get_drone_speed_after_node(drone1, graph, graph_dual, node)
                     v2 = get_drone_speed_after_node(drone2, graph, graph_dual, node)
 
-                    drone_shared_nodes_tab[i][j].append((t1, t2, protection_area/v1, protection_area/v2))
+                    # drone_shared_nodes_tab[i][j].append((t1, t2, protection_area/v1, protection_area/v2))
                     horizontal_shared_nodes_list.append((traj1, traj2, t1, t2, protection_area/v1, protection_area/v2))
 
                     # TODO pour les conflit sur edge je modifie ou j'ajoute nouvelle contrainte ? Il faut choisir le max ou ajouter ?
@@ -248,10 +252,10 @@ def main():
                                 delta_2 = (t1 - d1_t_prev_node) + (d2_t_next_node - t2)
                                 horizontal_shared_nodes_list.append((traj1, traj2, t1, t2, protection_area / v1, delta_2))
 
-    # Symmetry
-    for i in range(size):
-        for j in range(i):
-            drone_shared_nodes_tab[i][j] = drone_shared_nodes_tab[j][i]
+    # # Symmetry
+    # for i in range(size):
+    #     for j in range(i):
+    #         drone_shared_nodes_tab[i][j] = drone_shared_nodes_tab[j][i]
 
     ####
     # Horizontal/Vertical shared nodes
@@ -320,7 +324,7 @@ def main():
                 for k1 in drone_trajectories_dict[drone1.flight_number]:
                     for k2 in drone_trajectories_dict[drone2.flight_number]:
                         #todo speed exacte en f de distance du next node si virage
-                        climb_climb_list.append((k1,k2,drone1.dep_time, drone2.dep_time, model.protection_area/drone1.cruise_speed, model.protection_area/drone2.cruise_speed))
+                        climb_climb_list.append((k1+1,k2+1,drone1.dep_time, drone2.dep_time, temps_sep_vertiport, temps_sep_vertiport))
             # if drone1.dep == drone2.arr:
             #     # Si drone descendant arrive avant on attend qu'il se soit eloigne de dist secu verti, sinon horizontale
             #     for k1 in drone_trajectories_dict[drone1.flight_number]:
@@ -337,23 +341,10 @@ def main():
                     for k2 in drone_trajectories_dict[drone2.flight_number]:
                         drone2_arr_time = max(drone_trajectories_dict[drone2.flight_number][k2][2].path_dict.keys())
                         drone1_arr_time = max(drone_trajectories_dict[drone1.flight_number][k1][2].path_dict.keys())
-                        descent_descent_list.append((k1, k2, drone1_arr_time, drone2_arr_time, model.vertical_protection/drone1.vertical_speed, model.vertical_protection/drone2.vertical_speed))
-    # print("Shared vertiports\n", shared_vertiports)
-            # # print(dep_edge, arr_edge)
-            # x = [graph.nodes[node]["x"] for node in graph.nodes]
-            # y = [graph.nodes[node]["y"] for node in graph.nodes]
-            # # for node in graph.nodes:
-            # plt.scatter(x, y, color='grey')
-            # plt.plot(drone1.arrival_vertiport[0], drone1.arrival_vertiport[1], marker='o',
-            #          color='purple')
-            # plt.plot(drone1.departure_vertiport[0], drone1.departure_vertiport[1], marker='o',
-            #          color='purple')
-            # node1 = dep_edge[0]
-            # node2 = dep_edge[1]
-            # plt.plot([raw_graph.nodes[node1]["x"], raw_graph.nodes[node2]["x"]],[raw_graph.nodes[node1]["y"], raw_graph.nodes[node2]["y"]])
-            # plt.show()
+                        descent_descent_list.append((k1+1, k2+1, drone1_arr_time, drone2_arr_time, temps_sep_vertiport, temps_sep_vertiport))
 
     ####
+    print("Removing impossible conflicts")
     # Remove impossible conflict nodes
     # A conflict can't occur if abs(t1 - t2) > delay max + delta FL max + sep 12 ou 21
     to_be_removed = []
@@ -382,9 +373,9 @@ def main():
 
     print("Write PLNE outputs")
     with open("./PLNE OUTPUT/output.dat", 'w') as file:
-        file.write("param nbflights := " + str(len(drone_trajectories_dict)))
+        file.write("param nbflights := " + str(len(drone_trajectories_dict)) + ";\n")
         file.write("\nparam nbFL := " + str(nb_FL) + ";\n")
-        file.write("param delay_max := " + str(delay_max) + ";\n")
+        file.write("param maxDelay := " + str(delay_max) + ";\n")
         file.write("param nbTrajs := " + str(sum([len(drone_trajectories_dict[d]) for d in drone_trajectories_dict])) + ";\n")
         file.write("param nbPtHor := " + str(len(horizontal_shared_nodes_list)) + ";\n")
         file.write("param nbPtClmb := " + str(len(climb_horiz_list)) + ";\n")
@@ -399,7 +390,7 @@ def main():
                 idx = get_drone_index_in_model_list(drone, model)
                 file.write("\n" + str(traj_id + 1) + " " + str(int(drone_trajectories_dict[drone][traj_id][1])) + " " + str(idx+1))
         file.write(";\n\n")
-        file.write("param: k1 k2 tPrev1 tPrev2 sep12 sep21 :=")
+        file.write("param: k1 k2 t1 t2 sep12 sep21 :=")
         for index, traj in enumerate(horizontal_shared_nodes_list):
             file.write("\n")
             file.write(str(index+1))
@@ -694,5 +685,5 @@ def init_model(graph, graph_dual, drone_list_path, protection_area_size, current
     model.set_graph_dual(graph_dual)
     return model
 
-
-main()
+if __name__ == "__main__":
+    main()
