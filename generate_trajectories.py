@@ -23,7 +23,6 @@ dual_graph_path = "graph_files/dual_total_graph_200m.graphml"
 # drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/test_flight_intention.csv'
 drone_list_file_path = 'graph_files/Intentions/100_flight_intention.csv'
-
 protection_area = 30
 # vertical_protection_area = 7.62 # 25 ft
 nb_FL = 10
@@ -613,30 +612,6 @@ def generate_multiple_point_trajectories(drone, graph, list_of_points_to_explore
 
 
 def generate_points_from_shortest_path(model, drone, graph, steps, depth):
-    # Create 2 nodes combinaisons from the shortest_path nodes' succesors
-    trajectories = []
-    # 1 A* to find the shortest path
-    drone_dep_dual = ("S" + drone.dep, drone.dep)
-    drone_arr_dual = (drone.arr, drone.arr + "T")
-    shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path
-    index_list = [(i+1)*(len(shortest_path)//(steps+1)) for i in range(steps)]
-    nodes_list=[]
-    for index in index_list:
-        current_node_list = []
-        temp_node_list = []
-        initial_node = shortest_path[index]
-        temp_node_list.append(initial_node)
-        current_node_list.append(initial_node)
-        for i in range(depth):
-            for node in current_node_list:
-                temp_node_list = temp_node_list + list(graph.neighbors(node))
-            current_node_list = current_node_list + temp_node_list
-            current_node_list = list(set(current_node_list))
-        nodes_list.append(current_node_list)
-    return nodes_list
-
-
-def generate_points_from_shortest_path2(model, drone, graph, steps, depth):
     # Create 2 nodes combinaisons from the shortest_path nodes' succesors
     trajectories = []
     # 1 A* to find the shortest path

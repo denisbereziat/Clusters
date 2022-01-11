@@ -38,26 +38,6 @@ x = x_start
 added_2R_last = False
 start_with_r = False
 
-# while current_line_y > south_east_x_y[1] :
-#     current_line = []
-#     if start_with_r:
-#         x = hex_radius/2
-#         start_with_r = False
-#     else:
-#         x = 0
-#         start_with_r = True
-#     while x < south_east_x_y[0]:
-#         pt = (x, current_line_y)
-#         current_line.append(pt)
-#         if added_2R_last:
-#             x += hex_radius
-#             added_2R_last = False
-#         else:
-#             x += 2 * hex_radius
-#             added_2R_last = True
-#     hex_map.append(current_line)
-#     current_line_y = current_line_y - (3**0.5)*hex_radius/2
-
 while current_line_y > south_east_x_y[0]:
     current_line = []
     if start_with_r:
