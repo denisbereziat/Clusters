@@ -4,12 +4,9 @@ from generate_trajectories import init_graphs, init_model, return_drone_from_fli
 from main import generate_scenarios
 import BlueskySCNTools
 
-graph_file_path = "graph_files/total_graph.graphml"
-# graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
-# drone_list_file_path = 'graph_files/drones.txt'
-drone_list_file_path = 'graph_files/100_intention.csv'
-# output_file = "PLNE OUTPUT/10 drones 5 traj/FN_traj.dat"
-# output_scenario = "PLNE OUTPUT/10 drones 5 traj/scenario.scn"
+graph_file_path = "graph_files/total_graph_200m.graphml"
+dual_graph_path = "graph_files/dual_total_graph_200m.graphml"
+drone_list_file_path = 'graph_files/Intentions/100_flight_intention.csv'
 output_file = "PLNE OUTPUT/FN_traj.dat"
 output_scenario = "PLNE OUTPUT/scenario.scn"
 protection_area = 30
@@ -22,7 +19,6 @@ delay_max = 60
 delay_step = 10
 
 
-
 display_best_traj = True
 if display_best_traj:
     selected_traj = []
@@ -33,33 +29,28 @@ if display_best_traj:
         last_drone = lines[0].split()[0]
         selected_traj.append(int(lines[0].split()[1]))
         for line in lines:
-            if len(line.split())>2:
+            if len(line.split()) > 2:
                 continue
             current_drone = line.split()[0]
             if current_drone != last_drone:
                 selected_traj.append(int(line.split()[1]))
-                last_drone=current_drone
-                # print(current_drone, selected_traj[-1])
+                last_drone = current_drone
     delay = [0]*100
     fl = [1]*100
-else :
+else:
     # selected_traj = [1, 10, 11, 16, 21, 30, 35, 40, 41, 46]
     # selected_traj = [1 6 11 16 21 26 31 36 41 46]
     selected_traj = [1 + i*10 for i in range(100)]
     delay = [0]*100
     fl = [1]*100
 alts = dict()
-# print(selected_traj)
-# Check for conflicts
-print("Initialising")
-graph, graph_dual = init_graphs(graph_file_path)
-model = init_model(graph, graph_dual, drone_list_file_path, protection_area)
 
+print("Initialising")
+graph, graph_dual = init_graphs(graph_file_path, dual_path=dual_graph_path)
+model = init_model(graph, graph_dual, drone_list_file_path, protection_area)
 with open(output_file, 'r') as file:
     lines = file.readlines()
-    # print(len(selected_traj))
     for i in range(len(selected_traj)):
-        # print(selected_traj[i])
         # find the corresponding drone
         current_drone_FN = None
         path_list = None
@@ -74,10 +65,6 @@ with open(output_file, 'r') as file:
                 break
             # print(current_drone_FN)
         for index, drone in enumerate(model.droneList):
-            # print(current_drone_FN, selected_traj[i])
-            # if drone.flight_number == "3110":
-            #     print("YOUHOU")
-
             if drone.flight_number == current_drone_FN:
                 path_list = path_list.split()
                 # set it's dep time with delay
@@ -86,19 +73,12 @@ with open(output_file, 'r') as file:
                 path_object = Path.Path(drone.dep_time, [])
                 path_object.set_path(path_list, graph, graph_dual, drone)
                 drone.path_object = path_object
-                # if drone.flight_number == "3110":
-                #     print("Yahe")
-                #     print(path_list)
-                #     print(drone.path_object)
-                # print(drone.path_object)
                 alts[drone.flight_number] = []
                 for _k in range(len(path_list)):
                     alts[drone.flight_number].append(FL_step * fl[index])
                 alts[drone.flight_number][0] = FL_step
                 alts[drone.flight_number][-1] = FL_step
                 break
-
-
 
     print("Generating Bluesky SCN")
     scenario_dict = generate_scenarios(model, alts=alts)
@@ -113,12 +93,3 @@ with open(output_file, 'r') as file:
         f.write("\n")
         f.write(content)
 
-        # set it's path
-
-# for traj in chosen_traj:
-#     drone = return_drone_from_flight_number()
-#     pt = Path.Path(drone.dep_time, [])
-#     pt.set_path(traj)
-
-
-# Generate SCN

@@ -40,5 +40,7 @@ class Node:
         except ValueError:
             # print(math.acos(math.cos(90-y1)*math.cos(90-y2) +
             #                  math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)) * earth_radius)
-            return math.acos(math.cos(90-y1)*math.cos(90-y2) +
-                             math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)) * earth_radius
+            val = math.cos(90-y1)*math.cos(90-y2) + math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2)
+            if val > 1:
+                val = 1
+            return math.acos(val) * earth_radius

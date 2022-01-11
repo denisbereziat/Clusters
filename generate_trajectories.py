@@ -1,5 +1,8 @@
 """Generate trajectories to be used in the optim model"""
 import warnings
+
+import networkx as nx
+
 import dual_graph
 import networkx
 import Model as md
@@ -10,10 +13,12 @@ import Astar2 as a2
 import Path
 import numpy as np
 import osmnx
+import os
 import time
 
 # graph_file_path = "graph_files/processed_graphM2.graphml"
 graph_file_path = "graph_files/total_graph_200m.graphml"
+dual_graph_path = "graph_files/dual_total_graph_200m.graphml"
 # graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 # drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/test_flight_intention.csv'
@@ -33,10 +38,19 @@ def main():
     # Init
     t_start = time.time()
     print("Initialising graph")
-    graph, graph_dual = init_graphs(graph_file_path)
-    raw_graph = osmnx.load_graphml(graph_file_path)
 
-    # print(len(list(graph.edges)))
+    load_dual = True
+    if not load_dual:
+        graph, graph_dual = init_graphs(graph_file_path)
+        # print("Type of node :", type(list(graph_dual.nodes)[0]), list(graph_dual.nodes)[0])
+        # print("Type of edge :", type(list(graph_dual.edges)[0]), list(graph_dual.edges)[0])
+        networkx.write_graphml(graph_dual, dual_graph_path)
+    else:
+        graph, graph_dual = init_graphs(graph_file_path, dual_path=dual_graph_path)
+        # print("Type of node :", type(list(graph_dual.nodes)[0]), list(graph_dual.nodes)[0])
+        # print("Type of edge :", type(list(graph_dual.edges)[0]), list(graph_dual.edges)[0])
+
+    raw_graph = osmnx.load_graphml(graph_file_path)
     print("Done in ", time.time() - t_start)
     # # Test to check osmnx.get_nearest_edge
     # with warnings.catch_warnings():
@@ -69,15 +83,13 @@ def main():
 
     ####
     # Generate
-    nb_flights_to_process = 10000
+    nb_flights_to_process = 100000
     print("Generating trajectories")
 
     # Have the trajectory pass by multiple points close to the shortest one
-    # TODO POUR LES TRAJ TRES COURTES (2 POINTS ON A UN PB)
     multiple_point_bool = True
     if multiple_point_bool:
         for drone in model.droneList[:nb_flights_to_process]:
-            # print(drone.flight_number)
             # print("Generating")
             points_to_explore_from_shortest = generate_points_from_shortest_path(model, drone, graph, 2, 3)  # 2 3
             # print("Trajectories")
@@ -111,17 +123,15 @@ def main():
     for drone_flight_number in drone_trajectories_dict:
         new_dict[drone_flight_number] = dict()
         for i in range(min(number_of_traj_to_keep, len(drone_trajectories_dict[drone_flight_number])-1)):
-            # print("idx", i)
-            # print(drone_trajectories_dict[drone_flight_number])
             new_dict[drone_flight_number][id_trajectory] = [drone_trajectories_dict[drone_flight_number][i]]
             id_trajectory += 1
     drone_trajectories_dict = new_dict
-    trajectories_to_fn_dict = dict()
     print("Trajectories generated in :", time.time() - t_start)
 
     ####
     # Metrics (length, compatibility)
     # For each trajectory determine its total travel time and add the path_object
+    trajectories_to_fn_dict = dict()
     for drone_flight_number in drone_trajectories_dict:
         for id_trajectory in drone_trajectories_dict[drone_flight_number]:
             current_drone = None
@@ -168,6 +178,7 @@ def main():
             plt.plot(current_drone.arrival_vertiport[0], current_drone.arrival_vertiport[1], marker='o', color='purple')
             plt.plot(current_drone.departure_vertiport[0], current_drone.departure_vertiport[1], marker='o', color='pink')
             plt.show()
+
     size = 0
     for drone_flight_number in drone_trajectories_dict:
         size += len(drone_trajectories_dict[drone_flight_number])
@@ -177,7 +188,6 @@ def main():
     # Check for shared nodes between trajectories
     print("Check for shared nodes on horizontal route")
     # For each trajectory, list of shared nodes
-    # drone_shared_nodes_tab = [[[] for i in range(size)] for j in range(size)]
     horizontal_shared_nodes_list = []
     for i in range(size):
         for j in range(i+1, size):
@@ -252,11 +262,6 @@ def main():
                                 delta_2 = (t1 - d1_t_prev_node) + (d2_t_next_node - t2)
                                 horizontal_shared_nodes_list.append((traj1, traj2, t1, t2, protection_area / v1, delta_2))
 
-    # # Symmetry
-    # for i in range(size):
-    #     for j in range(i):
-    #         drone_shared_nodes_tab[i][j] = drone_shared_nodes_tab[j][i]
-
     ####
     # Get all drones vertiports (arrival and departure)
     print("Searching for departure and arrival edges for each drone")
@@ -275,14 +280,6 @@ def main():
         drone1.path_object = drone_trajectories_dict[flight_number1][i][2]
         dep_edge = dep_edge_dict[drone1.flight_number]
         arr_edge = arrival_edge_dict[drone1.flight_number]
-        # with warnings.catch_warnings():
-        #     warnings.simplefilter("ignore")
-        #     dep_edge = osmnx.get_nearest_edge(raw_graph, (drone1.departure_vertiport[1], drone1.departure_vertiport[0]))[0:2]
-        #     dep_edge = (str(dep_edge[0]), str(dep_edge[1]))
-        #     arr_edge = osmnx.get_nearest_edge(raw_graph, (drone1.arrival_vertiport[1], drone1.arrival_vertiport[0]))[0:2]
-        #     arr_edge = (str(arr_edge[0]), str(arr_edge[1]))
-        # print(dep_edge, arr_edge)
-        # print(drone1.path_object.edge_path)
         for j in range(size):
             flight_number2 = trajectories_to_fn_dict[j]
             if flight_number1 == flight_number2:
@@ -365,17 +362,6 @@ def main():
     to_be_removed.reverse()
     for index in to_be_removed:
         horizontal_shared_nodes_list.pop(index)
-
-    # to_be_removed = []
-    # for index, pt in enumerate(vertically_shared_edges_list):
-    #     max_delta = max_delta_fl * FL_sep / model.droneList[0].vertical_speed + delay_max
-    #     interval1 = [pt[2] - max_delta, pt[2] + max_delta]
-    #     interval2 = [pt[3] - max_delta, pt[3] + max_delta]
-    #     if not (interval1[0] <= pt[3] <= interval1[1] or interval2[0] <= pt[2] <= interval2[1]):
-    #         to_be_removed.append(index)
-    # to_be_removed.reverse()
-    # for index in to_be_removed:
-    #     vertically_shared_edges_list.pop(index)
 
     #TODO remove et faire verti/hori et verti/verti
 
@@ -712,7 +698,7 @@ def check_traj_is_possible(graph, traj):
     return True
 
 
-def init_graphs(graph_path):
+def init_graphs(graph_path, dual_path = None):
     raw_graph = networkx.read_graphml(graph_path)
     graph = networkx.Graph()
     # Creating a new graph without what's not needed
@@ -724,7 +710,37 @@ def init_graphs(graph_path):
         graph.add_edge(edge[0], edge[1])
         graph.edges[edge[0], edge[1]]["length"] = raw_graph.edges[edge]["length"]
         graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
-    graph_dual = dual_graph.create_dual(graph, turn_cost_function)
+
+    if dual_path is None:
+        graph_dual = dual_graph.create_dual(graph, turn_cost_function)
+
+    else:
+        _graph_dual = networkx.read_graphml(dual_path)
+        graph_dual = nx.DiGraph()
+        for node in _graph_dual.nodes:
+            new_node = node.split(",")
+            new_node = (new_node[0].strip(" '("), new_node[1].strip(" ')"))
+            # print(new_node)
+            graph_dual.add_node(new_node)
+            graph_dual.nodes[new_node]["x"] = _graph_dual.nodes[node]["x"]
+            graph_dual.nodes[new_node]["y"] = _graph_dual.nodes[node]["y"]
+            # print((new_node[0][3:-1], new_node[1][1:-3]))
+            # print(new_node[0].strip(" '("), new_node[1].strip(" ')"))
+        for edge in _graph_dual.edges:
+            # print(edge)
+            edge1 = tuple([node.strip("(),' ") for node in edge[0].split(",")])
+            edge2 = tuple([node.strip("(),' ") for node in edge[1].split(",")])
+            # print(edge1, edge2)
+            new_edge = (edge1, edge2)
+            # print(new_edge)
+            graph_dual.add_edge(edge1, edge2)
+            graph_dual.edges[new_edge]["is_turn"] = _graph_dual.edges[edge]["is_turn"]
+            graph_dual.edges[new_edge]["length"] = _graph_dual.edges[edge]["length"]
+            graph_dual.edges[new_edge]["total_turn_cost"] = _graph_dual.edges[edge]["total_turn_cost"]
+            graph_dual.edges[new_edge]["post_turn_cost"] = _graph_dual.edges[edge]["post_turn_cost"]
+            graph_dual.edges[new_edge]["pre_turn_cost"] = _graph_dual.edges[edge]["pre_turn_cost"]
+            graph_dual.edges[new_edge]["angle"] = _graph_dual.edges[edge]["angle"]
+
     return graph, graph_dual
 
 

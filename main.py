@@ -374,6 +374,9 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
     turn_bool = [False for _i in range(len(lats))]
     for i in range(1, len(turn_bool)-1):
         turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
+    for i in range(1, len(turn_bool) - 1):
+        if len(drone.path_object.path[i-1]) == 6 and len(drone.path_object.path[i]) == 6 and len(drone.path_object.path[i+1]) == 6:
+            turn_bool[i] = False
     return lats, lon, turn_bool
 
 
@@ -479,9 +482,10 @@ def turn_bool_function(node1, node2, node3, turn_enabled=None):
     x1, y1 = float(node1[0]), float(node1[1])
     x2, y2 = float(node2[0]), float(node2[1])
     x3, y3 = float(node3[0]), float(node3[1])
-    v1 = (x2 - x1, y2 - y1)
-    v2 = (x3 - x2, y3 - y2)
-    angle = tools.angle_btw_vectors(v1, v2)
+    # v1 = (x2 - x1, y2 - y1)
+    # v2 = (x3 - x2, y3 - y2)
+    # angle = tools.angle_btw_vectors(v1, v2)
+    angle = tools.angle_btw_vectors((x1, y1),(x2, y2),(x3, y3))
     if angle > minimum_angle_to_apply_added_weight and turn_enabled:
         return True
     else:
