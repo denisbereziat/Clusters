@@ -1,5 +1,7 @@
 import math
+import pyproj
 from shapely.geometry import LineString
+
 
 def intersection(interval1, interval2):
     if interval2[0] > interval1[1] or interval1[0] > interval2[1]:
@@ -8,16 +10,28 @@ def intersection(interval1, interval2):
         return [max([interval1[0], interval2[0]]), min(interval1[1], interval2[1])]
 
 
-def angle_btw_vectors(v1, v2):
-    magnitude1 = dot(v1, v1) ** 0.5
-    magnitude2 = dot(v2, v2) ** 0.5
-    cos_v1v2 = dot(v1, v2) / (magnitude1 * magnitude2)
-    try:
-        angle = math.acos(cos_v1v2)
-    except ValueError:
-        angle = math.pi
-    angle = abs(math.degrees(angle))
+def angle_btw_vectors(pt1, pt2, pt3):
+    geodesic = pyproj.Geod(ellps='WGS84')
+    fwd_azimuth1, back_azimuth1, _distance = geodesic.inv(pt1[1], pt1[0], pt2[1], pt2[0])
+    fwd_azimuth2, back_azimuth2, _distance = geodesic.inv(pt2[1], pt2[0], pt3[1], pt3[0])
+    angle = fwd_azimuth2 - fwd_azimuth1
+    # angle = bearing(pt1, pt2) - bearing(pt2, pt3)
+    # angle = angle*360/(2*math.pi)
+    angle = abs(angle)
+    if angle > 180:
+        angle = 360 - 180
     return angle
+
+# def angle_btw_vectors(v1, v2):
+#     magnitude1 = dot(v1, v1) ** 0.5
+#     magnitude2 = dot(v2, v2) ** 0.5
+#     cos_v1v2 = dot(v1, v2) / (magnitude1 * magnitude2)
+#     try:
+#         angle = math.acos(cos_v1v2)
+#     except ValueError:
+#         angle = math.pi
+#     angle = abs(math.degrees(angle))
+#     return angle
 
 
 def dot(v1, v2):

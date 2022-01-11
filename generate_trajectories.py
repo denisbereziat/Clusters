@@ -13,7 +13,7 @@ import osmnx
 import time
 
 # graph_file_path = "graph_files/processed_graphM2.graphml"
-graph_file_path = "graph_files/total_graph.graphml"
+graph_file_path = "graph_files/total_graph_200m.graphml"
 # graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 # drone_list_file_path = 'graph_files/drones.txt'
 # drone_list_file_path = 'graph_files/test_flight_intention.csv'
@@ -650,6 +650,30 @@ def generate_points_from_shortest_path(model, drone, graph, steps, depth):
     return nodes_list
 
 
+def generate_points_from_shortest_path2(model, drone, graph, steps, depth):
+    # Create 2 nodes combinaisons from the shortest_path nodes' succesors
+    trajectories = []
+    # 1 A* to find the shortest path
+    drone_dep_dual = ("S" + drone.dep, drone.dep)
+    drone_arr_dual = (drone.arr, drone.arr + "T")
+    shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path
+    index_list = [(i+1)*(len(shortest_path)//(steps+1)) for i in range(steps)]
+    nodes_list=[]
+    for index in index_list:
+        current_node_list = []
+        temp_node_list = []
+        initial_node = shortest_path[index]
+        temp_node_list.append(initial_node)
+        current_node_list.append(initial_node)
+        for i in range(depth):
+            for node in current_node_list:
+                temp_node_list = temp_node_list + list(graph.neighbors(node))
+            current_node_list = current_node_list + temp_node_list
+            current_node_list = list(set(current_node_list))
+        nodes_list.append(current_node_list)
+    return nodes_list
+
+
 def generate_points_to_pass_by_for_one_point(graph, steps):
     # Quadriller l'espace
     # Find max x,y et min x,y
@@ -712,6 +736,7 @@ def init_model(graph, graph_dual, drone_list_path, protection_area_size, current
     model.add_drones_from_file(drone_list_path, current_sim_time)
     model.set_graph_dual(graph_dual)
     return model
+
 
 if __name__ == "__main__":
     main()

@@ -456,9 +456,10 @@ def turn_cost_function(node1, node2, node3, turn_enabled=None):
     x1, y1 = float(node1["x"]), float(node1["y"])
     x2, y2 = float(node2["x"]), float(node2["y"])
     x3, y3 = float(node3["x"]), float(node3["y"])
-    v1 = (x2 - x1, y2 - y1)
-    v2 = (x3 - x2, y3 - y2)
-    angle = tools.angle_btw_vectors(v1, v2)
+    # v1 = (x2 - x1, y2 - y1)
+    # v2 = (x3 - x2, y3 - y2)
+    # angle = tools.angle_btw_vectors(v1, v2)
+    angle = tools.angle_btw_vectors((x1, y1),(x2, y2),(x3, y3))
     if angle > minimum_angle_to_apply_added_weight and turn_enabled:
         pre_turn_cost = (turn_weight * angle/180)/2
         post_turn_cost = (turn_weight * angle/180)/2

@@ -5,8 +5,11 @@ from tools import m_displacement_to_lat_lon
 from generate_trajectories import init_graphs
 from math import cos, radians, pi
 
+hex_map = []
+# Radius of each hexagon
+hex_radius = 500  # in m
 graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
-graph_save_path = "graph_files/total_graph.graphml"
+graph_save_path = "graph_files/total_graph_"+str(hex_radius) +"m.graphml"
 # Create the hexagonal grid and fix it to the constrained airspace
 
 raw_graph = nx.read_graphml(graph_file_path)
@@ -22,9 +25,6 @@ for edge in raw_graph.edges:
     graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
     # print(graph.edges[edge[0], edge[1]]["geometry"])
 
-# Radius of each hexagon
-hex_map = []
-hex_radius = 400  # in m
 # (lon, lat)
 north_west_x_y = (48.29509614394607, 16.23585715322775)
 south_east_x_y = (48.1202024787435, 16.516030216585275)
@@ -61,7 +61,7 @@ start_with_r = False
 while current_line_y > south_east_x_y[0]:
     current_line = []
     if start_with_r:
-        new_pt = m_displacement_to_lat_lon((x_start, current_line_y), 0, hex_radius/2)
+        new_pt = m_displacement_to_lat_lon((x_start, current_line_y), 0, hex_radius / 2)
         x = new_pt[0]
         start_with_r = False
         added_2R_last = True
@@ -83,13 +83,18 @@ while current_line_y > south_east_x_y[0]:
             x = new_pt[0]
             added_2R_last = True
     hex_map.append(current_line)
-    new_pt = m_displacement_to_lat_lon(pt, -(3 ** 0.5) * hex_radius / 2, 0)
+    new_pt = m_displacement_to_lat_lon(pt, -((3 ** 0.5) * hex_radius) / 2, 0)
     current_line_y = new_pt[1]
+
+# for i in range(3):
+#     print(hex_map[i])
 
 unconstrained_graph = nx.Graph()
 
+
 def get_index(line_index, node_index):
-    return '{:0>3}'.format(str(line_index))+'{:0>3}'.format(str(node_index))
+    return '{:0>3}'.format(str(line_index)) + '{:0>3}'.format(str(node_index))
+
 
 line_index, node_index = 0, 0
 for line in hex_map:
@@ -101,29 +106,29 @@ for line in hex_map:
         unconstrained_graph.nodes[_idx]["y"] = node[1]
         node_index += 1
     line_index += 1
-        # print(unconstrained_graph.nodes[node])
+    # print(unconstrained_graph.nodes[node])
 print(len(unconstrained_graph.nodes))
 line_index, node_index = 0, 0
-while line_index < len(hex_map)-1:
+while line_index < len(hex_map) - 1:
     node_index = 0
-    while node_index < len(hex_map[line_index])-1:
+    while node_index < len(hex_map[line_index]) - 1:
         if line_index == 0:
             if node_index % 2 == 0:
-                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index+1, node_index))
+                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index + 1, node_index))
             if node_index % 2 == 1:
                 unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index + 1, node_index))
                 unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index, node_index + 1))
         elif line_index % 2 == 0:
             if node_index % 2 == 0:
                 unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index + 1, node_index))
-                unconstrained_graph.add_edge(get_index(line_index,node_index), get_index(line_index - 1, node_index))
+                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index - 1, node_index))
             if node_index % 2 == 1:
-                unconstrained_graph.add_edge(get_index(line_index,node_index), get_index(line_index + 1,node_index))
-                unconstrained_graph.add_edge(get_index(line_index,node_index), get_index(line_index - 1,node_index))
-                unconstrained_graph.add_edge(get_index(line_index,node_index), get_index(line_index,node_index + 1))
+                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index + 1, node_index))
+                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index - 1, node_index))
+                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index, node_index + 1))
         elif line_index % 2 == 1:
             if node_index % 2 == 0:
-                unconstrained_graph.add_edge(get_index(line_index,node_index), get_index(line_index,node_index + 1))
+                unconstrained_graph.add_edge(get_index(line_index, node_index), get_index(line_index, node_index + 1))
         node_index += 1
     line_index += 1
 
@@ -158,15 +163,17 @@ nodes_to_be_removed = []
 idx = 0
 for node in unconstrained_graph.nodes:
     # print(tools.distance(node[0], node[1], centre[1], centre[0]))
-    if tools.distance(unconstrained_graph.nodes[node]["x"], unconstrained_graph.nodes[node]["y"], centre[1], centre[0]) > 8000:
+    if tools.distance(unconstrained_graph.nodes[node]["x"], unconstrained_graph.nodes[node]["y"], centre[1],
+                      centre[0]) > 8000:
         nodes_to_be_removed.append(node)
 for node in nodes_to_be_removed:
     unconstrained_graph.remove_node(node)
 
 for edge in unconstrained_graph.edges:
     unconstrained_graph.edges[edge]["length"] = str(hex_radius)
-    unconstrained_graph.edges[edge]["geometry"] = ("LINESTRING (" + str(unconstrained_graph.nodes[edge[0]]["x"]) + " " + str(unconstrained_graph.nodes[edge[0]]["y"]) + ", "+ str(unconstrained_graph.nodes[edge[1]]["x"]) + " "+ str(unconstrained_graph.nodes[edge[1]]["y"])) + ")"
-
+    unconstrained_graph.edges[edge]["geometry"] = ("LINESTRING (" + str(
+        unconstrained_graph.nodes[edge[0]]["x"]) + " " + str(unconstrained_graph.nodes[edge[0]]["y"]) + ", " + str(
+        unconstrained_graph.nodes[edge[1]]["x"]) + " " + str(unconstrained_graph.nodes[edge[1]]["y"])) + ")"
 
 nodes_to_be_removed = []
 nodes_to_be_reconnected = set()
@@ -174,7 +181,8 @@ dist_mini = 500
 for node1 in unconstrained_graph.nodes:
     for node2 in graph.nodes:
         # print(tools.distance(node1[0], node1[1], graph.nodes[node2]["x"], graph.nodes[node2]["y"]))
-        if tools.distance(unconstrained_graph.nodes[node1]["x"], unconstrained_graph.nodes[node1]["y"], graph.nodes[node2]["x"], graph.nodes[node2]["y"]) < dist_mini:
+        if tools.distance(unconstrained_graph.nodes[node1]["x"], unconstrained_graph.nodes[node1]["y"],
+                          graph.nodes[node2]["x"], graph.nodes[node2]["y"]) < dist_mini:
             nodes_to_be_removed.append(node1)
             for nd in unconstrained_graph.neighbors(node1):
                 nodes_to_be_reconnected.add(nd)
@@ -196,14 +204,23 @@ for node_to_connect in nodes_to_be_reconnected:
     closest_node = None
     min_dist = 1000000000000
     for node in graph.nodes:
-        d = tools.distance(total_graph.nodes[node_to_connect]["x"], total_graph.nodes[node_to_connect]["y"], graph.nodes[node]["x"], graph.nodes[node]["y"])
+        d = tools.distance(total_graph.nodes[node_to_connect]["x"], total_graph.nodes[node_to_connect]["y"],
+                           graph.nodes[node]["x"], graph.nodes[node]["y"])
         if d < min_dist:
             min_dist = d
             closest_node = node
     if closest_node is not None and closest_node not in already_connected_nodes:
         total_graph.add_edge(node_to_connect, closest_node)
-        total_graph.edges[(node_to_connect, closest_node)]["length"] = str(tools.distance(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"],total_graph.nodes[(node_to_connect, closest_node)[0]]["y"],total_graph.nodes[(node_to_connect, closest_node)[1]]["x"],total_graph.nodes[(node_to_connect, closest_node)[1]]["y"]))
-        total_graph.edges[(node_to_connect, closest_node)]["geometry"] = ("LINESTRING ("+ str(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"])+ " " + str(total_graph.nodes[(node_to_connect, closest_node)[0]]["y"])+ ", " + str(total_graph.nodes[(node_to_connect, closest_node)[1]]["x"])+ " " + str(total_graph.nodes[(node_to_connect, closest_node)[1]]["y"])) +")"
+        total_graph.edges[(node_to_connect, closest_node)]["length"] = str(
+            tools.distance(total_graph.nodes[(node_to_connect, closest_node)[0]]["x"],
+                           total_graph.nodes[(node_to_connect, closest_node)[0]]["y"],
+                           total_graph.nodes[(node_to_connect, closest_node)[1]]["x"],
+                           total_graph.nodes[(node_to_connect, closest_node)[1]]["y"]))
+        total_graph.edges[(node_to_connect, closest_node)]["geometry"] = ("LINESTRING (" + str(
+            total_graph.nodes[(node_to_connect, closest_node)[0]]["x"]) + " " + str(
+            total_graph.nodes[(node_to_connect, closest_node)[0]]["y"]) + ", " + str(
+            total_graph.nodes[(node_to_connect, closest_node)[1]]["x"]) + " " + str(
+            total_graph.nodes[(node_to_connect, closest_node)[1]]["y"])) + ")"
         # print(total_graph.edges[(node_to_connect, closest_node)]["geometry"])
         # print(total_graph.edges[(node_to_connect, closest_node)]["geometry"])
         # print( total_graph.edges[(node_to_connect, closest_node)]["length"])
@@ -263,7 +280,8 @@ plt.scatter(all_points_y, all_points_x, marker="*")
 
 for edge in total_graph.edges:
     if edge not in graph.edges:
-        plt.plot([total_graph.nodes[edge[0]]["x"], total_graph.nodes[edge[1]]["x"]], [total_graph.nodes[edge[0]]["y"], total_graph.nodes[edge[1]]["y"]])
+        plt.plot([total_graph.nodes[edge[0]]["x"], total_graph.nodes[edge[1]]["x"]],
+                 [total_graph.nodes[edge[0]]["y"], total_graph.nodes[edge[1]]["y"]])
 plt.show()
 
 final_graph = nx.Graph()
@@ -297,4 +315,3 @@ nx.write_graphml(final_graph, graph_save_path)
 #         else:
 #             f.write(line)
 #             # f.write("\n")
-
