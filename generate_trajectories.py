@@ -32,6 +32,225 @@ delay_max = 60
 temps_sep_vertiport = 5
 
 
+def generate_trajectories(model, graph, raw_graph, graph_dual, current_param, current_time):
+    """Generate trajectories for all drone in the model ane return the list of trajectories with conflicts
+    points and time intervals"""
+
+    nb_alternative_traj = 5
+    generated_trajectories = dict()
+    # generate alternate trajectories for all drones.
+    print("Trajectories")
+    for drone in model.droneList:
+        # Generate points to explore
+        points_to_explore_from_shortest = generate_points_from_shortest_path(model, drone, graph, 2, 3)
+        # Generate additional trajectories
+        generated_trajectories[drone.flight_number] = generate_multiple_point_trajectories(drone, graph,
+                                                                                            points_to_explore_from_shortest,
+                                                                                            model)
+    # Compute total time for each trajectory and only keep the n best
+    drone_trajectories_dict = dict()
+    total_time_trajectories = dict()
+    trajectories_to_fn = dict()
+    trajectories_to_duration = dict()
+    traj_id = 0
+    print("Time and path_object")
+    for drone_fn in generated_trajectories:
+        for trajectory in generated_trajectories[drone_fn]:
+            # Compute total time
+            drone = return_drone_from_flight_number(model, drone_fn)
+            path = Path.Path(drone.dep_time, [])
+            path.set_path(trajectory, graph, graph_dual,
+                          drone)
+            total_time = max(list(path.path_dict.keys()))
+            total_time_trajectories[total_time] = path
+        sorted_time = list(total_time_trajectories.keys())
+        sorted_time.sort()
+        for i in range(min(len(sorted_time), nb_alternative_traj)):
+            if drone_fn in drone_trajectories_dict:
+                drone_trajectories_dict[drone_fn][traj_id] = [total_time_trajectories[sorted_time[i]], sorted_time[i]]
+            else:
+                drone_trajectories_dict[drone_fn] = dict()
+                drone_trajectories_dict[drone_fn][traj_id] = [total_time_trajectories[sorted_time[i]], sorted_time[i]]
+            trajectories_to_fn[traj_id] = drone_fn
+            trajectories_to_duration[traj_id] = sorted_time[i]
+            traj_id += 1
+    fn_order = [drone.flight_number for drone in model.droneList]
+    return drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, fn_order
+
+
+def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, model, graph, graph_dual, raw_graph):
+    horizontal_shared_nodes_list = []
+    climb_horiz_list = []
+    descent_horiz_list = []
+    climb_climb_list = []
+    descent_descent_list = []
+    size = 0
+    for drone_fn in drone_trajectories_dict:
+        for traj in drone_trajectories_dict[drone_fn]:
+            size += 1
+    ####
+    # Check for shared nodes between trajectories
+    print("Check for shared nodes on horizontal route")
+    # For each trajectory, list of shared nodes
+    for i in range(size):
+        for j in range(i + 1, size):
+            flight_number1 = trajectories_to_fn_dict[i]
+            flight_number2 = trajectories_to_fn_dict[j]
+            if flight_number1 == flight_number2:
+                continue
+            drone1 = return_drone_from_flight_number(model, flight_number1)
+            drone2 = return_drone_from_flight_number(model, flight_number2)
+            drone1.path_object = drone_trajectories_dict[flight_number1][i][0]
+            drone2.path_object = drone_trajectories_dict[flight_number2][j][0]
+            # traj1 = i + 1
+            # traj2 = j + 1
+            traj1 = i
+            traj2 = j
+            # Nodes that both trajectories use
+            for node in drone1.path_object.path:
+                if node in drone2.path_object.path:
+                    t1 = None
+                    for t in drone1.path_object.path_dict:
+                        if drone1.path_object.path_dict[t] == node:
+                            t1 = t
+                            break
+                    t2 = None
+                    for t in drone2.path_object.path_dict:
+                        if drone2.path_object.path_dict[t] == node:
+                            t2 = t
+                            break
+                    v1 = get_drone_speed_after_node(drone1, graph, graph_dual, node)
+                    v2 = get_drone_speed_after_node(drone2, graph, graph_dual, node)
+
+                    # drone_shared_nodes_tab[i][j].append((t1, t2, protection_area/v1, protection_area/v2))
+                    horizontal_shared_nodes_list.append(
+                        (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2))
+
+                    # TODO pour les conflit sur edge je modifie ou j'ajoute nouvelle contrainte ? Il faut choisir le max ou ajouter ?
+                    t_stamps_d1 = sorted(list(drone1.path_object.path_dict.keys()))
+                    t_stamps_d2 = sorted(list(drone2.path_object.path_dict.keys()))
+                    # Same way
+                    if t1 != t_stamps_d1[-1] and t2 != t_stamps_d2[-1]:
+                        d1_t_next_node = t_stamps_d1[t_stamps_d1.index(t1) + 1]
+                        d2_t_next_node = t_stamps_d2[t_stamps_d2.index(t2) + 1]
+                        d1_next_node = drone1.path_object.path_dict[d1_t_next_node]
+                        d2_next_node = drone2.path_object.path_dict[d2_t_next_node]
+                        # same way
+                        if d1_next_node == d2_next_node:
+                            if t1 < t2:
+                                # If drone1 goes first we need to make sure the delta2 is enough for drone2 not to catch up
+                                # (t1-d1_t_next_node)-(t2-d2_t_next_node) > 0 if 2 is faster
+                                delta_2 = max(protection_area / v1, (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
+                                horizontal_shared_nodes_list.append(
+                                    (traj1, traj2, t1, t2, protection_area / v1, delta_2))
+                            if t2 < t1:
+                                # If drone2 goes first we need to make sure the delta1 is enough for drone2 not to catch up
+                                delta_1 = max(protection_area / v2, (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
+                                horizontal_shared_nodes_list.append(
+                                    (traj1, traj2, t1, t2, delta_1, protection_area / v2))
+                    # Opposite ways
+                    # If D1 goes first
+                    if t1 != t_stamps_d1[-1] and t2 != t_stamps_d2[0]:
+                        if t1 < t2:
+                            d1_t_next_node = t_stamps_d1[t_stamps_d1.index(t1) + 1]
+                            d2_t_prev_node = t_stamps_d2[t_stamps_d2.index(t2) - 1]
+                            d1_next_node = drone1.path_object.path_dict[d1_t_next_node]
+                            d2_prev_node = drone2.path_object.path_dict[d2_t_prev_node]
+                            if d1_next_node == d2_prev_node:
+                                delta_1 = (t2 - d2_t_prev_node) + (d1_t_next_node - t1)
+                                horizontal_shared_nodes_list.append(
+                                    (traj1, traj2, t1, t2, delta_1, protection_area / v2))
+                    # if D2 goes first
+                    if t2 != t_stamps_d2[-1] and t1 != t_stamps_d1[0]:
+                        if t2 < t1:
+                            d2_t_next_node = t_stamps_d2[t_stamps_d2.index(t2) + 1]
+                            d1_t_prev_node = t_stamps_d1[t_stamps_d1.index(t1) - 1]
+                            d2_next_node = drone2.path_object.path_dict[d2_t_next_node]
+                            d1_prev_node = drone1.path_object.path_dict[d1_t_prev_node]
+                            if d2_next_node == d1_prev_node:
+                                delta_2 = (t1 - d1_t_prev_node) + (d2_t_next_node - t2)
+                                horizontal_shared_nodes_list.append(
+                                    (traj1, traj2, t1, t2, protection_area / v1, delta_2))
+    ####
+    # Get all drones vertiports (arrival and departure)
+    print("Searching for departure and arrival edges for each drone")
+    dep_edge_dict, arrival_edge_dict = get_all_dep_and_arr_edges(model, raw_graph)
+
+    ####
+    # Horizontal/Vertical shared nodes
+    # TODO est ce qu'on veut les deux i,j j,i ou que un des deux suffit
+    print("Check for vertically shared nodes with horizontal route")
+    for i in range(size):
+        # print("D" + str(1 + (i // number_of_traj_to_keep)))
+        flight_number1 = trajectories_to_fn_dict[i]
+        drone1 = return_drone_from_flight_number(model, flight_number1)
+        drone1.path_object = drone_trajectories_dict[flight_number1][i][0]
+        dep_edge = dep_edge_dict[drone1.flight_number]
+        arr_edge = arrival_edge_dict[drone1.flight_number]
+        for j in range(size):
+            flight_number2 = trajectories_to_fn_dict[j]
+            if flight_number1 == flight_number2:
+                continue
+            drone2 = return_drone_from_flight_number(model, flight_number2)
+            drone2.path_object = drone_trajectories_dict[flight_number2][j][0]
+            # Find the edges the drone start and end on
+            # Check if either is part of the other drone path
+            # print(dep_edge)
+            # TODO Faire les delta t
+            for n in range(1, len(drone2.path_object.path)):
+                if dep_edge == (drone2.path_object.path[n - 1], drone2.path_object.path[n]) or (
+                dep_edge[1], dep_edge[0]) == (drone2.path_object.path[n - 1], drone2.path_object.path[n]):
+                    # k1, k2, t1, t2, delta1, delta2
+                    # k1, k2 = i + 1, j + 1
+                    k1, k2 = i, j
+                    t1 = drone1.dep_time
+                    drone2_t_stamps = sorted(list(drone2.path_object.path_dict.keys()))
+                    # Use the expected time at half edge
+                    t2 = (drone2_t_stamps[n - 1] + drone2_t_stamps[n]) / 2
+                    delta1 = model.vertical_protection / drone1.vertical_speed
+                    delta2 = model.protection_area / get_drone_speed_after_node(drone2, graph, graph_dual,
+                                                                                drone2.path_object.path[n - 1])
+                    climb_horiz_list.append((k1, k2, t1, t2, delta1, delta2))
+                if arr_edge == (drone2.path_object.path[n - 1], drone2.path_object.path[n]) or (
+                arr_edge[1], arr_edge[0]) == (drone2.path_object.path[n - 1], drone2.path_object.path[n]):
+                    # k1, k2, t1, t2, delta1, delta2
+                    k1, k2 = i, j
+                    drone1_t_stamps = sorted(list(drone1.path_object.path_dict.keys()))
+                    t1 = drone1_t_stamps[-1]
+                    drone2_t_stamps = sorted(list(drone2.path_object.path_dict.keys()))
+                    # Use the expected time at half edge
+                    t2 = (drone2_t_stamps[n - 1] + drone2_t_stamps[n]) / 2
+                    delta1 = model.vertical_protection / drone1.vertical_speed
+                    delta2 = model.protection_area / get_drone_speed_after_node(drone2, graph, graph_dual,
+                                                                                drone2.path_object.path[n - 1])
+                    descent_horiz_list.append((k1, k2, t1, t2, delta1, delta2))
+    # print("Verti/Horiz shared nodes\n", vertically_shared_edges_list)
+    ####
+    # Verti/verti nodes
+    print("Check for verti/verti shared nodes")
+    # TODO remove duplicates
+    for i in range(len(model.droneList)):
+        drone1 = model.droneList[i]
+        for j in range(i + 1, len(model.droneList)):
+            drone2 = model.droneList[j]
+            if drone1.flight_number == drone2.flight_number:
+                continue
+            if drone1.dep == drone2.dep:
+                for k1 in drone_trajectories_dict[drone1.flight_number]:
+                    for k2 in drone_trajectories_dict[drone2.flight_number]:
+                        # todo speed exacte en f de distance du next node si virage
+                        climb_climb_list.append((k1, k2, drone1.dep_time, drone2.dep_time,
+                                                 temps_sep_vertiport, temps_sep_vertiport))
+            if drone1.arr == drone2.arr:
+                for k1 in drone_trajectories_dict[drone1.flight_number]:
+                    for k2 in drone_trajectories_dict[drone2.flight_number]:
+                        drone2_arr_time = max(drone_trajectories_dict[drone2.flight_number][k2][0].path_dict.keys())
+                        drone1_arr_time = max(drone_trajectories_dict[drone1.flight_number][k1][0].path_dict.keys())
+                        descent_descent_list.append((k1, k2, drone1_arr_time, drone2_arr_time,
+                                                     temps_sep_vertiport, temps_sep_vertiport))
+    return horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list
+
+
 def main():
     ####
     # Init
@@ -40,45 +259,25 @@ def main():
 
     load_dual = True
     if not load_dual:
-        graph, graph_dual = init_graphs(graph_file_path)
+        graph, graph_dual = md.init_graphs(graph_file_path)
         # print("Type of node :", type(list(graph_dual.nodes)[0]), list(graph_dual.nodes)[0])
         # print("Type of edge :", type(list(graph_dual.edges)[0]), list(graph_dual.edges)[0])
         networkx.write_graphml(graph_dual, dual_graph_path)
     else:
-        graph, graph_dual = init_graphs(graph_file_path, dual_path=dual_graph_path)
+        graph, graph_dual = md.init_graphs(graph_file_path, dual_path=dual_graph_path)
         # print("Type of node :", type(list(graph_dual.nodes)[0]), list(graph_dual.nodes)[0])
         # print("Type of edge :", type(list(graph_dual.edges)[0]), list(graph_dual.edges)[0])
 
     raw_graph = osmnx.load_graphml(graph_file_path)
     print("Done in ", time.time() - t_start)
-    # # Test to check osmnx.get_nearest_edge
-    # with warnings.catch_warnings():
-    #     warnings.simplefilter("ignore")
-    #     for edge in graph.edges:
-    #         pt = abs(graph.nodes[edge[0]]["y"] + graph.nodes[edge[1]]["y"])/2, abs(graph.nodes[edge[0]]["x"] + graph.nodes[edge[1]]["x"])/2
-    #         if not edge[0] == osmnx.distance.nearest_edges(raw_graph, pt[0], pt[1])[0] and edge[1] == osmnx.distance.nearest_edges(raw_graph, pt[0], pt[1])[1]:
-    #             print(edge, (osmnx.distance.nearest_edges(raw_graph, pt[0], pt[1])[0], osmnx.distance.nearest_edges(raw_graph, pt[0], pt[1])[1]))
 
     t_start = time.time()
     print("Initialize model")
-    model = init_model(graph, graph_dual, drone_list_file_path, protection_area)
+    model = md.init_model(graph, graph_dual, drone_list_file_path, protection_area)
     print("Model initialized in ", time.time() - t_start)
     print("Total number of drones :", len(model.droneList))
     drone_trajectories_dict = dict()
     t_start = time.time()
-    # for drone in model.droneList:
-    #     print(drone.dep_time)
-    # while True:
-    #     for edge in graph.edges:
-    #         pt = abs(graph.nodes[edge[0]]["y"] + graph.nodes[edge[1]]["y"])/2, abs(graph.nodes[edge[0]]["x"] + graph.nodes[edge[1]]["x"])/2
-    #         x = [graph.nodes[node]["x"] for node in graph.nodes]
-    #         y = [graph.nodes[node]["y"] for node in graph.nodes]
-    #         # for node in graph.nodes:
-    #         plt.scatter(x, y, color='grey')
-    #         plt.scatter(pt[1], pt[0], color='red')
-    #         print((pt[1], pt[0]))
-    #         plt.show()
-
 
     ####
     # Generate
@@ -469,10 +668,10 @@ def main():
 def get_all_dep_and_arr_edges(model, raw_graph):
     dep_edge_dict = dict()
     arrival_edge_dict = dict()
-    count=0
+    count = 0
     for drone in model.droneList:
         print(count)
-        count+=1
+        count += 1
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             dep_edge = osmnx.get_nearest_edge(raw_graph, (drone.departure_vertiport[1], drone.departure_vertiport[0]))[0:2]
@@ -673,60 +872,6 @@ def check_traj_is_possible(graph, traj):
     return True
 
 
-def init_graphs(graph_path, dual_path = None):
-    raw_graph = networkx.read_graphml(graph_path)
-    graph = networkx.Graph()
-    # Creating a new graph without what's not needed
-    for node in raw_graph.nodes:
-        graph.add_node(node)
-        graph.nodes[node]["x"] = float(raw_graph.nodes[node]["x"])
-        graph.nodes[node]["y"] = float(raw_graph.nodes[node]["y"])
-    for edge in raw_graph.edges:
-        graph.add_edge(edge[0], edge[1])
-        graph.edges[edge[0], edge[1]]["length"] = raw_graph.edges[edge]["length"]
-        graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
-
-    if dual_path is None:
-        graph_dual = dual_graph.create_dual(graph, turn_cost_function)
-
-    else:
-        _graph_dual = networkx.read_graphml(dual_path)
-        graph_dual = nx.DiGraph()
-        for node in _graph_dual.nodes:
-            new_node = node.split(",")
-            new_node = (new_node[0].strip(" '("), new_node[1].strip(" ')"))
-            # print(new_node)
-            graph_dual.add_node(new_node)
-            graph_dual.nodes[new_node]["x"] = _graph_dual.nodes[node]["x"]
-            graph_dual.nodes[new_node]["y"] = _graph_dual.nodes[node]["y"]
-            # print((new_node[0][3:-1], new_node[1][1:-3]))
-            # print(new_node[0].strip(" '("), new_node[1].strip(" ')"))
-        for edge in _graph_dual.edges:
-            # print(edge)
-            edge1 = tuple([node.strip("(),' ") for node in edge[0].split(",")])
-            edge2 = tuple([node.strip("(),' ") for node in edge[1].split(",")])
-            # print(edge1, edge2)
-            new_edge = (edge1, edge2)
-            # print(new_edge)
-            graph_dual.add_edge(edge1, edge2)
-            graph_dual.edges[new_edge]["is_turn"] = _graph_dual.edges[edge]["is_turn"]
-            graph_dual.edges[new_edge]["length"] = _graph_dual.edges[edge]["length"]
-            graph_dual.edges[new_edge]["total_turn_cost"] = _graph_dual.edges[edge]["total_turn_cost"]
-            graph_dual.edges[new_edge]["post_turn_cost"] = _graph_dual.edges[edge]["post_turn_cost"]
-            graph_dual.edges[new_edge]["pre_turn_cost"] = _graph_dual.edges[edge]["pre_turn_cost"]
-            graph_dual.edges[new_edge]["angle"] = _graph_dual.edges[edge]["angle"]
-
-    return graph, graph_dual
-
-
-def init_model(graph, graph_dual, drone_list_path, protection_area_size, current_sim_time=None):
-    """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
-    into account the current_time so the drones announced after this time aren't loaded."""
-    model = md.Model(graph, protection_area_size)
-    model.droneList = []
-    model.add_drones_from_file(drone_list_path, current_sim_time)
-    model.set_graph_dual(graph_dual)
-    return model
 
 
 if __name__ == "__main__":

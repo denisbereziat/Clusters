@@ -1,6 +1,7 @@
 import Model
 import Path
-from generate_trajectories import init_graphs, init_model, return_drone_from_flight_number
+from generate_trajectories import return_drone_from_flight_number
+from Model import init_graphs, init_model
 from main import generate_scenarios
 import BlueskySCNTools
 

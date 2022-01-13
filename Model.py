@@ -3,6 +3,8 @@ import math
 import tools
 import networkx as nx
 import csv
+import dual_graph
+from main import turn_cost_function
 
 
 class Model:
@@ -338,4 +340,60 @@ def get_closest_node(x, y, graph):
     
     return closest_node
 
+
+def init_model(graph, graph_dual, drone_list_path, protection_area_size, current_sim_time=None):
+    """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
+    into account the current_time so the drones announced after this time aren't loaded."""
+    model = Model(graph, protection_area_size)
+    model.droneList = []
+    model.add_drones_from_file(drone_list_path, current_sim_time)
+    model.set_graph_dual(graph_dual)
+    return model
+
+
+
+def init_graphs(graph_path, dual_path = None):
+    raw_graph = nx.read_graphml(graph_path)
+    graph = nx.Graph()
+    # Creating a new graph without what's not needed
+    for node in raw_graph.nodes:
+        graph.add_node(node)
+        graph.nodes[node]["x"] = float(raw_graph.nodes[node]["x"])
+        graph.nodes[node]["y"] = float(raw_graph.nodes[node]["y"])
+    for edge in raw_graph.edges:
+        graph.add_edge(edge[0], edge[1])
+        graph.edges[edge[0], edge[1]]["length"] = raw_graph.edges[edge]["length"]
+        graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
+
+    if dual_path is None:
+        graph_dual = dual_graph.create_dual(graph, turn_cost_function)
+
+    else:
+        _graph_dual = nx.read_graphml(dual_path)
+        graph_dual = nx.DiGraph()
+        for node in _graph_dual.nodes:
+            new_node = node.split(",")
+            new_node = (new_node[0].strip(" '("), new_node[1].strip(" ')"))
+            # print(new_node)
+            graph_dual.add_node(new_node)
+            graph_dual.nodes[new_node]["x"] = _graph_dual.nodes[node]["x"]
+            graph_dual.nodes[new_node]["y"] = _graph_dual.nodes[node]["y"]
+            # print((new_node[0][3:-1], new_node[1][1:-3]))
+            # print(new_node[0].strip(" '("), new_node[1].strip(" ')"))
+        for edge in _graph_dual.edges:
+            # print(edge)
+            edge1 = tuple([node.strip("(),' ") for node in edge[0].split(",")])
+            edge2 = tuple([node.strip("(),' ") for node in edge[1].split(",")])
+            # print(edge1, edge2)
+            new_edge = (edge1, edge2)
+            # print(new_edge)
+            graph_dual.add_edge(edge1, edge2)
+            graph_dual.edges[new_edge]["is_turn"] = _graph_dual.edges[edge]["is_turn"]
+            graph_dual.edges[new_edge]["length"] = _graph_dual.edges[edge]["length"]
+            graph_dual.edges[new_edge]["total_turn_cost"] = _graph_dual.edges[edge]["total_turn_cost"]
+            graph_dual.edges[new_edge]["post_turn_cost"] = _graph_dual.edges[edge]["post_turn_cost"]
+            graph_dual.edges[new_edge]["pre_turn_cost"] = _graph_dual.edges[edge]["pre_turn_cost"]
+            graph_dual.edges[new_edge]["angle"] = _graph_dual.edges[edge]["angle"]
+
+    return graph, graph_dual
 
