@@ -109,7 +109,101 @@ class BlueskySCNTools():
         lines.append(start_time_txt + lnav)
 
         return lines
-    
+    #
+    # def Drone2Scn(self, drone_id, start_time, lats, lons, turnbool, alts=None):
+    #     """Converts arrays to Bluesky scenario files. The first
+    #     and last waypoints will be taken as the origin and
+    #     destination of the drone.
+    #
+    #     Parameters
+    #     ----------
+    #     drone_id : str
+    #         The ID of the drone to be created
+    #
+    #     start_time : int [sec]
+    #         The simulation time in seconds at which the drone starts its
+    #         journey.
+    #
+    #     turn_speed : float [kts]
+    #         The speed with which to turn at turn waypoints in knots.
+    #
+    #     lats : float array/list [deg]
+    #         The lattitudes of the waypoints.
+    #
+    #     lons : float array/list [deg]
+    #         The longitudes of the waypoints.
+    #
+    #     turnbool : bool array/list
+    #         True if waypoint is a turn waypoint, else false.
+    #
+    #     alts : float array/list, optional [ft]
+    #         Defines the required altitude at waypoints.
+    #
+    #     """
+    #
+    #     # Define the lines list to be returned
+    #     lines = []
+    #
+    #     # Change these values to control how an aircraft turns and cruises
+    #     turn_speed = 10  # [kts]
+    #     cruise_speed = 30  # [kts]
+    #     speed_dist = 30  # [m]
+    #     turn_dist = 15  # [m]
+    #
+    #     speeds, turnbool = self.TurnSpeedBuffer(lats, lons, turnbool, alts,
+    #                                             turn_speed, cruise_speed, speed_dist, turn_dist)
+    #
+    #     # First, define some strings we will often be using
+    #     trn = f'ADDWPT {drone_id} FLYTURN\n'
+    #     trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speed}\n'
+    #     fvr = f'ADDWPT {drone_id} FLYBY\n'
+    #     lnav = f'LNAV {drone_id} ON\n'
+    #     vnav = f'VNAV {drone_id} ON\n'
+    #     # Convert start_time to Bluesky format
+    #     start_time_txt = self.TimeToStr(start_time) + '>'
+    #
+    #     # Everyone starts at 25ft above ground
+    #     # First, we need to create the drone, Matrice 600 going 30 kts for now.
+    #     # Let's calculate its required heading.
+    #     qdr = self.qdrdist(lats[0], lons[0], lats[1], lons[1], 'qdr')
+    #     #        cre_text = f'CRE {drone_id} M600 {lats[0]} {lons[0]} {qdr} 25 {turn_speed}\n'
+    #     cre_text = f'CRE {drone_id} M600 {lats[0]} {lons[0]} {qdr} 25 {cruise_speed}\n'
+    #     lines.append(start_time_txt + cre_text)
+    #
+    #     # Then we need to for loop through all the lats
+    #     prev_wpt_turn = False
+    #     for i in range(1, len(lats)):
+    #         if turnbool[i] == 1 or turnbool[i] == True:
+    #             # We have a turn waypoint
+    #             if prev_wpt_turn == False:
+    #                 # The previous waypoint was not a turn one, we need to enter
+    #                 # turn waypoint mode.
+    #                 lines.append(start_time_txt + trn)
+    #                 lines.append(start_time_txt + trn_spd)
+    #         else:
+    #             # Not a turn waypoint
+    #             if prev_wpt_turn == True:
+    #                 # We had a turn waypoint initially, change to flyover mode
+    #                 lines.append(start_time_txt + fvr)
+    #
+    #         # Add the waypoint
+    #         if any(alts):
+    #             wpt_txt = f'ADDWPT {drone_id} {lats[i]} {lons[i]} {alts[i]} {speeds[i]}\n'
+    #         else:
+    #             wpt_txt = f'ADDWPT {drone_id} {lats[i]} {lons[i]} ,, {speeds[i]}\n'
+    #         lines.append(start_time_txt + wpt_txt)
+    #
+    #         # Set prev waypoint type value
+    #         prev_wpt_turn = turnbool[i]
+    #
+    #     # Delete aircraft at destination waypoint
+    #     lines.append(start_time_txt + f'{drone_id} ATDIST {lats[-1]} {lons[-1]} {5 / nm} DEL {drone_id}\n')
+    #     # Enable vnav and lnav
+    #     lines.append(start_time_txt + vnav)
+    #     lines.append(start_time_txt + lnav)
+    #
+    #     return lines
+
     def Dict2Scn(self, filepath, dictionary):
         """Creates a scenario file from dictionary given that dictionary
         has the correct format.
@@ -151,7 +245,7 @@ class BlueskySCNTools():
                 except:
                     print('Key error. Make sure the dictionary is formatted correctly.')
                     return
-                
+
                 lines = self.Drone2Scn(drone_id, start_time, lats, lons, turnbool, alts)
                 f.write(''.join(lines))
                 

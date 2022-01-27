@@ -4,8 +4,9 @@ import tools
 import networkx as nx
 import csv
 import dual_graph
-from main import turn_cost_function
+import matplotlib.pyplot as plt
 
+turn_angle = 25
 
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph, safety parameters
@@ -24,6 +25,8 @@ class Model:
         self.turning_edges = dict()
         # Count Astar iterations for testing
         self.countAstar = 0
+        self.hash_map = None
+        self.generation_params = None
 
     def add_drone(self, drone):
         self.droneList.append(drone)
@@ -74,23 +77,38 @@ class Model:
     def add_drones_from_csv_file(self, filename, time):
         """Extract the information of drones from the given file and add them to the model"""
         print("Loading from CSV file")
+        if time is None:
+            time = math.inf
         with open(filename, newline='') as csv_file:
             reader = csv.reader(csv_file, delimiter=',', quotechar='|')
             for line in reader:
+                deposit_time = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
+                # print(time, deposit_time)
+                if deposit_time > time:
+                    continue
                 dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
                 arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
-                dep = get_closest_node(float(dep_vertiport_coordinates[0]), float(dep_vertiport_coordinates[1]), self.graph)
-                arr = get_closest_node(float(arr_vertiport_coordinates[0]), float(arr_vertiport_coordinates[1]), self.graph)
-                # print(dep_vertiport_coordinates)
-                # print(self.graph.nodes[dep])
+                hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
+                x_dep, y_dep = float(dep_vertiport_coordinates[0]), float(dep_vertiport_coordinates[1])
+                list_of_possible_closest = tools.find_list_of_closest_with_hash(x_dep, y_dep, hash_nodes, min_x, min_y, x_step, y_step, resolution)
+                dep = tools.find_closest_node_in_list(x_dep, y_dep, list_of_possible_closest, self.graph)
+                x_arr, y_arr = float(arr_vertiport_coordinates[0]), float(arr_vertiport_coordinates[1])
+                list_of_possible_closest = tools.find_list_of_closest_with_hash(x_arr, y_arr, hash_nodes, min_x, min_y, x_step, y_step, resolution)
+                arr = tools.find_closest_node_in_list(x_arr, y_arr, list_of_possible_closest, self.graph)
                 dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
                 drone_type = line[2][-1]
                 flight_number = line[1]
-                # print(line)
                 drone = dr.Drone(flight_number, dep, arr, dep_time, drone_type)
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
-                self.add_drone(drone)
+
+                # Check that the drone isn't already in the list
+                drone_in_list = False
+                for _d in self.droneList:
+                    if _d.flight_number == drone.flight_number:
+                        drone_in_list = True
+                if not drone_in_list:
+                    self.add_drone(drone)
 
     def find_conflicts(self):
         """Detect conflicts on the graph"""
@@ -141,6 +159,91 @@ class Model:
     def open_all_nodes(self):
         for edge in self.graph.edges:
             self.graph.edges[edge]['open'] = True
+
+
+def generate_scenarios(model, alts=None):
+    scenario_dict = dict()
+
+    def get_dep_time(d):
+        return d.dep_time
+    sorted_drone_list = sorted(model.droneList, key=get_dep_time)
+    for drone in sorted_drone_list:
+        if drone.path_object is None:
+            print("SKIPPED A DRONE : ", drone.flight_number)
+            continue
+        drone_id = drone.flight_number
+        scenario_dict[drone.flight_number] = dict()
+        lats, lons, turns = extract_lat_lon_turn_bool_from_path(drone, model)
+        # scenario_dict[drone_id]['start_time'] = min(drone.path_object.path_dict.keys())
+        scenario_dict[drone_id]['start_time'] = drone.dep_time
+        # Add lats
+        scenario_dict[drone_id]['lats'] = lats
+        # Add lons
+        scenario_dict[drone_id]['lons'] = lons
+        # Add turnbool
+        scenario_dict[drone_id]['turnbool'] = turns
+        if alts is None:
+            scenario_dict[drone_id]['alts'] = [25] * len(lats)
+        else:
+            scenario_dict[drone_id]['alts'] = alts[drone_id]
+    return scenario_dict
+
+
+def extract_lat_lon_turn_bool_from_path(drone, model):
+    lats = []
+    lon = []
+    graph = model.graph
+    # print(drone.flight_number)
+    # print(drone.path_object)
+    for node in drone.path_object.path:
+        node_x = graph.nodes[node]['x']
+        node_y = graph.nodes[node]['y']
+        lats.append(node_y)
+        lon.append(node_x)
+    turn_bool = [False for _i in range(len(lats))]
+    for i in range(1, len(turn_bool)-1):
+        turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
+    for i in range(1, len(turn_bool) - 1):
+        if len(drone.path_object.path[i-1]) == 6 and len(drone.path_object.path[i]) == 6 and len(drone.path_object.path[i+1]) == 6:
+            turn_bool[i] = False
+    return lats, lon, turn_bool
+
+
+def turn_bool_function(node1, node2, node3, turn_enabled=None):
+    # if turn_enabled is None:
+    #      turn_enabled = turn_bool_enabled
+    minimum_angle_to_apply_added_weight = 25
+    x1, y1 = float(node1[0]), float(node1[1])
+    x2, y2 = float(node2[0]), float(node2[1])
+    x3, y3 = float(node3[0]), float(node3[1])
+    # v1 = (x2 - x1, y2 - y1)
+    # v2 = (x3 - x2, y3 - y2)
+    # angle = tools.angle_btw_vectors(v1, v2)
+    angle = tools.angle_btw_vectors((x1, y1),(x2, y2),(x3, y3))
+    if angle > minimum_angle_to_apply_added_weight:
+        return True
+    else:
+        return False
+
+
+def turn_cost_function(node1, node2, node3):
+    """The function used to determine the cost to add to the edge in the dual graph to take into account the effect
+    of turns on the drone speed and flight_time, it returns the 2 parts of the added cost of the turn (deceleration
+    and acceleration) and the total added cost in time"""
+    # TODO as of now we consider only one speed profile, we can either make a graph per drone, or
+    #  just return the turn angle and do calculations each time
+    x1, y1 = float(node1["x"]), float(node1["y"])
+    x2, y2 = float(node2["x"]), float(node2["y"])
+    x3, y3 = float(node3["x"]), float(node3["y"])
+    # v1 = (x2 - x1, y2 - y1)
+    # v2 = (x3 - x2, y3 - y2)
+    # angle = tools.angle_btw_vectors(v1, v2)
+    angle = tools.angle_btw_vectors((x1, y1), (x2, y2), (x3, y3))
+    if angle > turn_angle:
+        return 0, 0, 0, True
+
+    else:
+        return 0, 0, 0, False
 
 
 def find_conflict_on_edges(drone1, drone2):
@@ -341,15 +444,15 @@ def get_closest_node(x, y, graph):
     return closest_node
 
 
-def init_model(graph, graph_dual, drone_list_path, protection_area_size, current_sim_time=None):
+def init_model(graph, graph_dual, drone_list_path, protection_area_size, graph_hash, current_sim_time=None):
     """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
     into account the current_time so the drones announced after this time aren't loaded."""
     model = Model(graph, protection_area_size)
+    model.hash_map = graph_hash
     model.droneList = []
     model.add_drones_from_file(drone_list_path, current_sim_time)
     model.set_graph_dual(graph_dual)
     return model
-
 
 
 def init_graphs(graph_path, dual_path = None):

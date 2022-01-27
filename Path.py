@@ -48,7 +48,7 @@ class Path:
                          (new_path[node_index], new_path[node_index+1]))
             # Determine travel cost to the node (remove the post turn cost)
             try:
-                cost = graph_dual.edges[edge_dual]["length"] - graph_dual.edges[edge_dual]["post_turn_cost"]
+                cost = graph_dual.edges[edge_dual]["length"]
             except:
                 print(new_path)
                 raise Exception
@@ -70,12 +70,12 @@ class Path:
                 elif current_edge is not None and next_edge is not None:
                     if graph_dual.edges[current_edge, next_edge]["is_turn"]:
                         drone_speed = drone.turn_speed
-                        if graph.edges[next_edge]["length"] < 30:
+                        if graph.edges[current_edge]["length"] < drone.braking_distance:
                             t += cost / drone_speed
                         else:
-                            t += (graph.edges[next_edge]["length"] - 30) / drone.cruise_speed
+                            t += (graph.edges[current_edge]["length"] - drone.braking_distance) / drone.cruise_speed
                             # Adding the added time with constant deceleration
-                            t += 30 / ((drone.cruise_speed - drone_speed) / 2)
+                            t += drone.braking_distance / ((drone.cruise_speed + drone_speed) / 2)
                     else:
                         t += cost / drone.cruise_speed
                 else:
@@ -84,12 +84,12 @@ class Path:
             elif current_edge is not None and next_edge is not None:
                 if graph_dual.edges[current_edge, next_edge]["is_turn"]:
                     drone_speed = drone.turn_speed
-                    if graph.edges[next_edge]["length"] < 30:
+                    if graph.edges[current_edge]["length"] < drone.braking_distance:
                         t += cost / drone_speed
                     else:
-                        t += (graph.edges[next_edge]["length"] - 30) / drone.cruise_speed
+                        t += (graph.edges[current_edge]["length"] - drone.braking_distance) / drone.cruise_speed
                         # Adding the added time with constant deceleration
-                        t += 30 / ((drone.cruise_speed - drone_speed) / 2)
+                        t += drone.braking_distance / ((drone.cruise_speed + drone_speed) / 2)
                 else:
                     t += cost / drone.cruise_speed
             # Else if there is no turning before or after
@@ -98,7 +98,7 @@ class Path:
 
             self.path_dict[t] = new_path[node_index]
             # Add back the post turn cost
-            t += graph_dual.edges[edge_dual]["post_turn_cost"]/drone_speed
+            # t += graph_dual.edges[edge_dual]["post_turn_cost"]/drone_speed
             self.speed_time_stamps.append([t, drone_speed])
         # Last node :
         try:

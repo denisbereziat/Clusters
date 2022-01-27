@@ -2,12 +2,12 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import tools
 from tools import m_displacement_to_lat_lon
-from generate_trajectories import init_graphs
+from Model import init_graphs
 from math import cos, radians, pi
 
 hex_map = []
 # Radius of each hexagon
-hex_radius = 500  # in m
+hex_radius = 200  # in m
 graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 graph_save_path = "graph_files/total_graph_"+str(hex_radius) +"m.graphml"
 # Create the hexagonal grid and fix it to the constrained airspace

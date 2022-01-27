@@ -316,32 +316,7 @@ def save_drones(model, final_model, sim_time_index, deposit_times_list, next_sim
                             drone.path_object.path.append(drone.path_object.path_dict[node_time])
 
 
-def generate_scenarios(model, alts=None):
-    scenario_dict = dict()
 
-    def get_dep_time(d):
-        return d.dep_time
-    sorted_drone_list = sorted(model.droneList, key=get_dep_time)
-    for drone in sorted_drone_list:
-        if drone.path_object is None:
-            print("SKIPPED A DRONE : ", drone.flight_number)
-            continue
-        drone_id = drone.flight_number
-        scenario_dict[drone.flight_number] = dict()
-        lats, lons, turns = extract_lat_lon_turn_bool_from_path(drone, model)
-        # scenario_dict[drone_id]['start_time'] = min(drone.path_object.path_dict.keys())
-        scenario_dict[drone_id]['start_time'] = drone.dep_time
-        # Add lats
-        scenario_dict[drone_id]['lats'] = lats
-        # Add lons
-        scenario_dict[drone_id]['lons'] = lons
-        # Add turnbool
-        scenario_dict[drone_id]['turnbool'] = turns
-        if alts is None:
-            scenario_dict[drone_id]['alts'] = [25] * len(lats)
-        else:
-            scenario_dict[drone_id]['alts'] = alts[drone_id]
-    return scenario_dict
 
 
 def draw_solution(model):
@@ -358,26 +333,6 @@ def draw_solution_drone(drone, graph, path):
     gr.draw_solution(graph, drone, show_id=False, show_discretized=False, show_time=True, show=False)
     plt.savefig(path, dpi=400)
     plt.close()
-
-
-def extract_lat_lon_turn_bool_from_path(drone, model):
-    lats = []
-    lon = []
-    graph = model.graph
-    # print(drone.flight_number)
-    # print(drone.path_object)
-    for node in drone.path_object.path:
-        node_x = graph.nodes[node]['x']
-        node_y = graph.nodes[node]['y']
-        lats.append(node_y)
-        lon.append(node_x)
-    turn_bool = [False for _i in range(len(lats))]
-    for i in range(1, len(turn_bool)-1):
-        turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
-    for i in range(1, len(turn_bool) - 1):
-        if len(drone.path_object.path[i-1]) == 6 and len(drone.path_object.path[i]) == 6 and len(drone.path_object.path[i+1]) == 6:
-            turn_bool[i] = False
-    return lats, lon, turn_bool
 
 
 def init_model(graph, graph_dual, drone_list_path, protection_area_size, current_sim_time):
@@ -474,22 +429,6 @@ def turn_cost_function(node1, node2, node3, turn_enabled=None):
 
     else:
         return 0, 0, 0, False
-
-
-def turn_bool_function(node1, node2, node3, turn_enabled=None):
-    if turn_enabled is None:
-         turn_enabled = turn_bool_enabled
-    x1, y1 = float(node1[0]), float(node1[1])
-    x2, y2 = float(node2[0]), float(node2[1])
-    x3, y3 = float(node3[0]), float(node3[1])
-    # v1 = (x2 - x1, y2 - y1)
-    # v2 = (x3 - x2, y3 - y2)
-    # angle = tools.angle_btw_vectors(v1, v2)
-    angle = tools.angle_btw_vectors((x1, y1),(x2, y2),(x3, y3))
-    if angle > minimum_angle_to_apply_added_weight and turn_enabled:
-        return True
-    else:
-        return False
 
 
 if __name__ == "__main__":
