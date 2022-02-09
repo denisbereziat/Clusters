@@ -4,7 +4,8 @@ import tools
 import networkx as nx
 import csv
 import dual_graph
-import matplotlib.pyplot as plt
+import geopandas
+from shapely.geometry import Point
 
 turn_angle = 25
 
@@ -16,6 +17,8 @@ class Model:
         self.graph_dual = None
         self.timeInterval = dt
         self.droneList = drones
+        self.total_drone_dict = []
+        self.drone_order = []
         self.protection_area = protection_area
         self.vertical_protection = 7.62  # 25 ft
         # Initial constraints contains the constraints caused by the currently
@@ -101,6 +104,9 @@ class Model:
                 drone = dr.Drone(flight_number, dep, arr, dep_time, drone_type)
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
+                drone.deposit_time = deposit_time
+                if line[9] != '':
+                    drone.is_loitering_mission = True
 
                 # Check that the drone isn't already in the list
                 drone_in_list = False
@@ -360,26 +366,6 @@ def find_conflict_on_nodes(drone1, drone2, protection_area, graph_dual, graph):
                 if conflict_time is not None:
                     return conflict_time
     return None
-    #
-    #             # We need the drones next time stamps to know their speed after the node
-    #             # Drone speed when reaching the node
-    #             # d1_speed_before = get_current_drone_speed(drone1_time_stamps[t_drone1], drone1)
-    #             if not t_drone1 == drone1_time_stamps[-1]:
-    #                 drone1_next_time_stamp = drone1_time_stamps[drone1_time_stamps.index(t_drone1) + 1]
-    #             else:
-    #                 drone1_next_time_stamp = t_drone1
-    #             d1_speed_after = get_current_drone_speed(drone1_next_time_stamp, drone1)
-    #             # d2_speed_before = get_current_drone_speed(drone2_time_stamps[t_drone2], drone2)
-    #             if not t_drone2 == drone2_time_stamps[-1]:
-    #                 drone2_next_time_stamp = drone2_time_stamps[drone2_time_stamps.index(t_drone2) + 1]
-    #             else:
-    #                 drone2_next_time_stamp = t_drone2
-    #             d2_speed_after = get_current_drone_speed(drone2_next_time_stamp, drone2)
-    #             conflict_time = check_conflict_on_node(t_drone1, t_drone2, d1_speed_after, d2_speed_after, protection_area)
-    #             # Check for conflict :
-    #             if conflict_time is not None:
-    #                 return conflict_time
-    # return None
 
 
 def check_conflict_on_node(t_drone1, t_drone2, d1_speed_after, d2_speed_after, protection_area):
@@ -468,7 +454,11 @@ def init_graphs(graph_path, dual_path = None):
         graph.edges[edge[0], edge[1]]["length"] = raw_graph.edges[edge]["length"]
         graph.edges[edge[0], edge[1]]["geometry"] = raw_graph.edges[edge]["geometry"]
 
+    print("Removing nodes in static geofence")
+    remove_nodes_in_geofences("graph_files/geo_data_new/crs_epsg_32633/geofences/geofences_big.gpkg", graph)
+
     if dual_path is None:
+        print("CREATING DUAL GRAPH")
         graph_dual = dual_graph.create_dual(graph, turn_cost_function)
 
     else:
@@ -499,4 +489,19 @@ def init_graphs(graph_path, dual_path = None):
             graph_dual.edges[new_edge]["angle"] = _graph_dual.edges[edge]["angle"]
 
     return graph, graph_dual
+
+
+def remove_nodes_in_geofences(gpkg_file, graph):
+    geofences_gpkg = geopandas.read_file(gpkg_file, crs= 'EPSG:32633')
+    nodes_to_be_removed = []
+    geofences_gpkg.to_crs(crs='EPSG:4326', inplace=True)
+    for node in graph:
+        pt = Point(graph.nodes[node]["x"], graph.nodes[node]["y"])
+        for fence in geofences_gpkg.geometry:
+            if fence.contains(pt):
+                nodes_to_be_removed.append(node)
+    for node in nodes_to_be_removed:
+        graph.remove_node(node)
+
+
 

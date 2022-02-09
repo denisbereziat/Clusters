@@ -31,9 +31,9 @@ def hash_graph(graph, resolution):
     #     edge_hash_tab.append([edge, middle_coords])
     x_step = round((max_x-min_x) / resolution, 8)
     y_step = round((max_y-min_y) / resolution, 8)
-    print("max", max_x, max_y)
-    print("min", min_x, min_y)
-    print("step :", x_step, y_step)
+    # print("max", max_x, max_y)
+    # print("min", min_x, min_y)
+    # print("step :", x_step, y_step)
 
     for node in graph.nodes:
         h = hash_pos(graph.nodes[node]["x"], graph.nodes[node]["y"], min_x, min_y, x_step, y_step)

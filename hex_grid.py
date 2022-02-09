@@ -8,7 +8,7 @@ from math import cos, radians, pi
 hex_map = []
 # Radius of each hexagon
 hex_radius = 200  # in m
-graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
+graph_file_path = "graph_files/geo_data_new/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
 graph_save_path = "graph_files/total_graph_"+str(hex_radius) +"m.graphml"
 # Create the hexagonal grid and fix it to the constrained airspace
 

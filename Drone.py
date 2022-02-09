@@ -8,6 +8,8 @@ class Drone:
         self.vertical_speed = 5  # m/s
         self.vertical_accel = 3.5  # m/s**2
         self.braking_distance = 30  # m
+        self.deposit_time = None
+        self.is_loitering_mission = None
         self.dep = dep
         self.arr = arr
         self.dep_time = hDep
