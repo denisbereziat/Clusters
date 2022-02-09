@@ -327,7 +327,7 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
                             descent_descent_list.append(conflict)
 
     # print("Nb pt conflits :")
-    print(len(horizontal_shared_nodes_list), len(climb_horiz_list), len(descent_horiz_list), len(climb_climb_list), len(descent_descent_list))
+    # print(len(horizontal_shared_nodes_list), len(climb_horiz_list), len(descent_horiz_list), len(climb_climb_list), len(descent_descent_list))
     return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
 
 
@@ -953,7 +953,7 @@ def return_drone_from_flight_number(model, flight_number):
     for drone in model.droneList:
         if drone.flight_number == flight_number:
             return drone
-    print("Drone not in list")
+    print("Drone not in list", flight_number, model.droneList)
     raise Exception
 
 
