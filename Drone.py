@@ -1,10 +1,13 @@
+
 class Drone:
+    turn_speed = 5.144
+
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
         self.flight_number = flightNumber
         self.speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
         self.accel_max = 3  # m/s**2
         self.cruise_speed = 15.4333  # in m/s
-        self.turn_speed = 5.144  # m/s
+        self.turn_speed = Drone.turn_speed  # m/s
         self.vertical_speed = 5  # m/s
         self.vertical_accel = 3.5  # m/s**2
         self.braking_distance = 30  # m

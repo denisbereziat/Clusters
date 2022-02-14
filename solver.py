@@ -53,7 +53,7 @@ def solve_with_time_segmentation():
     # model.drone_order = drone_order
     drones_with_dynamic_fences = get_drones_with_dynamic_geofences_flight_number(drone_list_file_path)
     model.generation_params = generation_params
-    print("NB DRONES :", len(model.droneList))
+    print("TOTAL NB DRONES :", len(model.droneList))
     print("-- INITIALISED")
 
     fixed_flights_dict = dict()
@@ -66,16 +66,16 @@ def solve_with_time_segmentation():
         model.droneList.append(fn_to_drones_dict[drone_fn])
     current_param = None
     # SOLVE
+    print("\n\n--NB DRONES :", len(model.droneList))
     traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
                                                                             current_param, fixed_flights_dict)
     trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
     # Add the dynamic geofence drones to the fixed flights list
-    # For each of the drone find the chosen traj, fl, delay
     for k in problem.param.K:
+        # For each of the drone find the chosen traj, fl, delay
         if problem.x[k].x == 1:
             drone_fn = trajectories_to_fn[k]
             a = drone_fn
-            # a = model.drone_order.index(drone_fn)
             fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
 
     print("Starting resolution")
@@ -89,6 +89,7 @@ def solve_with_time_segmentation():
         sim_time += sim_step
         set_model_drone_list(model, sim_time + sim_size)
         print("\n\n--NB DRONES :", len(model.droneList))
+        print("-- ", len(fixed_flights_dict.keys()), " Fixed flights at this time")
         traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
                                                                                 traj_output, fixed_flights_dict)
         trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
@@ -125,7 +126,10 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
         delayfix.append(fixed_flights_dict[drone][3])
     # print("FIXED FLIGHTS :", Afix, Kfix, yfix, delayfix)
     # Create param
-    param = create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_order,Afix, Kfix,yfix, delayfix,horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list)
+    param = create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_order,
+                         Afix, Kfix,yfix, delayfix,horizontal_shared_nodes_list,climb_horiz_list,
+                         descent_horiz_list,climb_climb_list,descent_descent_list,
+                         fixed_flights_dict)
     # Create Problem
     problem = PLNE2.ProblemGlobal(param)
     problem.model.setParam("TimeLimit", T_MAX_OPTIM)
@@ -437,9 +441,9 @@ def generate_output(trajectories, horizontal_shared_nodes_list,climb_horiz_list,
         file.write(";\n")
 
 
-def create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_order,Afix, Kfix,yfix, delayfix,horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list):
-    nb_flights = len(list(trajectories.keys()))
-    nb_trajs = sum([len(trajectories[drone_fn]) for drone_fn in trajectories.keys()])
+def create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_order,Afix, Kfix,yfix, delayfix,horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list, fixed_flights_dict):
+    # nb_flights = len(list(trajectories.keys()))
+    # nb_trajs = sum([len(trajectories[drone_fn]) for drone_fn in trajectories.keys()])
     # print("Devrait etre egal :", nb_trajs, len(trajectories_to_fn))
     maxDelay = delay_max
     nbPt = [len(horizontal_shared_nodes_list), len(climb_horiz_list), len(descent_horiz_list), len(climb_climb_list),
@@ -462,9 +466,12 @@ def create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_ord
         for k in trajectories[a]:
             K.append([k, trajectories_to_duration[k], a])
     fixed_intentions = []
-    fixed_levels = []
+    # fixed_levels = []
+    for fn in fixed_flights_dict:
+        fixed_intentions.append(fixed_flights_dict[fn])
+        # fixed_levels.append([fn, fixed_flights_dict[fn][2]])
     param = Param2.Param(A, K, maxDelay, nbPt, k1, k2, t1, t2, sep12, sep21,
-                         fixed_intentions, fixed_levels)
+                         fixed_intentions)
     return param
 
 
