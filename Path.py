@@ -19,7 +19,7 @@ class Path:
         self.edge_path = []
         # This list contain the speed and time_stamps, the speed for each time stamp is the speed before reaching it
         # (in between the last one and the current one)
-        self.speed_time_stamps = []
+        self.speed_time_stamps = dict()
         # The discretized version of the path with time as key and position x,y as value
         self.path_dict_discretized = {}
         self.delay = {}
@@ -39,6 +39,7 @@ class Path:
         # TODO implement case where path length = 2
         # drone_speed = drone.cruise_speed
         self.edge_path = []
+        drone_speed_after_node = Drone.speeds_dict["cruise"]
         for node_index in range(len(new_path)-1):
             self.edge_path.append((new_path[node_index], new_path[node_index+1]))
         for node_index in range(1, len(new_path)-1):
@@ -71,6 +72,7 @@ class Path:
                     turning_speed = Drone.return_speed_from_angle(angle)
                     # drone_speed = drone.turn_speed
                     # drone_speed = turning_speed
+                    drone_speed_after_node = turning_speed
                     t += cost / turning_speed
                 # If last node wasn't a turn point, the next one may be one
                 elif current_edge is not None and next_edge is not None:
@@ -81,6 +83,7 @@ class Path:
                         # drone_speed = drone.turn_speed
                         if graph.edges[current_edge]["length"] < braking_distance:
                             t += cost / turning_speed
+                            drone_speed_after_node = turning_speed
                         else:
                             t += (graph.edges[current_edge]["length"] - braking_distance) / Drone.speeds_dict["cruise"]
                             # Adding the added time with constant deceleration
@@ -99,6 +102,7 @@ class Path:
                     # drone_speed = drone.turn_speed
                     if graph.edges[current_edge]["length"] < braking_distance:
                         t += cost / turning_speed
+                        drone_speed_after_node = turning_speed
                     else:
                         t += (graph.edges[current_edge]["length"] - braking_distance) / drone.cruise_speed
                         # Adding the added time with constant deceleration
@@ -110,15 +114,17 @@ class Path:
                 t += cost/Drone.speeds_dict["cruise"]
 
             self.path_dict[t] = new_path[node_index]
+            self.speed_time_stamps[t] = drone_speed_after_node
         # Last node :
+        # print(self.speed_time_stamps)
         try:
             cost = graph.edges[new_path[-2], new_path[-1]]["length"]
         except:
             print(len(new_path))
             raise Exception
-        #TODO a verifier qu'il faut bien ajouter un dernier t
+        #TODO a verifier qu'il faut bien ajouter un dernier t parce que ça pourrait etre turn l'avant dernier
         t += cost/Drone.speeds_dict["cruise"]
-        # self.speed_time_stamps.append([t, drone_speed])
+        self.speed_time_stamps[t] = Drone.speeds_dict["cruise"]
         self.path_dict[t] = new_path[-1]
 
         # creating next and previous node path :

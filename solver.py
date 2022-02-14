@@ -17,13 +17,13 @@ save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 drone_list_file_path = 'graph_files/Intentions/1000drones.csv'
 output_scenario = "PLNE OUTPUT/scenario.scn"
 output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
-protection_area = 200
-nb_FL = 10
-delay_max = 120
+protection_area = 50
+nb_FL = 16
+delay_max = 240
 FL_sep = 9.14  # in m
 FL_min = 25
 temps_sep_vertiport = 5
-T_MAX_OPTIM = 120
+T_MAX_OPTIM = 600
 
 
 def solve_with_time_segmentation():
@@ -104,7 +104,7 @@ def solve_with_time_segmentation():
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
     sim_step = 25
-    sim_size = 50
+    sim_size = 100
     sim_time = 0
     last_departure = max([model.total_drone_dict[drone_fn].dep_time for drone_fn in model.total_drone_dict])
     print("Last departure : ", last_departure)
