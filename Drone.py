@@ -1,13 +1,16 @@
+turn_speed = 5.144
+speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+angle_intervals = [25, 100, 150]
+accel_max = 3 # m/s**2
 
 class Drone:
-    turn_speed = 5.144
-    speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
         self.flight_number = flightNumber
-        self.speeds_dict = Drone.speeds_dict
-        self.accel_max = 3  # m/s**2
+        self.speeds_dict = speeds_dict
+        self.accel_max = accel_max
         self.cruise_speed = 15.4333  # in m/s
-        self.turn_speed = Drone.turn_speed  # m/s
+        self.turn_speed = turn_speed  # m/s
         self.vertical_speed = 5  # m/s
         self.vertical_accel = 3.5  # m/s**2
         self.braking_distance = 30  # m
@@ -34,4 +37,18 @@ class Drone:
         # if conflict time is before take off time or beetween first and second node
         return self.path_object.path[0], self.path_object.path[1]
 
-            
+
+def return_speed_from_angle(angle):
+    if angle <= angle_intervals[0]:
+        return speeds_dict["cruise"]
+    elif angle_intervals[0] < angle <= angle_intervals[1]:
+        return speeds_dict["turn1"]
+    elif angle_intervals[1] < angle <= angle_intervals[2]:
+        return speeds_dict["turn2"]
+    elif angle_intervals[2] < angle:
+        return speeds_dict["turn3"]
+
+
+def return_braking_distance(v1, v2):
+    avg_speed = (v1 + v2)/2
+    return avg_speed * abs(v1 - v2)

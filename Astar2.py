@@ -30,6 +30,7 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
         for neighbor in neighbors:
             edge = (current_node.id, neighbor)
             speed_on_neighbor = drone.cruise_speed
+            # TODO Mettre les bonnes v de virage
             if graph_dual.edges[current_node.id, neighbor]["is_turn"]:
                 speed_on_neighbor = drone.turn_speed
             if current_node.parent is not None:

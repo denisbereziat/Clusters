@@ -9,6 +9,7 @@ import tools
 import BlueskySCNTools
 import networkx
 import csv
+import matplotlib.pyplot as plt
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
@@ -70,6 +71,28 @@ def solve_with_time_segmentation():
     traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
                                                                             current_param, fixed_flights_dict)
     trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
+    # for drone in trajectories:
+    #     for traj in trajectories[drone]:
+    #         # print(trajectories[drone][traj])
+    #         nodes = trajectories[drone][traj][0].path
+    #
+    #         x = []
+    #         y = []
+    #         for node in graph.nodes:
+    #             x.append(graph.nodes[node]["x"])
+    #             y.append(graph.nodes[node]["y"])
+    #         plt.scatter(x,y)
+    #         x = []
+    #         y = []
+    #         for i in range(len(nodes)-1):
+    #             x.append(graph.nodes[nodes[i]]["x"])
+    #             y.append(graph.nodes[nodes[i]]["y"])
+    #         plt.plot(x,y, color='red')
+    #         plt.scatter(x[0], y[0], color='red')
+    #         for i in range(1, len(nodes)-2):
+    #             print(graph_dual.edges[(nodes[i-1],nodes[i]),(nodes[i],nodes[i+1])]["angle"])
+    #         plt.show()
+
     # Add the dynamic geofence drones to the fixed flights list
     for k in problem.param.K:
         # For each of the drone find the chosen traj, fl, delay
@@ -285,7 +308,7 @@ def generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn):
         drone = generate_trajectories.return_drone_from_flight_number(model, drone_fn)
         drone.dep_time = drone.dep_time + selected_delay[a]
         alts[drone_fn] = [selected_fl[a]] * len(drone.path_object.path)
-
+    # TODO RESTE A METTRE LES VITESSES DE VIRAGE COMME IL FAUT
     ####
     # BLUESKY
     print("Generating Bluesky SCN")
@@ -469,7 +492,6 @@ def create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_ord
     # fixed_levels = []
     for fn in fixed_flights_dict:
         fixed_intentions.append(fixed_flights_dict[fn])
-        # fixed_levels.append([fn, fixed_flights_dict[fn][2]])
     param = Param2.Param(A, K, maxDelay, nbPt, k1, k2, t1, t2, sep12, sep21,
                          fixed_intentions)
     return param
