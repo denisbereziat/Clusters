@@ -14,6 +14,8 @@ class Path:
         self.previous_path = []
         # Path dict contain a path with the time as keys and the node as value
         self.path_dict = {}
+        self.previous_node_dict = dict()
+        self.next_node_dict = dict()
         self.edge_path = []
         # This list contain the speed and time_stamps, the speed for each time stamp is the speed before reaching it
         # (in between the last one and the current one)
@@ -53,7 +55,6 @@ class Path:
             except:
                 print(new_path)
                 raise Exception
-
             # If the edge length is more than turn_distance then we have to take into account the deceleration
             # and the phase where the drone was going at his normal speed
             if node_index > 2:
@@ -109,20 +110,31 @@ class Path:
                 t += cost/Drone.speeds_dict["cruise"]
 
             self.path_dict[t] = new_path[node_index]
-            # Add back the post turn cost
-            # t += graph_dual.edges[edge_dual]["post_turn_cost"]/drone_speed
-            # self.speed_time_stamps.append([t, drone_speed])
         # Last node :
         try:
             cost = graph.edges[new_path[-2], new_path[-1]]["length"]
         except:
             print(len(new_path))
             raise Exception
-        #TODO a verifier
+        #TODO a verifier qu'il faut bien ajouter un dernier t
         t += cost/Drone.speeds_dict["cruise"]
         # self.speed_time_stamps.append([t, drone_speed])
         self.path_dict[t] = new_path[-1]
-        # drone.path_object = self
+
+        # creating next and previous node path :
+        sorted_time_stamps = sorted(self.path_dict.keys())
+        for i in range(0, len(sorted_time_stamps)-1):
+            t = sorted_time_stamps[i]
+            node = self.path_dict[t]
+            if i > 0:
+                previous_time = sorted_time_stamps[i-1]
+                previous_node = self.path_dict[previous_time]
+                self.previous_node_dict[(t, node)] = (previous_time, previous_node)
+            if i < len(sorted_time_stamps) - 1:
+                next_time = sorted_time_stamps[i+1]
+                next_node = self.path_dict[next_time]
+                self.next_node_dict[(t, node)] = (next_time, next_node)
+
         
     def flight_time_and_distance(self, graph, drone):
         self.flightDistance = 0
