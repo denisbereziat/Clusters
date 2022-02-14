@@ -53,61 +53,6 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
         priority_queue.sort(key=lambda x: x.f())
 
 
-#
-# def astar_dual_no_limit(model, dep_node_id, arr_node_id, drone, departure_time, primal_constraint_nodes_dict=None):
-#     """A star without a closed node list and no restriction to add in open nodes"""
-#     # model.countAstar += 1
-#     # print(model.countAstar)
-#     graph_dual = model.graph_dual
-#     # closed_nodes_list = []
-#     if primal_constraint_nodes_dict is None:
-#         primal_constraint_nodes_dict = dict()
-#     current_node = nd.Node(dep_node_id)
-#     current_node.cost = 0
-#     # Everytime a node time is mentioned it's equivalent to the time at the first node of the dual node in the primal
-#     # graph
-#     current_node.time = departure_time
-#     current_node.heuristic = current_node.dist_to_node(arr_node_id, graph_dual)
-#     priority_queue = [current_node]
-#
-#     while len(priority_queue) > 0:
-#         current_node = priority_queue.pop(0)
-#         # closed_nodes_list.append(current_node.id)
-#         # TERMINATION CONDITION : Having reached the arrival node
-#         if current_node.id == arr_node_id:
-#             solution_dual_path = current_node.path()
-#             # Turning the path back in the normal graph path
-#             shortest_path = pt.Path(drone.dep_time, [node.id[1] for node in solution_dual_path[:-1]])
-#             return shortest_path
-#         neighbors = get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, drone, model)
-#         for neighbor_id in neighbors:
-#             edge = (current_node.id, neighbor_id)
-#             speed_on_neighbor = drone.cruise_speed
-#             if graph_dual.edges[current_node.id, neighbor_id]["is_turn"]:
-#                 speed_on_neighbor = drone.turn_speed
-#             if current_node.parent is not None:
-#                 if graph_dual.edges[current_node.parent.id, current_node.id]["is_turn"]:
-#                     speed_on_neighbor = drone.turn_speed
-#             # If current node was AB and neighbor is BC, the time we set here is the arrival time at B taking into
-#             # account pre and post turn added cost
-#             new_time = current_node.time + graph_dual.edges[edge]["length"] / speed_on_neighbor
-#             new_cost = current_node.cost + graph_dual.edges[edge]["length"]
-#             neighbor = nd.Node(neighbor_id)
-#             priority_queue.append(neighbor)
-#             # neighbor_in_priority_queue, neighbor = node_in_list(neighbor, priority_queue)
-#             # # RQ : le fait de pas etre dans closed nodes onpourrait le faire avant les calculs de neighbor
-#             # if not neighbor_in_priority_queue and neighbor.id not in closed_nodes_list:
-#             #     priority_queue.append(neighbor)
-#             # EFFET DE BORD pour modifier la valeur de neighbor dans la liste priority_queue
-#             if neighbor.time >= new_time:
-#                 neighbor.time = new_time
-#                 neighbor.cost = new_cost
-#                 # RQ on peut ajouter le cout du neighbor avec le virage a l'heuristic
-#                 neighbor.heuristic = neighbor.dist_to_node(arr_node_id, graph_dual)
-#                 neighbor.parent = current_node
-#         priority_queue.sort(key=lambda x: x.f())
-
-
 def node_in_list(node_id, node_list):
     """Returns whether a node is in a given list and the node object associated to the nodeId"""
     for node in node_list:
@@ -140,7 +85,6 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
 
         # Determine the drone time of arrival on the current edge :
         # Was the last node a turn point :
-
         neighbor_edge_entry_time = None
 
         if current_edge[0][0] == "S":

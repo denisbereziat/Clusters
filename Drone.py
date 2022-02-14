@@ -1,10 +1,10 @@
 
 class Drone:
     turn_speed = 5.144
-
+    speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
     def __init__(self, flightNumber, dep, arr, hDep, droneType):
         self.flight_number = flightNumber
-        self.speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+        self.speeds_dict = Drone.speeds_dict
         self.accel_max = 3  # m/s**2
         self.cruise_speed = 15.4333  # in m/s
         self.turn_speed = Drone.turn_speed  # m/s
@@ -19,7 +19,7 @@ class Drone:
         self.type = droneType
         self.departure_vertiport = None
         self.arrival_vertiport = None
-        # A path object that will be used to store the drone current path, previous and discretized path
+        # A path object that will be used to store the drone current path
         self.path_object = None
 
     def find_current_edge(self, current_t, graph):
