@@ -105,8 +105,9 @@ class Model:
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
                 drone.deposit_time = deposit_time
-                if line[9] != '':
-                    drone.is_loitering_mission = True
+                if len(line) > 9:
+                    if line[9] != '':
+                        drone.is_loitering_mission = True
 
                 # Check that the drone isn't already in the list
                 drone_in_list = False
@@ -167,7 +168,7 @@ class Model:
             self.graph.edges[edge]['open'] = True
 
 
-def generate_scenarios(model, alts=None):
+def generate_scenarios(model, alts=None, turn_speeds = None):
     scenario_dict = dict()
 
     def get_dep_time(d):
@@ -188,6 +189,7 @@ def generate_scenarios(model, alts=None):
         scenario_dict[drone_id]['lons'] = lons
         # Add turnbool
         scenario_dict[drone_id]['turnbool'] = turns
+        scenario_dict[drone_id]['turn_speeds'] = turn_speeds
         if alts is None:
             scenario_dict[drone_id]['alts'] = [25] * len(lats)
         else:

@@ -40,8 +40,6 @@ def solve_with_time_segmentation():
     resolution = 100
     graph_hash = tools.hash_graph(graph, resolution)
     print("Graphs initialised")
-    # Extract all deposit times
-    deposit_time_list = tools.extract_deposit_times(drone_list_file_path)
     # No specified time to load all drones at first
     model = md.init_model(graph, graph_dual, drone_list_file_path, protection_area, graph_hash)
     # Dict used to store the drones and give them to the model.
@@ -49,7 +47,6 @@ def solve_with_time_segmentation():
     # drone_order = []
     for drone in model.droneList:
         fn_to_drones_dict[drone.flight_number] = drone
-        # drone_order.append(drone.flight_number)
     model.total_drone_dict = fn_to_drones_dict
     # model.drone_order = drone_order
     drones_with_dynamic_fences = get_drones_with_dynamic_geofences_flight_number(drone_list_file_path)
@@ -58,48 +55,52 @@ def solve_with_time_segmentation():
     print("-- INITIALISED")
 
     fixed_flights_dict = dict()
-
     print("Generating trajectories for dynamic geofences")
     # Keep only the dynamic geofences drones
     model.droneList = []
-    for drone_with_fence in drones_with_dynamic_fences:
-        drone_fn = drone_with_fence[0]
-        model.droneList.append(fn_to_drones_dict[drone_fn])
-    current_param = None
-    # SOLVE
-    print("\n\n--NB DRONES :", len(model.droneList))
-    traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
-                                                                            current_param, fixed_flights_dict)
-    trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
-    # for drone in trajectories:
-    #     for traj in trajectories[drone]:
-    #         # print(trajectories[drone][traj])
-    #         nodes = trajectories[drone][traj][0].path
-    #
-    #         x = []
-    #         y = []
-    #         for node in graph.nodes:
-    #             x.append(graph.nodes[node]["x"])
-    #             y.append(graph.nodes[node]["y"])
-    #         plt.scatter(x,y)
-    #         x = []
-    #         y = []
-    #         for i in range(len(nodes)-1):
-    #             x.append(graph.nodes[nodes[i]]["x"])
-    #             y.append(graph.nodes[nodes[i]]["y"])
-    #         plt.plot(x,y, color='red')
-    #         plt.scatter(x[0], y[0], color='red')
-    #         for i in range(1, len(nodes)-2):
-    #             print(graph_dual.edges[(nodes[i-1],nodes[i]),(nodes[i],nodes[i+1])]["angle"])
-    #         plt.show()
+    # print(drones_with_dynamic_fences)
+    if len(drones_with_dynamic_fences) > 0:
+        for drone_with_fence in drones_with_dynamic_fences:
+            drone_fn = drone_with_fence[0]
+            model.droneList.append(fn_to_drones_dict[drone_fn])
+        current_param = None
+        # SOLVE
+        print("\n\n--NB DRONES :", len(model.droneList))
+        traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
+                                                                                current_param, fixed_flights_dict)
+        trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
+        # for drone in trajectories:
+        #     for traj in trajectories[drone]:
+        #         # print(trajectories[drone][traj])
+        #         nodes = trajectories[drone][traj][0].path
+        #
+        #         x = []
+        #         y = []
+        #         for node in graph.nodes:
+        #             x.append(graph.nodes[node]["x"])
+        #             y.append(graph.nodes[node]["y"])
+        #         plt.scatter(x,y)
+        #         x = []
+        #         y = []
+        #         for i in range(len(nodes)-1):
+        #             x.append(graph.nodes[nodes[i]]["x"])
+        #             y.append(graph.nodes[nodes[i]]["y"])
+        #         plt.plot(x,y, color='red')
+        #         plt.scatter(x[0], y[0], color='red')
+        #         for i in range(1, len(nodes)-2):
+        #             print(graph_dual.edges[(nodes[i-1],nodes[i]),(nodes[i],nodes[i+1])]["angle"])
+        #         plt.show()
 
-    # Add the dynamic geofence drones to the fixed flights list
-    for k in problem.param.K:
-        # For each of the drone find the chosen traj, fl, delay
-        if problem.x[k].x == 1:
-            drone_fn = trajectories_to_fn[k]
-            a = drone_fn
-            fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
+        # Add the dynamic geofence drones to the fixed flights list
+        for k in problem.param.K:
+            # For each of the drone find the chosen traj, fl, delay
+            if problem.x[k].x == 1:
+                drone_fn = trajectories_to_fn[k]
+                a = drone_fn
+                fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
+        generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+    else:
+        traj_output = None
 
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
@@ -119,13 +120,11 @@ def solve_with_time_segmentation():
         for k in problem.param.K:
             if problem.x[k].x == 1:
                 drone_fn = trajectories_to_fn[k]
-                # print(drone_fn)
                 drone = model.total_drone_dict[drone_fn]
                 if drone.dep_time < sim_time and drone_fn not in fixed_flights_dict:
                     a = drone_fn
                     fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
         generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
-
     # Generate SCN
     generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
 
@@ -135,11 +134,14 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     # Solve current state of the model :
     # Generate trajectories
     print("-- Generating trajectories")
-    trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = generate_trajectories.generate_trajectories(model, graph, raw_graph, graph_dual, current_param)
+    trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = generate_trajectories.generate_trajectories(model, graph, raw_graph,
+                                                                                                                                             graph_dual, current_param)
     trajectories_output = trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order
     # Generate intersection points
     print("-- Intersection points")
-    horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list = generate_trajectories.generate_intersection_points(trajectories, trajectories_to_fn, model, graph, graph_dual, raw_graph)
+    horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list = generate_trajectories.generate_intersection_points(trajectories,
+                                                                                                                                                                trajectories_to_fn, model,
+                                                                                                                                                                graph, graph_dual, raw_graph)
     intersection_outputs = horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list
     Afix, Kfix, yfix, delayfix = [], [], [], []
     for drone in fixed_flights_dict:
@@ -288,18 +290,22 @@ def sort_flight_intention(flight_intention_file):
 def generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn):
     ####
     # Generate SCN from the problem output
-    # selected_traj = [None] * len(problem.param.A)  # All the selected trajectories after solving
-    # selected_delay = [None] * len(problem.param.A)  # Match traj with the selected delay
     selected_delay = dict()
-    # selected_fl = [None] * len(problem.param.A)  # Selected flight level
+    turn_speeds = dict()
     selected_fl = dict()    # Get every selected trajectory for each drone :
     for k in problem.param.K:
         # If trajectory is selected
         if problem.x[k].x == 1:
-            # selected_traj[problem.param.mon_vol[k]] = k
             # Set the corresponding path to the drone
             drone = generate_trajectories.return_drone_from_flight_number(model, trajectories_to_fn[k])
             drone.path_object = trajectories[drone.flight_number][k][0]
+            # Create turn_speeds_dict :
+            turn_speeds[drone.flight_number] = []
+            speed_time_stamps = sorted(drone.path_object.speed_time_stamps.keys())
+            for time_stamp in speed_time_stamps:
+                turn_speeds[drone.flight_number].append(drone.path_object.speed_time_stamps[time_stamp])
+    # print("turn_speeds : ", turn_speeds)
+
     alts = dict()
     for a in problem.param.A:
         selected_fl[a] = problem.y[a].x * FL_sep * 3.28084 + FL_min
@@ -312,7 +318,7 @@ def generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn):
     ####
     # BLUESKY
     print("Generating Bluesky SCN")
-    scenario_dict = md.generate_scenarios(model, alts=alts)
+    scenario_dict = md.generate_scenarios(model, alts=alts, turn_speeds=turn_speeds)
     bst = BlueskySCNTools.BlueskySCNTools()
     bst.Dict2Scn(output_scenario, scenario_dict)
     # Add a line to enable ASAS in Bluesky
