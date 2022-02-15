@@ -23,7 +23,8 @@ class Path:
         # The discretized version of the path with time as key and position x,y as value
         self.path_dict_discretized = {}
         self.delay = {}
-        self.hStart = hStart
+        self.dep_time = hStart
+        self.arr_time = None
         # TODO ça va pas du tout ça il faut supprimer ces attributs et laisser que la methode qui calcule
         self.flightTime = 0
         self.flightDistance = 0
@@ -34,7 +35,8 @@ class Path:
         the added turning times into account"""
         self.path_dict = {}
         self.path = new_path
-        t = self.hStart
+        t = self.dep_time
+        self.speed_time_stamps[t] = Drone.speeds_dict["cruise"]
         self.path_dict[t] = new_path[0]
         # TODO implement case where path length = 2
         # drone_speed = drone.cruise_speed
@@ -43,6 +45,7 @@ class Path:
         for node_index in range(len(new_path)-1):
             self.edge_path.append((new_path[node_index], new_path[node_index+1]))
         for node_index in range(1, len(new_path)-1):
+            drone_speed_after_node = Drone.speeds_dict["cruise"]
             # print(new_path)
             # To have the speed on the edge we need to know if the last node was a turn and if the next one is
             previous_edge, current_edge, next_edge = None, None, None
@@ -115,6 +118,7 @@ class Path:
 
             self.path_dict[t] = new_path[node_index]
             self.speed_time_stamps[t] = drone_speed_after_node
+            self.arr_time = t
         # Last node :
         # print(self.speed_time_stamps)
         try:
@@ -157,7 +161,7 @@ class Path:
         edgeIndex = 0
         edge = [self.path[edgeIndex], self.path[edgeIndex+1]]
         i = 0
-        t = self.hStart
+        t = self.dep_time
         self.path_dict_discretized = {t: (x0, y0)}
         if edge[0] in self.delay:
             c = self.delay[edge[0]]//dt

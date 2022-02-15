@@ -96,7 +96,7 @@ def solve_clusters():
     if len(conflicts) != 0:
         print('-----------------------------------------')
         print(len(conflicts))
-        print([(d.flight_number, d.path_object.hStart, d.dep_time) for d in cluster.drones])
+        print([(d.flight_number, d.path_object.dep_time, d.dep_time) for d in cluster.drones])
         for d in cluster.drones:
             gr.draw_solution(G, d, show_id=False, show_discretized=True, show_time=True, show=False)
             plt.savefig("solutions\\plt_sooo_{}.pdf".format(d.flight_number), dpi=100)
@@ -120,7 +120,7 @@ def solve_clusters():
         if added == 0:
             noAdded += 1
         flightDistance += d.path_object.flightDistance
-        delayDrone = d.path_object.hStart - d.dep_time
+        delayDrone = d.path_object.dep_time - d.dep_time
 
         for node in d.path_object.delay:
             delayDrone += d.path_object.delay[node]
@@ -135,7 +135,7 @@ def solve_clusters():
     print('Total delay:', delay, 'including with no delay:', noDelay, 'and max delay:', maxDelay)
     print('Time taken by algorithm:', time.time() - startT, 's')
     for d in m.droneList:
-        print('Delay at departure for', d.flight_number, ':', d.path_object.hStart - d.dep_time)
+        print('Delay at departure for', d.flight_number, ':', d.path_object.dep_time - d.dep_time)
     return len(conflicts)
 
 
@@ -180,7 +180,7 @@ def solve_clusters_with_dual():
     if len(conflicts) != 0:
         print('-----------------------------------------')
         print(len(conflicts))
-        print([(d.flight_number, d.path_object.hStart, d.dep_time) for d in cluster.drones])
+        print([(d.flight_number, d.path_object.dep_time, d.dep_time) for d in cluster.drones])
     print('##############################\n##############################')
     print('Final number of conflicts:', len(conflicts))
     print('Number of iterations:', iteration_count)

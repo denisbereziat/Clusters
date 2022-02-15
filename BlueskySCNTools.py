@@ -49,7 +49,9 @@ class BlueskySCNTools():
         
         # Define the lines list to be returned
         lines = []
-        
+        # for i in range(len(turnbool)):
+        #     print(turnbool[i],turn_speeds[i])
+        # print(len(turnbool), len(turn_speeds))
         # Change these values to control how an aircraft turns and cruises
         turn_speed = 10 # [kts]
         cruise_speed = 30 # [kts]
@@ -87,7 +89,7 @@ class BlueskySCNTools():
                     if turn_speeds is None :
                         trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speed}\n'
                     else:
-                        trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speeds[i] * 1.94384}\n'
+                        trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speeds[i+1] * 1.94384}\n'
                     lines.append(start_time_txt + trn)
                     lines.append(start_time_txt + trn_spd)
             else:

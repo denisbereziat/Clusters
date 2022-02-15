@@ -384,7 +384,7 @@ def compute_and_display_results(model, start_time):
         if added_flight_time == 0:
             no_added_flight_time_count += 1
         total_flight_distance += drone.path_object.flightDistance
-        delay_drone = drone.path_object.hStart - drone.dep_time
+        delay_drone = drone.path_object.dep_time - drone.dep_time
         for node in drone.path_object.delay:
             delay_drone += drone.path_object.delay[node]
         total_delay += delay_drone

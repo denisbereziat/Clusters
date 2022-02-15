@@ -99,6 +99,8 @@ def solve_with_time_segmentation():
                 a = drone_fn
                 fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
         generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+        generate_rta(model)
+        generate_time_stamps(model, graph)
     else:
         traj_output = None
 
@@ -375,8 +377,13 @@ def generate_rta(model):
             current_drone_fn = None
             turning = False
             current_wpt = 0
-            for line in lines:
+            for index, line in enumerate(lines):
                 content = line.split(" ")
+                next_is_flyturn = False
+                if index + 1 < len(lines) - 1:
+                    next_content = lines[index + 1].split(" ")
+                    if "ADDWPT" in next_content[0] and "FLYTURN" in next_content[2]:
+                        next_is_flyturn = True
                 if "CRE" in content[0]:
                     if current_drone_fn != content[1]:
                         current_drone_fn = content[1]
@@ -393,7 +400,12 @@ def generate_rta(model):
                     turning = False
                     scenario_with_RTA.write(line)
                 elif "ADDWPT" in content[0]:
+                    # print(content)
                     if turning:
+                        scenario_with_RTA.write(line)
+                    elif next_is_flyturn:
+                        scenario_with_RTA.write(line)
+                    elif content[5] != "30\n":
                         scenario_with_RTA.write(line)
                     else:
                         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
