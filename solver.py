@@ -17,7 +17,7 @@ save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 drone_list_file_path = 'graph_files/Intentions/1000drones.csv'
 output_scenario = "PLNE OUTPUT/scenario.scn"
 output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
-protection_area = 50
+protection_area = 32
 nb_FL = 16
 delay_max = 240
 FL_sep = 9.14  # in m
@@ -64,6 +64,8 @@ def solve_with_time_segmentation():
             drone_fn = drone_with_fence[0]
             model.droneList.append(fn_to_drones_dict[drone_fn])
         current_param = None
+        print("DEP FN", model.droneList[0].flight_number)
+        print("DEP COORds", model.droneList[0].departure_vertiport)
         # SOLVE
         print("\n\n--NB DRONES :", len(model.droneList))
         traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
@@ -377,7 +379,16 @@ def generate_rta(model):
             current_drone_fn = None
             turning = False
             current_wpt = 0
+            path = None
+            fixed_speed_str = ""
             for index, line in enumerate(lines):
+                if path is not None:
+                    fixed_speed = path.fixed_speed_wpt[current_wpt]
+
+                    if fixed_speed is not None:
+                        fixed_speed_str = str(fixed_speed)
+                    else:
+                        fixed_speed_str = ""
                 content = line.split(" ")
                 next_is_flyturn = False
                 if index + 1 < len(lines) - 1:
@@ -388,7 +399,8 @@ def generate_rta(model):
                     if current_drone_fn != content[1]:
                         current_drone_fn = content[1]
                         current_drone = generate_trajectories.return_drone_from_flight_number(model, current_drone_fn)
-                        current_wpt = 1
+                        path = current_drone.path_object
+                        current_wpt = 0
                         turning = False
                         scenario_with_RTA.write(line)
                 elif "ADDWPT" in content[0] and "FLYTURN" in content[2]:
@@ -401,13 +413,31 @@ def generate_rta(model):
                     scenario_with_RTA.write(line)
                 elif "ADDWPT" in content[0]:
                     # print(content)
-                    if turning:
+
+                    if next_is_flyturn:
                         scenario_with_RTA.write(line)
-                    elif next_is_flyturn:
-                        scenario_with_RTA.write(line)
-                    elif content[5] != "30\n":
-                        scenario_with_RTA.write(line)
+                        to_write = content[0][:-6] + "RTA" + " " + content[1] + " " + content[1]
+                        wpt_nb = str(int(current_wpt // 100)) + str(int((current_wpt % 100) // 10)) + str(
+                            int(current_wpt % 10))
+                        to_write += wpt_nb
+                        rta_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
+                        rta_time_str = str(int((rta_time // 3600) // 10)) + str(int((rta_time // 3600) % 10)) + ":"
+                        rta_time_str += str(int((rta_time % 3600) // 60 // 10)) + str(
+                            int((rta_time % 3600) // 60 % 10)) + ":"
+                        rta_time_str += str(int((rta_time % 60) // 10)) + str(int((rta_time % 10)))
+                        to_write += " " + rta_time_str + "\n"
+                        scenario_with_RTA.write(to_write)
+                    # elif content[5] != "30\n":
+                    #     to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
+                    #     scenario_with_RTA.write(to_write)
+                    # else:
                     else:
+                        # if turning:
+                        #     if fixed_speed is not None:
+                        #         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + " " + fixed_speed_str + "\n"
+                        #     else:
+                        #         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
+                        # else:
                         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
                         scenario_with_RTA.write(to_write)
                         to_write = content[0][:-6]+"RTA" + " " + content[1] + " " + content[1]

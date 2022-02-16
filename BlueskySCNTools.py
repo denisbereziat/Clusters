@@ -89,7 +89,7 @@ class BlueskySCNTools():
                     if turn_speeds is None :
                         trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speed}\n'
                     else:
-                        trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speeds[i+1] * 1.94384}\n'
+                        trn_spd = f'ADDWPT {drone_id} TURNSPEED {turn_speeds[i] * 1.94384}\n'
                     lines.append(start_time_txt + trn)
                     lines.append(start_time_txt + trn_spd)
             else:
@@ -100,9 +100,9 @@ class BlueskySCNTools():
                     
             # Add the waypoint
             if any(alts):
-                wpt_txt = f'ADDWPT {drone_id} {lats[i]} {lons[i]} {alts[i]} {speeds[i]}\n'
+                wpt_txt = f'ADDWPT {drone_id} {lats[i]} {lons[i]} {alts[i]} {cruise_speed}\n' #speeds[i]
             else:
-                wpt_txt = f'ADDWPT {drone_id} {lats[i]} {lons[i]} ,, {speeds[i]}\n'
+                wpt_txt = f'ADDWPT {drone_id} {lats[i]} {lons[i]} ,, {cruise_speed}\n'
             lines.append(start_time_txt + wpt_txt)
             
             # Set prev waypoint type value

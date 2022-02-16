@@ -118,22 +118,24 @@ def find_closest_node_in_list(x, y, nodes_list, graph):
 
 
 def find_closest_edge_in_list(x, y, edge_list, graph):
+    # TODO AJOUTER UNE DIST MINI POUR SAVOIR SI DANS UNCONSTRAINED OU CONSTRAIND ABD(dist) < precision
+    # PARCE QUE SI ON EST TRES PROCHE DE l'ARRETE ON VEUT FAIRE COMME CONSTRAINED ET SINON  COMME UNCONSTRAUNED
     closest = None
-    smallest_dst = math.inf
+    smallest_dist = math.inf
     for edge in edge_list:
         node1 = edge[0]
         node2 = edge[1]
         x_middle = (graph.nodes[node1]["x"] + graph.nodes[node2]["x"]) / 2
         y_middle = (graph.nodes[node1]["y"] + graph.nodes[node2]["y"]) / 2
         dist = distance(x, y, x_middle, y_middle)
-        if dist < smallest_dst:
+        if dist < smallest_dist:
             closest = edge
-            smallest_dst = dist
+            smallest_dist = dist
     if closest is None:
         print("no node found")
         raise Exception
     else:
-        return closest
+        return closest, smallest_dist
 
 
 def intersection(interval1, interval2):

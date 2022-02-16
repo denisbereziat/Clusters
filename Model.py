@@ -92,12 +92,21 @@ class Model:
                 dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
                 arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
                 hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
+                # Find departure edge and node of drone
                 x_dep, y_dep = float(dep_vertiport_coordinates[0]), float(dep_vertiport_coordinates[1])
-                list_of_possible_closest = tools.find_list_of_closest_with_hash(x_dep, y_dep, hash_nodes, min_x, min_y, x_step, y_step, resolution)
-                dep = tools.find_closest_node_in_list(x_dep, y_dep, list_of_possible_closest, self.graph)
+                list_of_possible_closest_edges = tools.find_list_of_closest_with_hash(x_dep, y_dep, hash_edges, min_x, min_y, x_step, y_step, resolution)
+                dep_edge, dist_dep_edge = tools.find_closest_edge_in_list(x_dep, y_dep, list_of_possible_closest_edges, self.graph)
                 x_arr, y_arr = float(arr_vertiport_coordinates[0]), float(arr_vertiport_coordinates[1])
-                list_of_possible_closest = tools.find_list_of_closest_with_hash(x_arr, y_arr, hash_nodes, min_x, min_y, x_step, y_step, resolution)
-                arr = tools.find_closest_node_in_list(x_arr, y_arr, list_of_possible_closest, self.graph)
+                list_of_possible_closest_edges = tools.find_list_of_closest_with_hash(x_arr, y_arr, hash_edges, min_x, min_y, x_step, y_step, resolution)
+                arr_edge, dist_arr_edge = tools.find_closest_edge_in_list(x_arr, y_arr, list_of_possible_closest_edges, self.graph)
+                # TODO choisir mieux le dep_node et le arr _node
+                dep = dep_edge[0]
+                arr = arr_edge[0]
+                # If the departure is too far from the edge we store the dep or arr edge as None
+                if dist_arr_edge > self.protection_area:
+                    arr_edge = None
+                if dist_dep_edge > self.protection_area:
+                    dep_edge = None
                 dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
                 drone_type = line[2][-1]
                 flight_number = line[1]
@@ -105,6 +114,8 @@ class Model:
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
                 drone.deposit_time = deposit_time
+                drone.dep_edge = dep_edge
+                drone.arr_edge = arr_edge
                 if len(line) > 9:
                     if line[9] != '':
                         drone.is_loitering_mission = True

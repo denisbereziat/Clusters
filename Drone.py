@@ -18,6 +18,9 @@ class Drone:
         self.is_loitering_mission = None
         self.dep = dep
         self.arr = arr
+        # TODO edge depart et edge arr = NONE SI ON EST DANS UNCONSTRAINED
+        self.dep_edge = None
+        self.arr_edge = None
         self.dep_time = hDep
         self.type = droneType
         self.departure_vertiport = None
@@ -51,4 +54,14 @@ def return_speed_from_angle(angle):
 
 def return_braking_distance(v1, v2):
     avg_speed = (v1 + v2)/2
-    return avg_speed * abs(v1 - v2)
+    return avg_speed * abs(v1 - v2)/accel_max
+
+
+def return_accel_time(v1, v2=None):
+    if v2 is None:
+        accel_time = abs(v1 - speeds_dict["cruise"])/accel_max
+    else:
+        accel_time = abs(v1 - v2) / accel_max
+    return accel_time
+
+
