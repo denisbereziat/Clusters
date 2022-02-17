@@ -9,6 +9,8 @@ import tools
 import BlueskySCNTools
 import networkx
 import csv
+import Drone
+from Path import over_estimate_turn_factor
 import matplotlib.pyplot as plt
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
@@ -414,41 +416,47 @@ def generate_rta(model):
                 elif "ADDWPT" in content[0]:
                     # print(content)
 
-                    if next_is_flyturn:
-                        scenario_with_RTA.write(line)
-                        to_write = content[0][:-6] + "RTA" + " " + content[1] + " " + content[1]
-                        wpt_nb = str(int(current_wpt // 100)) + str(int((current_wpt % 100) // 10)) + str(
-                            int(current_wpt % 10))
-                        to_write += wpt_nb
-                        rta_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
-                        rta_time_str = str(int((rta_time // 3600) // 10)) + str(int((rta_time // 3600) % 10)) + ":"
-                        rta_time_str += str(int((rta_time % 3600) // 60 // 10)) + str(
-                            int((rta_time % 3600) // 60 % 10)) + ":"
-                        rta_time_str += str(int((rta_time % 60) // 10)) + str(int((rta_time % 10)))
-                        to_write += " " + rta_time_str + "\n"
-                        scenario_with_RTA.write(to_write)
+                    # if next_is_flyturn:
+                    #     scenario_with_RTA.write(line)
+                    #     to_write = content[0][:-6] + "RTA" + " " + content[1] + " " + content[1]
+                    #     wpt_nb = str(int(current_wpt // 100)) + str(int((current_wpt % 100) // 10)) + str(int(current_wpt % 10))
+                    #     to_write += wpt_nb
+                    #     rta_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
+                    #     rta_time_str = str(int((rta_time // 3600) // 10)) + str(int((rta_time // 3600) % 10)) + ":"
+                    #     rta_time_str += str(int((rta_time % 3600) // 60 // 10)) + str(
+                    #         int((rta_time % 3600) // 60 % 10)) + ":"
+                    #     rta_time_str += str(int((rta_time % 60) // 10)) + str(int((rta_time % 10)))
+                    #     to_write += " " + rta_time_str + "\n"
+                    #     scenario_with_RTA.write(to_write)
                     # elif content[5] != "30\n":
                     #     to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
                     #     scenario_with_RTA.write(to_write)
                     # else:
-                    else:
-                        # if turning:
-                        #     if fixed_speed is not None:
-                        #         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + " " + fixed_speed_str + "\n"
-                        #     else:
-                        #         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
-                        # else:
-                        to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
-                        scenario_with_RTA.write(to_write)
-                        to_write = content[0][:-6]+"RTA" + " " + content[1] + " " + content[1]
-                        wpt_nb = str(int(current_wpt // 100)) + str(int((current_wpt % 100) // 10)) + str(int(current_wpt % 10))
-                        to_write += wpt_nb
-                        rta_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
-                        rta_time_str = str(int((rta_time // 3600) // 10)) + str(int((rta_time // 3600) % 10)) + ":"
-                        rta_time_str += str(int((rta_time % 3600) // 60 // 10)) + str(int((rta_time % 3600) // 60 % 10)) + ":"
-                        rta_time_str += str(int((rta_time % 60) // 10)) + str(int((rta_time % 10)))
-                        to_write += " " + rta_time_str + "\n"
-                        scenario_with_RTA.write(to_write)
+                    # else:
+                    # if turning:
+                    #     if fixed_speed is not None:
+                    #         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + " " + fixed_speed_str + "\n"
+                    #     else:
+                    #         to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
+                    # else:
+                    to_write = content[0] + " " + content[1] + " " + content[2] + " " + content[3] + " " + content[4] + "\n"
+                    scenario_with_RTA.write(to_write)
+                    to_write = content[0][:-6]+"RTA" + " " + content[1] + " " + content[1]
+                    wpt_nb = str(int(current_wpt // 100)) + str(int((current_wpt % 100) // 10)) + str(int(current_wpt % 10))
+                    to_write += wpt_nb
+                    rta_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
+
+                    if path.speed_time_stamps[rta_time] == Drone.speeds_dict["turn1"]:
+                        rta_time -= 1
+                    elif path.speed_time_stamps[rta_time] == Drone.speeds_dict["turn2"]:
+                        rta_time -= 3
+                    rta_time -= 1
+
+                    rta_time_str = str(int((rta_time // 3600) // 10)) + str(int((rta_time // 3600) % 10)) + ":"
+                    rta_time_str += str(int((rta_time % 3600) // 60 // 10)) + str(int((rta_time % 3600) // 60 % 10)) + ":"
+                    rta_time_str += str(int((rta_time % 60) // 10)) + str(int((rta_time % 10)))
+                    to_write += " " + rta_time_str + "\n"
+                    scenario_with_RTA.write(to_write)
                     current_wpt += 1
                 else:
                     scenario_with_RTA.write(line)

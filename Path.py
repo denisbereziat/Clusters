@@ -1,5 +1,8 @@
-import tools as tools
+# import tools as tools
 import Drone
+
+
+over_estimate_turn_factor = 1.2
 
 
 class Path:
@@ -53,7 +56,6 @@ class Path:
             # length = graph_dual.edges[current_edge_dual]["length"]
             length = graph.edges[current_edge]["length"]
             fixed_speed = None
-            t_sep = 0
 
             # Check if last node was a turn
             last_node_was_turn = False
@@ -76,19 +78,18 @@ class Path:
 
             # Determine travel time on edge and arrival time at the node along with the
             # 2 separation time (before and after the node)
-            travel_time = 0
             # If both nodes were turns
             if last_node_was_turn and current_node_is_turn:
                 accel_distance_last_node = Drone.return_braking_distance(speed_at_previous_node, Drone.speeds_dict["cruise"])
                 accel_distance_current_node = Drone.return_braking_distance(speed_at_current_node, Drone.speeds_dict["cruise"])
                 # TODO a preciser
                 if length > accel_distance_last_node + accel_distance_current_node:
-                    travel_time = Drone.return_accel_time(speed_at_previous_node) + Drone.return_accel_time(speed_at_current_node)
+                    travel_time = (Drone.return_accel_time(speed_at_previous_node) + Drone.return_accel_time(speed_at_current_node)) * over_estimate_turn_factor
                     travel_time += (length - accel_distance_last_node - accel_distance_current_node) / Drone.speeds_dict["cruise"]
                 else:
                     # If there's not enough space to accelerate fully, then speed will be set to the speed of the coming turn
                     inter_accel_distance = Drone.return_braking_distance(speed_at_previous_node, speed_at_current_node)
-                    travel_time = Drone.return_accel_time(speed_at_current_node, speed_at_previous_node)
+                    travel_time = (Drone.return_accel_time(speed_at_current_node, speed_at_previous_node))*over_estimate_turn_factor
                     travel_time += (length - inter_accel_distance) / speed_at_current_node
                     fixed_speed = speed_at_current_node
 
@@ -101,7 +102,7 @@ class Path:
             elif current_node_is_turn and not last_node_was_turn:
                 accel_distance_current_node = Drone.return_braking_distance(speed_at_current_node, Drone.speeds_dict["cruise"])
                 if length > accel_distance_current_node:
-                    travel_time = Drone.return_accel_time(speed_at_current_node)
+                    travel_time = (Drone.return_accel_time(speed_at_current_node)) * over_estimate_turn_factor
                     travel_time += (length - accel_distance_current_node)/Drone.speeds_dict["cruise"]
                     if model.protection_area < accel_distance_current_node:
                         t_sep = Drone.return_accel_time(speed_at_current_node)
@@ -114,7 +115,7 @@ class Path:
 
             # If the last node was a turn but not the coming one
             elif last_node_was_turn and not current_node_is_turn:
-                accel_distance_last_node = Drone.return_braking_distance(speed_at_previous_node, Drone.speeds_dict["cruise"])
+                accel_distance_last_node = (Drone.return_braking_distance(speed_at_previous_node, Drone.speeds_dict["cruise"])) *over_estimate_turn_factor
                 travel_time = Drone.return_accel_time(speed_at_previous_node)
                 travel_time += (length - accel_distance_last_node)/Drone.speeds_dict["cruise"]
                 t_sep = model.protection_area / Drone.speeds_dict["cruise"]
@@ -275,8 +276,7 @@ class Path:
     #             next_node = self.path_dict[next_time]
     #             self.next_node_dict[(t, node)] = (next_time, next_node)
 
-        
-    def flight_time_and_distance(self, graph, drone):
+    def flight_time_and_distance(self, graph):
         self.flightDistance = 0
         for i in range(len(self.path)-1):
             self.flightDistance += graph.edges[self.path[i], self.path[i+1]]['length']
@@ -284,79 +284,79 @@ class Path:
         for node in self.delay:
             self.flightTime += self.delay[node]
 
-    def discretize_path(self, dt, graph, drone):
-        loop = True
-        x0, y0 = graph.nodes[drone.dep]['x'], graph.nodes[drone.dep]['y']
-        xEnd, yEnd = graph.nodes[drone.arr]['x'], graph.nodes[drone.arr]['y']
-        edgeIndex = 0
-        edge = [self.path[edgeIndex], self.path[edgeIndex+1]]
-        i = 0
-        t = self.dep_time
-        self.path_dict_discretized = {t: (x0, y0)}
-        if edge[0] in self.delay:
-            c = self.delay[edge[0]]//dt
-            for j in range(c):
-                t += dt
-                self.path_dict_discretized[t] = (x0, y0)
-
-        try:
-            drone_speed = self.speed_time_stamps[0][1]
-        except Exception:
-            print(drone.flight_number)
-            print(drone.path_object.path)
-            print(drone.path_object.path_dict)
-            print(drone.path_object.speed_time_stamps)
-            raise Exception
-        next_time_stamp = self.speed_time_stamps[0][0]
-        time_stamp_index = 0
-
-        dist_to_travel = dt*drone_speed
-        traveled = 0
-        geometryList = graph.edges[edge]["geometry"]
-        if (geometryList[i], geometryList[i+1]) != (graph.nodes[edge[0]]['x'], graph.nodes[edge[0]]['y']):
-            geometryList = reverse_geometry_list(geometryList)
-        lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
-        while loop:
-            if t > next_time_stamp and time_stamp_index < len(self.speed_time_stamps) - 1:
-                time_stamp_index += 1
-                next_time_stamp = self.speed_time_stamps[time_stamp_index][0]
-                drone_speed = self.speed_time_stamps[time_stamp_index][1]
-
-            if lengthSegment >= dist_to_travel:
-                v = (geometryList[i+2]-x0, geometryList[i+3]-y0) 
-                x0, y0 = dist_to_travel/lengthSegment*v[0] + x0, dist_to_travel/lengthSegment*v[1] + y0
-                t += dt
-                self.path_dict_discretized[t] = (x0, y0)
-                lengthSegment -= dist_to_travel
-                dist_to_travel = dt*drone_speed
-                traveled = 0
-            else:
-                dist_to_travel -= lengthSegment
-                traveled += lengthSegment
-                # TODO a faire au propre
-                try:
-                    i += 2
-                    lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
-                    x0, y0 = geometryList[i], geometryList[i+1]
-                except Exception:
-                    if edgeIndex < len(self.path)-2:
-                        edgeIndex += 1 
-                        edge = [self.path[edgeIndex], self.path[edgeIndex+1]]
-                        geometryList = graph.edges[edge]["geometry"]
-                        i = 0
-                        x0, y0 = graph.nodes[edge[0]]['x'], graph.nodes[edge[0]]['y']
-                        if (geometryList[i], geometryList[i+1]) != (x0, y0):
-                            geometryList = reverse_geometry_list(geometryList.copy())
-                        lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
-                        if edge[0] in self.delay:
-                            c = self.delay[edge[0]]//dt
-                            for j in range(c):
-                                t += dt
-                                self.path_dict_discretized[t] = (x0, y0)
-                    else:
-                        loop = False
-        t += traveled/drone_speed
-        self.path_dict_discretized[t] = (xEnd, yEnd)
+    # def discretize_path(self, dt, graph, drone):
+    #     loop = True
+    #     x0, y0 = graph.nodes[drone.dep]['x'], graph.nodes[drone.dep]['y']
+    #     xEnd, yEnd = graph.nodes[drone.arr]['x'], graph.nodes[drone.arr]['y']
+    #     edgeIndex = 0
+    #     edge = [self.path[edgeIndex], self.path[edgeIndex+1]]
+    #     i = 0
+    #     t = self.dep_time
+    #     self.path_dict_discretized = {t: (x0, y0)}
+    #     if edge[0] in self.delay:
+    #         c = self.delay[edge[0]]//dt
+    #         for j in range(c):
+    #             t += dt
+    #             self.path_dict_discretized[t] = (x0, y0)
+    #
+    #     try:
+    #         drone_speed = self.speed_time_stamps[0][1]
+    #     except Exception:
+    #         print(drone.flight_number)
+    #         print(drone.path_object.path)
+    #         print(drone.path_object.path_dict)
+    #         print(drone.path_object.speed_time_stamps)
+    #         raise Exception
+    #     next_time_stamp = self.speed_time_stamps[0][0]
+    #     time_stamp_index = 0
+    #
+    #     dist_to_travel = dt*drone_speed
+    #     traveled = 0
+    #     geometryList = graph.edges[edge]["geometry"]
+    #     if (geometryList[i], geometryList[i+1]) != (graph.nodes[edge[0]]['x'], graph.nodes[edge[0]]['y']):
+    #         geometryList = reverse_geometry_list(geometryList)
+    #     lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
+    #     while loop:
+    #         if t > next_time_stamp and time_stamp_index < len(self.speed_time_stamps) - 1:
+    #             time_stamp_index += 1
+    #             next_time_stamp = self.speed_time_stamps[time_stamp_index][0]
+    #             drone_speed = self.speed_time_stamps[time_stamp_index][1]
+    #
+    #         if lengthSegment >= dist_to_travel:
+    #             v = (geometryList[i+2]-x0, geometryList[i+3]-y0)
+    #             x0, y0 = dist_to_travel/lengthSegment*v[0] + x0, dist_to_travel/lengthSegment*v[1] + y0
+    #             t += dt
+    #             self.path_dict_discretized[t] = (x0, y0)
+    #             lengthSegment -= dist_to_travel
+    #             dist_to_travel = dt*drone_speed
+    #             traveled = 0
+    #         else:
+    #             dist_to_travel -= lengthSegment
+    #             traveled += lengthSegment
+    #             # TODO a faire au propre
+    #             try:
+    #                 i += 2
+    #                 lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
+    #                 x0, y0 = geometryList[i], geometryList[i+1]
+    #             except Exception:
+    #                 if edgeIndex < len(self.path)-2:
+    #                     edgeIndex += 1
+    #                     edge = [self.path[edgeIndex], self.path[edgeIndex+1]]
+    #                     geometryList = graph.edges[edge]["geometry"]
+    #                     i = 0
+    #                     x0, y0 = graph.nodes[edge[0]]['x'], graph.nodes[edge[0]]['y']
+    #                     if (geometryList[i], geometryList[i+1]) != (x0, y0):
+    #                         geometryList = reverse_geometry_list(geometryList.copy())
+    #                     lengthSegment = tools.distance(geometryList[i],geometryList[i+1],geometryList[i+2],geometryList[i+3])
+    #                     if edge[0] in self.delay:
+    #                         c = self.delay[edge[0]]//dt
+    #                         for j in range(c):
+    #                             t += dt
+    #                             self.path_dict_discretized[t] = (x0, y0)
+    #                 else:
+    #                     loop = False
+    #     t += traveled/drone_speed
+    #     self.path_dict_discretized[t] = (xEnd, yEnd)
 
 
 def reverse_geometry_list(listGeo):
@@ -368,23 +368,23 @@ def reverse_geometry_list(listGeo):
     return reversedList
 
 
-def new_coords(pathDict, coords, lengthSegment, lengthTraveled, t, dt, i, lengthEdge):
-    '''Finds the new coordinates for the discretization of the path.'''
-    v = (coords[i+2]-coords[i], coords[i+3]-coords[i+1])
-    l0 = tools.distance(coords[i], coords[i+1], coords[i+2], coords[i+3])
-    x0, y0 = coords[i], coords[i+1]
-    offset = lengthTraveled - lengthSegment
-    if l0 != 0:
-        x, y = offset/l0*v[0] + x0, offset/l0*v[1] + y0
-
-        distance_from_previous_node = tools.distance(coords[0], coords[1], x, y)
-        
-        if distance_from_previous_node >= lengthEdge:
-            return False, offset, t, x0, y0
-    
-        else:
-            t += dt
-            pathDict[t] = (x, y)
-        
-            return True, offset, t, x0, y0
-    return False, offset, t, x0, y0
+# def new_coords(pathDict, coords, lengthSegment, lengthTraveled, t, dt, i, lengthEdge):
+#     '''Finds the new coordinates for the discretization of the path.'''
+#     v = (coords[i+2]-coords[i], coords[i+3]-coords[i+1])
+#     l0 = tools.distance(coords[i], coords[i+1], coords[i+2], coords[i+3])
+#     x0, y0 = coords[i], coords[i+1]
+#     offset = lengthTraveled - lengthSegment
+#     if l0 != 0:
+#         x, y = offset/l0*v[0] + x0, offset/l0*v[1] + y0
+#
+#         distance_from_previous_node = tools.distance(coords[0], coords[1], x, y)
+#
+#         if distance_from_previous_node >= lengthEdge:
+#             return False, offset, t, x0, y0
+#
+#         else:
+#             t += dt
+#             pathDict[t] = (x, y)
+#
+#             return True, offset, t, x0, y0
+#     return False, offset, t, x0, y0

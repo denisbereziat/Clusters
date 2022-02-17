@@ -9,6 +9,7 @@ from shapely.geometry import Point
 
 turn_angle = 25
 
+
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph, safety parameters
      and find conflicts."""
@@ -85,10 +86,12 @@ class Model:
         with open(filename, newline='') as csv_file:
             reader = csv.reader(csv_file, delimiter=',', quotechar='|')
             for line in reader:
+                # print(line)
                 deposit_time = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
                 # print(time, deposit_time)
                 if deposit_time > time:
                     continue
+                drone_model = line[2]
                 dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
                 arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
                 hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
@@ -108,9 +111,8 @@ class Model:
                 if dist_dep_edge > self.protection_area:
                     dep_edge = None
                 dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
-                drone_type = line[2][-1]
                 flight_number = line[1]
-                drone = dr.Drone(flight_number, dep, arr, dep_time, drone_type)
+                drone = dr.Drone(flight_number, dep, arr, dep_time, drone_model)
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
                 drone.deposit_time = deposit_time
@@ -391,7 +393,6 @@ def check_conflict_on_node(t_drone1, t_drone2, d1_speed_after, d2_speed_after, p
             return t_drone2
 
 
-
 def get_current_drone_speed(current_t, drone):
     """Return the current drone speed at the specified node"""
     current_edge, previous_edge, next_edge = None, None, None
@@ -407,8 +408,7 @@ def get_current_drone_speed(current_t, drone):
                 return drone.path_object.speed_time_stamps[node_index-1][1]
 
 
-def init_graph(graph : nx.Graph):
-    #TODO maintenant qu'on a qu'un graph pas besoin de l'init plein de fois
+def init_graph(graph):
     for edge in graph.edges:
         edge_dict = graph.edges[edge]
         edge_dict['open'] = True

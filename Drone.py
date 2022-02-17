@@ -2,6 +2,8 @@ turn_speed = 5.144
 speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
 angle_intervals = [25, 100, 150]
 accel_max = 3 # m/s**2
+vertical_speed = 5
+vertical_accel = 3.5
 
 class Drone:
 
@@ -11,13 +13,14 @@ class Drone:
         self.accel_max = accel_max
         self.cruise_speed = 15.4333  # in m/s
         self.turn_speed = turn_speed  # m/s
-        self.vertical_speed = 5  # m/s
-        self.vertical_accel = 3.5  # m/s**2
+        self.vertical_speed = vertical_speed  # m/s
+        self.vertical_accel = vertical_accel  # m/s**2
         self.braking_distance = 30  # m
         self.deposit_time = None
         self.is_loitering_mission = None
         self.dep = dep
         self.arr = arr
+        self.drone_type = None
         # TODO edge depart et edge arr = NONE SI ON EST DANS UNCONSTRAINED
         self.dep_edge = None
         self.arr_edge = None
