@@ -47,7 +47,6 @@ class Path:
         self.path_dict[t] = new_path[0]
         # TODO ajouter le premier point dans le sep_dict car maintenant le premier point c'est plus le depart
         # drone_speed = drone.cruise_speed
-        # TODO EDGE DICT {edge id : (t_entree, t_sortie)}
         speed_at_current_node = Drone.speeds_dict["cruise"]
         # TODO AJOUTER t supplementaire depart depuis milieu edge depart
 
