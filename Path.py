@@ -1,7 +1,6 @@
 # import tools as tools
 import Drone
 
-
 over_estimate_turn_factor = 1.2
 
 
@@ -46,6 +45,7 @@ class Path:
         self.speed_time_stamps[t] = Drone.speeds_dict["cruise"]
         self.fixed_speed_wpt.append(None)
         self.path_dict[t] = new_path[0]
+        # TODO ajouter le premier point dans le sep_dict car maintenant le premier point c'est plus le depart
         # drone_speed = drone.cruise_speed
         # TODO EDGE DICT {edge id : (t_entree, t_sortie)}
         speed_at_current_node = Drone.speeds_dict["cruise"]
@@ -56,6 +56,7 @@ class Path:
             # length = graph_dual.edges[current_edge_dual]["length"]
             length = graph.edges[current_edge]["length"]
             fixed_speed = None
+            middle_value = None
 
             # Check if last node was a turn
             last_node_was_turn = False
@@ -92,6 +93,7 @@ class Path:
                     travel_time = (Drone.return_accel_time(speed_at_current_node, speed_at_previous_node))*over_estimate_turn_factor
                     travel_time += (length - inter_accel_distance) / speed_at_current_node
                     fixed_speed = speed_at_current_node
+                    middle_value = (t + travel_time/2, speed_at_current_node)
 
                 if model.protection_area < accel_distance_current_node:
                     t_sep = Drone.return_accel_time(speed_at_current_node)
@@ -112,6 +114,7 @@ class Path:
                 else:
                     travel_time = Drone.return_accel_time(speed_at_current_node)
                     t_sep = Drone.return_accel_time(speed_at_current_node)
+                    middle_value = (t + travel_time / 2, speed_at_current_node)
 
             # If the last node was a turn but not the coming one
             elif last_node_was_turn and not current_node_is_turn:
@@ -138,7 +141,10 @@ class Path:
                 speed_middle = (speed_at_previous_node + speed_at_current_node)/2
             else:
                 speed_middle = speed_at_current_node
-            self.edge_middle_dict[current_edge] = (t_at_middle, speed_middle)
+            if middle_value is None:
+                self.edge_middle_dict[current_edge] = (t_at_middle, speed_middle)
+            else:
+                self.edge_middle_dict[current_edge] = (t_at_middle, middle_value)
 
         self.arr_time = t
 

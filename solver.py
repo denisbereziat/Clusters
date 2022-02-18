@@ -1,8 +1,6 @@
 import generate_trajectories
 import Model as md
 import osmnx
-# import Param
-# import PLNE
 import Param2
 import PLNE2
 import tools
@@ -10,7 +8,6 @@ import BlueskySCNTools
 import networkx
 import csv
 import Drone
-from Path import over_estimate_turn_factor
 import matplotlib.pyplot as plt
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
