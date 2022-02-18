@@ -116,6 +116,7 @@ class Model:
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
                 drone.deposit_time = deposit_time
+                # print(dep_edge)
                 drone.dep_edge = dep_edge
                 drone.arr_edge = arr_edge
                 if len(line) > 9:
@@ -193,6 +194,7 @@ def generate_scenarios(model, alts=None, turn_speeds = None):
             continue
         drone_id = drone.flight_number
         scenario_dict[drone.flight_number] = dict()
+        # Here we need to add the first and last segment too
         lats, lons, turns = extract_lat_lon_turn_bool_from_path(drone, model)
         # scenario_dict[drone_id]['start_time'] = min(drone.path_object.path_dict.keys())
         scenario_dict[drone_id]['start_time'] = drone.dep_time
@@ -213,19 +215,30 @@ def generate_scenarios(model, alts=None, turn_speeds = None):
 def extract_lat_lon_turn_bool_from_path(drone, model):
     lats = []
     lon = []
+
+    # Add the take off node:
+    dep_vertiport = drone.departure_vertiport
+    x_dep, y_dep = float(dep_vertiport[0]), float(dep_vertiport[1])
+    lats.append(y_dep)
+    lon.append(x_dep)
+    # Add all the other nodes
     graph = model.graph
-    # print(drone.flight_number)
-    # print(drone.path_object)
     for node in drone.path_object.path:
         node_x = graph.nodes[node]['x']
         node_y = graph.nodes[node]['y']
         lats.append(node_y)
         lon.append(node_x)
+    # Add arrival node
+    arr_vertiport = drone.arrival_vertiport
+    x_arr, y_arr = float(arr_vertiport[0]), float(arr_vertiport[1])
+    lats.append(y_arr)
+    lon.append(x_arr)
     turn_bool = [False for _i in range(len(lats))]
     for i in range(1, len(turn_bool)-1):
         turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
-    for i in range(1, len(turn_bool) - 1):
-        if len(drone.path_object.path[i-1]) == 6 and len(drone.path_object.path[i]) == 6 and len(drone.path_object.path[i+1]) == 6:
+    for i in range(0, len(turn_bool) - 2):
+        # if len(drone.path_object.path[i-1]) == 6 and len(drone.path_object.path[i]) == 6 and len(drone.path_object.path[i+1]) == 6:
+        if len(drone.path_object.path[i]) == 6:
             turn_bool[i] = False
     return lats, lon, turn_bool
 

@@ -163,20 +163,8 @@ def dot(v1, v2):
 
 
 def distance(x1, y1, x2, y2):
-    # x1, y1 = x1*math.pi/180, y1*math.pi/180
-    # x2, y2 = x2*math.pi/180, y2*math.pi/180
-    # try:
-    #     dist =  math.acos(math.sin(y1)*math.sin(y2)+math.cos(y1)*math.cos(y2)*math.cos(x1-x2))* 6371009
-    # except ValueError:
-    #     dist = math.acos(math.cos(90-y1)*math.cos(90-y2)+math.sin(90-y1)*math.sin(90-y2)*math.cos(x1-x2))* 6371009
-    # print("dist")
-    # print(dist)
-    # g = pyproj.Geod(ellps='clrk66')
     g = pyproj.Geod(ellps="WGS84")
     dist = g.line_lengths([x1,x2], [y1,y2])[0]
-    # dist = g.inv(x1,y1,x2,y2)[2]
-    # g = pyproj.Geod(ellps="WGS84")
-    # print(dist)
     return dist
 
 
