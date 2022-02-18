@@ -59,7 +59,7 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, current_param=Non
     for drone_fn in generated_trajectories:
         for traj in generated_trajectories[drone_fn]:
             drone = return_drone_from_flight_number(model, drone_fn)
-            path = Path.Path(drone.dep_time, [])
+            path = Path.Path(drone.dep_time, [], drone)
             path.set_path(traj, model)
             total_time = max(list(path.path_dict.keys()))
             trajectories_to_path[traj_id] = path

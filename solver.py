@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
-drone_list_file_path = 'graph_files/Intentions/1000drones.csv'
+drone_list_file_path = 'graph_files/Intentions/100_drones.csv'
 output_scenario = "PLNE OUTPUT/scenario.scn"
 output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
 protection_area = 32
@@ -22,7 +22,9 @@ delay_max = 240
 FL_sep = 9.14  # in m
 FL_min = 25
 temps_sep_vertiport = 5
-T_MAX_OPTIM = 600
+T_MAX_OPTIM = 120
+
+TIME_MARGIN = 15
 
 
 def solve_with_time_segmentation():
@@ -100,15 +102,18 @@ def solve_with_time_segmentation():
                 a = drone_fn
                 fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
         generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
-        generate_rta(model)
+        generate_rta(model, problem)
         generate_time_stamps(model, graph)
     else:
         traj_output = None
 
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
-    sim_step = 25
-    sim_size = 100
+    # sim_step = 25
+    # sim_size = 100
+    # sim_time = 0
+    sim_step = 9999
+    sim_size = 9999
     sim_time = 0
     last_departure = max([model.total_drone_dict[drone_fn].dep_time for drone_fn in model.total_drone_dict])
     print("Last departure : ", last_departure)
@@ -128,8 +133,12 @@ def solve_with_time_segmentation():
                     a = drone_fn
                     fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
         generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+        generate_rta(model, problem)
+        generate_time_stamps(model, graph)
     # Generate SCN
     generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+    generate_rta(model, problem)
+    generate_time_stamps(model, graph)
 
 
 def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixed_flights_dict):
@@ -316,7 +325,8 @@ def generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn):
         drone_fn = a
         drone = generate_trajectories.return_drone_from_flight_number(model, drone_fn)
         drone.dep_time = drone.dep_time + selected_delay[a]
-        alts[drone_fn] = [selected_fl[a]] * len(drone.path_object.path)
+        # + 2 for the take off and landing wpt
+        alts[drone_fn] = [selected_fl[a]] * (len(drone.path_object.path) + 2)
     # TODO RESTE A METTRE LES VITESSES DE VIRAGE COMME IL FAUT
     ####
     # BLUESKY
@@ -370,7 +380,7 @@ def generate_time_stamps(model, graph):
             f.write("\n")
 
 
-def generate_rta(model):
+def generate_rta(model, problem):
     print("Creating file with RTA")
     with open(output_scenario, 'r') as scenario_without_RTA:
         with open(output_scenario_with_RTA, "w") as scenario_with_RTA:
@@ -381,13 +391,13 @@ def generate_rta(model):
             path = None
             fixed_speed_str = ""
             for index, line in enumerate(lines):
-                if path is not None:
-                    fixed_speed = path.fixed_speed_wpt[current_wpt]
-
-                    if fixed_speed is not None:
-                        fixed_speed_str = str(fixed_speed)
-                    else:
-                        fixed_speed_str = ""
+                # if path is not None:
+                #     fixed_speed = path.fixed_speed_wpt[current_wpt]
+                #
+                #     if fixed_speed is not None:
+                #         fixed_speed_str = str(fixed_speed)
+                #     else:
+                #         fixed_speed_str = ""
                 content = line.split(" ")
                 next_is_flyturn = False
                 if index + 1 < len(lines) - 1:
@@ -399,6 +409,7 @@ def generate_rta(model):
                         current_drone_fn = content[1]
                         current_drone = generate_trajectories.return_drone_from_flight_number(model, current_drone_fn)
                         path = current_drone.path_object
+                        all_rta = compute_rta(path, problem)
                         current_wpt = 0
                         turning = False
                         scenario_with_RTA.write(line)
@@ -441,11 +452,16 @@ def generate_rta(model):
                     to_write = content[0][:-6]+"RTA" + " " + content[1] + " " + content[1]
                     wpt_nb = str(int(current_wpt // 100)) + str(int((current_wpt % 100) // 10)) + str(int(current_wpt % 10))
                     to_write += wpt_nb
-                    rta_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
-
-                    if path.speed_time_stamps[rta_time] == Drone.speeds_dict["turn1"]:
+                    # path_time = sorted(current_drone.path_object.path_dict.keys())[current_wpt]
+                    rta_time = all_rta[current_wpt]
+                    # if path.speed_time_stamps[path_time] == Drone.speeds_dict["turn1"]:
+                    #     rta_time -= 1
+                    # elif path.speed_time_stamps[path_time] == Drone.speeds_dict["turn2"]:
+                    #     rta_time -= 3
+                    # print(len(path.turns), current_wpt)
+                    if Drone.angle_intervals[0] < path.turns[current_wpt] < Drone.angle_intervals[1]:
                         rta_time -= 1
-                    elif path.speed_time_stamps[rta_time] == Drone.speeds_dict["turn2"]:
+                    elif path.turns[current_wpt] >= Drone.angle_intervals[1]:
                         rta_time -= 3
                     rta_time -= 1
 
@@ -457,6 +473,23 @@ def generate_rta(model):
                     current_wpt += 1
                 else:
                     scenario_with_RTA.write(line)
+
+
+def compute_rta(path, problem):
+    """Compute all RTA time for this path"""
+    # First we need delay and chosen FL for this flight
+    drone = path.drone
+    for a in problem.param.A:
+        if a == drone.flight_number:
+            selected_fl = problem.y[a].x * FL_sep * 3.28084 + FL_min
+            selected_delay = problem.delay[a].x
+
+    #TODO reste a prendre en compte le temps de montée
+    all_rta = [drone.dep_time + selected_delay * 10]
+    for wpt_time in path.path_dict:
+        all_rta.append(wpt_time + selected_delay * 10)
+
+    return all_rta
 
 
 def generate_output(trajectories, horizontal_shared_nodes_list,climb_horiz_list, descent_horiz_list, climb_climb_list,descent_descent_list, model):
@@ -532,8 +565,8 @@ def create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_ord
     k2 = [pt[1] for pt in all_pt]
     t1 = [pt[2] for pt in all_pt]
     t2 = [pt[3] for pt in all_pt]
-    sep12 = [pt[4] for pt in all_pt]
-    sep21 = [pt[5] for pt in all_pt]
+    sep12 = [pt[4] + TIME_MARGIN for pt in all_pt]
+    sep21 = [pt[5] + TIME_MARGIN for pt in all_pt]
     # print(nb_flights, nb_trajs, maxDelay, nbPt, len(d), len(mon_vol), len(all_pt))
     A = trajectories.keys()
     K = []
