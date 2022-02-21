@@ -8,7 +8,6 @@ import BlueskySCNTools
 import networkx
 import csv
 import Drone
-import matplotlib.pyplot as plt
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
@@ -24,7 +23,7 @@ FL_min = 25
 temps_sep_vertiport = 5
 T_MAX_OPTIM = 120
 
-TIME_MARGIN = 15
+TIME_MARGIN = 0
 
 
 def solve_with_time_segmentation():
@@ -59,41 +58,16 @@ def solve_with_time_segmentation():
     print("Generating trajectories for dynamic geofences")
     # Keep only the dynamic geofences drones
     model.droneList = []
-    # print(drones_with_dynamic_fences)
     if len(drones_with_dynamic_fences) > 0:
         for drone_with_fence in drones_with_dynamic_fences:
             drone_fn = drone_with_fence[0]
             model.droneList.append(fn_to_drones_dict[drone_fn])
         current_param = None
-        print("DEP FN", model.droneList[0].flight_number)
-        print("DEP COORds", model.droneList[0].departure_vertiport)
         # SOLVE
         print("\n\n--NB DRONES :", len(model.droneList))
         traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual,
                                                                                 current_param, fixed_flights_dict)
         trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
-        # for drone in trajectories:
-        #     for traj in trajectories[drone]:
-        #         # print(trajectories[drone][traj])
-        #         nodes = trajectories[drone][traj][0].path
-        #
-        #         x = []
-        #         y = []
-        #         for node in graph.nodes:
-        #             x.append(graph.nodes[node]["x"])
-        #             y.append(graph.nodes[node]["y"])
-        #         plt.scatter(x,y)
-        #         x = []
-        #         y = []
-        #         for i in range(len(nodes)-1):
-        #             x.append(graph.nodes[nodes[i]]["x"])
-        #             y.append(graph.nodes[nodes[i]]["y"])
-        #         plt.plot(x,y, color='red')
-        #         plt.scatter(x[0], y[0], color='red')
-        #         for i in range(1, len(nodes)-2):
-        #             print(graph_dual.edges[(nodes[i-1],nodes[i]),(nodes[i],nodes[i+1])]["angle"])
-        #         plt.show()
-
         # Add the dynamic geofence drones to the fixed flights list
         for k in problem.param.K:
             # For each of the drone find the chosen traj, fl, delay
@@ -107,6 +81,8 @@ def solve_with_time_segmentation():
     else:
         traj_output = None
 
+    #####
+    # Full resolution
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
     # sim_step = 25
@@ -605,6 +581,11 @@ def create_fixed_param(problem, model, trajectories, trajectories_to_path, traje
             yfix.append(problem.y[corresponding_flight].x)
             delayfix.append(problem.delay[corresponding_flight].x)
     return Afix, Kfix, yfix, delayfix
+
+
+def generate_SCN_v2(model, problem):
+    # For each drone, find
+    pass
 
 
 solve_with_time_segmentation()

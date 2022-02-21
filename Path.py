@@ -7,9 +7,6 @@ over_estimate_turn_factor = 1.2
 
 class Path:
     def __init__(self, hStart, path, drone):
-        # Path contain the pth as a list of node
-        # if path is None:
-        #     path = []
         self.path = path
         self.drone = drone
         # Contains informations on the first and last segment (from and to vertiports)
@@ -94,12 +91,10 @@ class Path:
         self.speed_time_stamps[self.dep_time] = Drone.speeds_dict["cruise"]
         t = self.dep_time + self.first_segment[0]
         self.separation_dict[t] = self.first_segment[3]
-
         self.speed_time_stamps[t] = Drone.speeds_dict["cruise"]
         self.fixed_speed_wpt.append(None)
         self.path_dict[t] = new_path[0]
         # TODO ajouter le premier point dans le sep_dict car maintenant le premier point c'est plus le depart
-        # drone_speed = drone.cruise_speed
         speed_at_current_node = Drone.speeds_dict["cruise"]
         # TODO AJOUTER t supplementaire depart depuis milieu edge depart
 
@@ -168,6 +163,7 @@ class Path:
                         t_sep = Drone.return_accel_time(speed_at_current_node) + (model.protection_area - accel_distance_current_node)/Drone.speeds_dict["cruise"]
                 # If there's not enough distance to brake
                 else:
+                    # The whole arc is done at v_turn
                     travel_time = Drone.return_accel_time(speed_at_current_node)
                     t_sep = Drone.return_accel_time(speed_at_current_node)
                     middle_value = (t + travel_time / 2, speed_at_current_node)
@@ -200,7 +196,7 @@ class Path:
             if middle_value is None:
                 self.edge_middle_dict[current_edge] = (t_at_middle, speed_middle)
             else:
-                self.edge_middle_dict[current_edge] = (t_at_middle, middle_value)
+                self.edge_middle_dict[current_edge] = middle_value
 
         # Add last segment
         self.last_segment = self.set_last_segment(model)
