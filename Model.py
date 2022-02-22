@@ -18,7 +18,8 @@ class Model:
         self.graph_dual = None
         self.timeInterval = dt
         self.droneList = drones
-        self.total_drone_dict = []
+        self.total_drone_list = []
+        self.total_drone_dict = dict()
         self.drone_order = []
         self.protection_area = protection_area
         self.vertical_protection = 7.62  # 25 ft

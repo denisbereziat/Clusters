@@ -1,4 +1,6 @@
 # import tools as tools
+import math
+
 import Drone
 import tools
 
@@ -52,7 +54,13 @@ class Path:
             x_next, y_next = model.graph.nodes[next_node]["x"], model.graph.nodes[next_node]["y"]
             dist_to_next_node = tools.distance(x_dep, y_dep, x_next, y_next)
             sep = return_sep(model, self.drone, Drone.speeds_dict["cruise"], drone_speed_next_node)
-            return dist_to_next_node/drone_speed_next_node, drone_speed_next_node, 0, sep
+            accel_dist = Drone.return_accel_time(Drone.speeds_dict["cruise"], 0)
+            if accel_dist < dist_to_next_node:
+                accel_time = Drone.return_accel_time(Drone.speeds_dict["cruise"], 0)
+                travel_time = accel_time + (dist_to_next_node - accel_dist)/drone_speed_next_node
+            else:
+                travel_time = math.sqrt(2 * dist_to_next_node / Drone.accel_max)
+            return travel_time, drone_speed_next_node, 0, sep
         else:
             # Then this means we are entering in the constrained airspace
             next_edge = (self.path[0], self.path[1])
@@ -269,16 +277,101 @@ def reverse_geometry_list(listGeo):
     return reversedList
 
 
-def return_sep(model, drone, v1, v2):
+def return_sep(model, drone, v1, v2, v3, v_cruise, l1, l2, t_node, t_last_node, t_next_node):
+    t_sep1, t_sep2 = None, None
     protec = model.protection_area
-    braking = Drone.return_braking_distance(v1, v2)
-    braking_time = Drone.return_accel_time(v1, v2)
-    if protec > braking:
-        sep = braking_time + (protec - braking) / v2
-        return sep, sep
+    # 3 CAS :  protec E : accel, cruise ou braking
+    # t_sep1 :
+    if v1 == v2 and v2 == v_cruise:
+        t_sep1 = protec/v1
     else:
-        # TODO a preciser
-        return braking_time, braking_time
+        accel1 = Drone.return_braking_distance(v1, v_cruise)
+        braking1 = Drone.return_braking_distance(v2, v_cruise)
+        if l1 > protec:
+            if l1 > accel1 + braking1:
+                # Then there's enough room for acceleration to cruise_speed and braking before the node
+                delta_accel = l1 - accel1
+                if delta_accel > protec:
+                    # Then acceleration is done outside protec area
+                    if protec > braking1:
+                        # Then the whole braking is done in the protection area
+                        t_sep1 = Drone.return_accel_time(v1, v2) + (protec - braking1) / v1
+                    else:
+                        # Then only part of the braking is in the protection area
+                        # Find the t of passage a protec entry_point
+                        t_to_protec = return_t_at_d(protec - delta_accel, -Drone.accel_max, v1)
+                        v_at_protec = v_cruise - Drone.accel_max * t_to_protec
+                        t_sep1 = Drone.return_accel_time(v_at_protec, v2)
+                else:
+                    # Then acceleration is part of the protec area:
+                    t_to_protec = return_t_at_d(l1 - protec, Drone.accel_max, v1)
+                    v_at_protec = v1 + Drone.accel_max * t_to_protec
+                    t_sep1 = Drone.return_accel_time(v_at_protec, v2)
+                    t_sep1 += (protec - Drone.return_braking_distance(v_at_protec, v2) - braking1) / v_cruise
+                    t_sep1 += Drone.return_accel_time(v_cruise, v2)
+            else:
+                # Then there's not enough room to reach cruise_speed
+                # TODO est ce que ça suffit vraiment ? Si un drone arrive plus vite ou moins vite ?
+                t_sep1 = t_node - t_last_node
+        else:
+            t_sep1 = t_node - t_last_node
+    # t_sep2 :
+    if v2 == v3 and v3 == v_cruise:
+        t_sep2 = protec / v2
+    else:
+        accel2 = Drone.return_braking_distance(v2, v_cruise)
+        braking2 = Drone.return_braking_distance(v3, v_cruise)
+        if l2 > protec:
+            if protec < braking2:
+                # Then braking finish after the protec area
+                t_sep2 = return_t_at_d(protec, Drone.accel_max, v1)
+            elif braking2 < protec < (l2 - accel2):
+                # Then braking occurs in constant speed segment
+                t_sep2 = Drone.return_accel_time(v2, v_cruise)
+                t_sep2 += (protec - accel2) / v_cruise
+            else:
+                # Then braking occurs in the deceleration segment
+                t_sep2 = Drone.return_accel_time(v2, v_cruise)
+                t_sep2 += (l2 - accel2) / v_cruise
+                t_sep2 += return_t_at_d(protec - (l2 - braking2), Drone.accel_max, v1)
+        else:
+            t_sep2 = t_next_node
+    #     delta_1 = l1 - braking1
+    #     if v1 < v2:
+    #         # Then it's a flyby after a turn
+    #         if delta_1 > protec:
+    #             # Then the acceleration occurs far enough away to be at v2 cst near the node if it's not a turn
+    #             t_sep1 = protec / v2
+    #         else:
+    #             # Then part of the protec area is during the acceleration
+    #             t_at_protec = return_t_at_d(protec - delta_1, Drone.accel_max, v1)
+    #             t_sep1 = t_node - t_at_protec
+    #     else:
+    #         # Then the node is a turn and we are braking before it
+    #         if braking1 < protec:
+    #             # Then the braking is done entirely in the protec area
+    #             t_sep1 = Drone.return_accel_time(v1, v2) + (protec - braking1) / v1
+    #         else:
+    #             # The protec area is part of the braking area.
+    #             t_at_protec = return_t_at_d(protec - delta_1, Drone.accel_max, v1)
+    #             t_sep1 = t_node - t_at_protec
+    #
+    # # t_sep2 :
+    # if v2 == v3:
+    #     t_sep2 = protec/v2
+    # else:
+    #     braking2 = Drone.return_braking_distance(v2, v3)
+
+
+    return t_sep1, t_sep2
+
+
+def return_t_at_d(dist, a, v0):
+    t1 = (-v0 + math.sqrt(v0 ** 2 + 2 * a * dist)) / (2 * a)
+    if t1 > 0:
+        return t1
+    else:
+        return (-v0 - math.sqrt(v0 ** 2 + 2 * a * dist)) / (2 * a)
 
 
 def invert_dep_edge_if_needed(new_path, drone):

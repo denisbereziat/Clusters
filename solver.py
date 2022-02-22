@@ -8,11 +8,12 @@ import BlueskySCNTools
 import networkx
 import csv
 import Drone
+import math
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
-drone_list_file_path = 'graph_files/Intentions/100_drones.csv'
+drone_list_file_path = 'graph_files/Intentions/1000drones.csv'
 output_scenario = "PLNE OUTPUT/scenario.scn"
 output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
 protection_area = 32
@@ -21,7 +22,9 @@ delay_max = 240
 FL_sep = 9.14  # in m
 FL_min = 25
 temps_sep_vertiport = 5
-T_MAX_OPTIM = 120
+T_MAX_OPTIM = 180
+MIP_GAP = 0.3
+ms_to_knots = 1.94384
 
 TIME_MARGIN = 0
 
@@ -75,8 +78,9 @@ def solve_with_time_segmentation():
                 drone_fn = trajectories_to_fn[k]
                 a = drone_fn
                 fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
-        generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
-        generate_rta(model, problem)
+        # generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+        # generate_rta(model, problem)
+        generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_" + "geofence" + ".scn")
         generate_time_stamps(model, graph)
     else:
         traj_output = None
@@ -85,12 +89,12 @@ def solve_with_time_segmentation():
     # Full resolution
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
-    # sim_step = 25
-    # sim_size = 100
-    # sim_time = 0
-    sim_step = 9999
-    sim_size = 9999
+    sim_step = 20
+    sim_size = 100
     sim_time = 0
+    # sim_step = 9999
+    # sim_size = 9999
+    # sim_time = 0
     last_departure = max([model.total_drone_dict[drone_fn].dep_time for drone_fn in model.total_drone_dict])
     print("Last departure : ", last_departure)
     while sim_time < last_departure:
@@ -108,12 +112,16 @@ def solve_with_time_segmentation():
                 if drone.dep_time < sim_time and drone_fn not in fixed_flights_dict:
                     a = drone_fn
                     fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
-        generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
-        generate_rta(model, problem)
+        # generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+        # generate_rta(model, problem)
+        generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_" + str(sim_time) + ".scn")
         generate_time_stamps(model, graph)
+
+
     # Generate SCN
-    generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
-    generate_rta(model, problem)
+    # generate_scn(problem, fn_order, trajectories, model, trajectories_to_fn)
+    # generate_rta(model, problem)
+    generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_Final.scn")
     generate_time_stamps(model, graph)
 
 
@@ -128,7 +136,7 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     # Generate intersection points
     print("-- Intersection points")
     horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list = generate_trajectories.generate_intersection_points(trajectories,
-                                                                                                                                                                trajectories_to_fn, model,
+                                                                                                                                                                trajectories_to_fn, trajectories_to_path, model,
                                                                                                                                                                 graph, graph_dual, raw_graph)
     intersection_outputs = horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list
     Afix, Kfix, yfix, delayfix = [], [], [], []
@@ -145,7 +153,8 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
                          fixed_flights_dict)
     # Create Problem
     problem = PLNE2.ProblemGlobal(param)
-    problem.model.setParam("TimeLimit", T_MAX_OPTIM)
+    # problem.model.setParam("TimeLimit", T_MAX_OPTIM)
+    problem.model.setParam("MIPGap", MIP_GAP)
     # Solve
     problem.solve()
     # problem.printSolution()
@@ -583,9 +592,78 @@ def create_fixed_param(problem, model, trajectories, trajectories_to_path, traje
     return Afix, Kfix, yfix, delayfix
 
 
-def generate_SCN_v2(model, problem):
-    # For each drone, find
-    pass
+def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_file):
+    graph = model.graph
+    with open(output_file, 'w') as file:
+        to_write = "00:00:00>CDMETHOD STATEBASED\n00:00:00>DTLOOK 20\n00:00:00>HOLD\n00:00:00>PAN 48.223775 16.337976\n00:00:00>ZOOM 50\n"
+        file.write(to_write)
+        # For each drone, find the chosen trajectory, FL, delay
+        # for drone in model.total_drone_list:
+        for k in problem.param.K:
+            # If trajectory is selected
+            if problem.x[k].x == 1:
+                # Set the corresponding path to the drone
+                drone = generate_trajectories.return_drone_from_flight_number(model, trajectories_to_fn[k])
+                drone.path_object = trajectories[drone.flight_number][k][0]
+                for a in problem.param.A:
+                    if a == drone.flight_number:
+                        fl = problem.y[a].x * FL_sep * 3.28084 + FL_min
+                        delay = problem.delay[a].x
+                        drone.dep_time += delay
+                dep_vertiport = " " + str(drone.departure_vertiport[1]) + " " + str(drone.departure_vertiport[0])
+                first_node_x, first_node_y = graph.nodes[drone.path_object.path[0]]["x"], graph.nodes[drone.path_object.path[0]]["y"]
+                qdr = BlueskySCNTools.qdrdist(drone.departure_vertiport[1], drone.departure_vertiport[0], first_node_y, first_node_x, 'qdr')
+                # Write SCN
+                h, m, s = drone.dep_time // 3600, (drone.dep_time % 3600) // 60, drone.dep_time % 60
+                time_str = str(int(h // 10)) + str(int(h % 10)) + ":" + str(int(m // 10)) + str(int(m % 10)) + ":" + str(int(s // 10)) + str(int(s % 10))
+                to_write = time_str + ">CRE " + drone.flight_number + " " +  "M600" + " " + dep_vertiport + " " + str(qdr) + " 25 " + str(0.1) + "\n"
+                file.write(to_write)
+                to_write = "00:00:00>ADDWAYPOINTS " + drone.flight_number + " " + dep_vertiport + "," + str(fl) + ",,FLYBY,0,"
+                # print(len(drone.path_object.path_dict.keys()), len(drone.path_object.turns))
+                wpt = 0
+                for wpt_time, node in drone.path_object.path_dict.items():
+                    x, y = graph.nodes[node]["x"], graph.nodes[node]["y"]
+                    if Drone.return_speed_from_angle(drone.path_object.turns[wpt]) != Drone.speeds_dict["cruise"]:
+                        to_write += str(y) + "," + str(x) + "," + str(fl) + ",,TURNSPD," + str(Drone.return_speed_from_angle(drone.path_object.turns[wpt]) * ms_to_knots)
+                    else:
+                        to_write += str(y) + "," + str(x) + "," + str(fl) + ",,FLYBY,0"
+                    wpt += 1
+                    if node != drone.path_object.path[-1]:
+                        to_write += ","
+                to_write += "\n"
+                file.write(to_write)
+                to_write = "00:00:00>" + drone.flight_number + " ATDIST " + str(y) + " " + str(x) + " 0.0026997840172786176 DEL " + drone.flight_number + "\n"
+                file.write(to_write)
+                file .write("00:00:00>LNAV " + drone.flight_number + " ON\n")
+                file.write("00:00:00>VNAV " + drone.flight_number + " ON\n")
+                wpt = 2
+                for wpt_time, node in drone.path_object.path_dict.items():
+                    to_write = "00:00:00>RTA " + drone.flight_number + " " + drone.flight_number
+                    wpt_str = str(wpt // 100) + str((wpt % 100) // 10) + str(wpt % 10)
+                    to_write += wpt_str + " "
+                    rta_deviation = 0
+                    if drone.path_object.turns[wpt - 2] > Drone.angle_intervals[0]:
+                        rta_deviation = -3
+                    h, m, s = (wpt_time + rta_deviation) // 3600, ((wpt_time + rta_deviation) % 3600) // 60, (wpt_time + rta_deviation) % 60
+                    time_str = str(int(h // 10)) + str(int(h % 10)) + ":" + str(int(m // 10)) + str(int(m % 10)) + ":" + str(int(s // 10)) + str(int(s % 10))
+                    to_write += time_str + "\n"
+                    file.write(to_write)
+                    wpt += 1
+
+
+def return_drone_cruise_speed(drone_type):
+    return Drone.speeds_dict["cruise"]
+                    # selected_fl[a] = problem.y[a].x * FL_sep * 3.28084 + FL_min
+                    # selected_delay[a] = problem.delay[a].x
+                    # drone_fn = a
+                    # drone = generate_trajectories.return_drone_from_flight_number(model, drone_fn)
+                    # drone.dep_time = drone.dep_time + selected_delay[a]
+                # # Create turn_speeds_dict :
+                # turn_speeds[drone.flight_number] = []
+                # speed_time_stamps = sorted(drone.path_object.speed_time_stamps.keys())
+                # for time_stamp in speed_time_stamps:
+                #     turn_speeds[drone.flight_number].append(drone.path_object.speed_time_stamps[time_stamp])
+        # print("turn_speeds : ", turn_speeds)
 
 
 solve_with_time_segmentation()

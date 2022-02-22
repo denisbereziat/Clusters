@@ -1,5 +1,7 @@
 turn_speed = 5.144
 speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model1 = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model2 = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
 angle_intervals = [25, 100, 150]
 accel_max = 3 # m/s**2
 vertical_speed = 5
