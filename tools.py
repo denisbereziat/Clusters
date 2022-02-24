@@ -154,7 +154,7 @@ def angle_btw_vectors(pt1, pt2, pt3):
     # angle = angle*360/(2*math.pi)
     angle = abs(angle)
     if angle > 180:
-        angle = 360 - 180
+        angle = 360 - angle
     return angle
 
 

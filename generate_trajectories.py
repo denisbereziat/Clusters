@@ -12,6 +12,7 @@ import itertools
 import Drone
 import sys
 
+
 # # graph_file_path = "graph_files/processed_graphM2.graphml"
 # graph_file_path = "graph_files/total_graph_200m.graphml"
 # dual_graph_path = "graph_files/dual_total_graph_200m.graphml"
@@ -45,10 +46,11 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, current_param=Non
     # If the drone doesn't already have trajectories generated we generate some
     for drone in model.droneList:
         if drone.flight_number not in drone_trajectories_dict:
-            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, graph, model, 6, 500, nb_alternative_traj)
+            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, graph, model, 6, 500,
+                                                                                         nb_alternative_traj)
         else:
             pass
-            # print("drone already has generated traj")
+        # print("drone already has generated traj")
 
     # Compute total time for each trajectory
     fn_order = []
@@ -76,51 +78,63 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, current_param=Non
             traj_id += 1
     return drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order
 
+
 def save_intersection(trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, horizontal_shared_nodes_list):
-	#check what is situation and save intersection(s)
-	print("Connected :", multiPoints)
-	if multiPointsStatus == 1: #this could be verified with len of multiPoints
-		#save independent intersecting point
-		t1 = multiPoints[0][1]
-		t2 = multiPoints[0][2]
-		conflict = (k1, k2, t1, t2, max(trajectories_to_path[k1].separation_dict[t1][1], trajectories_to_path[k2].separation_dict[t2][0]), max(trajectories_to_path[k2].separation_dict[t2][1], trajectories_to_path[k1].separation_dict[t1][0]))
-	else:
-		first_node = multiPoints[0]
-		last_node = multiPoints[-1]
+    # check what is situation and save intersection(s)
+    # print("Connected :", multiPoints)
+    if multiPointsStatus == 1:  # this could be verified with len of multiPoints
+        # save independent intersecting point
+        t1 = multiPoints[0][1]
+        t2 = multiPoints[0][2]
+        conflict = (k1, k2, t1, t2, max(trajectories_to_path[k1].separation_dict[t1][1],
+                                        trajectories_to_path[k2].separation_dict[t2][0]),
+                    max(trajectories_to_path[k2].separation_dict[t2][1],
+                        trajectories_to_path[k1].separation_dict[t1][0]))
+    else:
+        first_node = multiPoints[0]
+        last_node = multiPoints[-1]
 
-		t_k1_first = first_node[1]
-		t_k1_last = last_node[1]
-		
-		t_k2_first = first_node[2]
-		t_k2_last = last_node[2]
-		
-		sep12_first = max(trajectories_to_path[k1].separation_dict[t_k1_first][1], trajectories_to_path[k2].separation_dict[t_k2_first][0])
-		sep12_last = max(trajectories_to_path[k1].separation_dict[t_k1_last][1], trajectories_to_path[k2].separation_dict[t_k2_last][0])
+        t_k1_first = first_node[1]
+        t_k1_last = last_node[1]
 
-		sep21_first = max(trajectories_to_path[k2].separation_dict[t_k2_first][1], trajectories_to_path[k1].separation_dict[t_k1_first][0])
-		sep21_last = max(trajectories_to_path[k2].separation_dict[t_k2_last][1], trajectories_to_path[k1].separation_dict[t_k1_last][0])
+        t_k2_first = first_node[2]
+        t_k2_last = last_node[2]
 
-		if multiPointsStatus == 2:
-			#they are consecutive, take fist and last and create single intersection condition
-			cut_k2 = (t_k1_last - t_k1_first) - (t_k2_last - t_k2_first)
-			delta_sep12 = sep12_last - sep12_first
+        sep12_first = max(trajectories_to_path[k1].separation_dict[t_k1_first][1],
+                          trajectories_to_path[k2].separation_dict[t_k2_first][0])
+        sep12_last = max(trajectories_to_path[k1].separation_dict[t_k1_last][1],
+                         trajectories_to_path[k2].separation_dict[t_k2_last][0])
 
-			new_sep12_first = sep12_first + max(0, min(cut_k2, cut_k2 + delta_sep12)) + max(0, min(delta_sep12, delta_sep12 + cut_k2))
+        sep21_first = max(trajectories_to_path[k2].separation_dict[t_k2_first][1],
+                          trajectories_to_path[k1].separation_dict[t_k1_first][0])
+        sep21_last = max(trajectories_to_path[k2].separation_dict[t_k2_last][1],
+                         trajectories_to_path[k1].separation_dict[t_k1_last][0])
 
-			cut_k1 = (t_k2_last - t_k2_first) - (t_k1_last - t_k1_first)
-			delta_sep21 = sep21_last - sep21_first
+        if multiPointsStatus == 2:
+            # they are consecutive, take fist and last and create single intersection condition
+            cut_k2 = (t_k1_last - t_k1_first) - (t_k2_last - t_k2_first)
+            delta_sep12 = sep12_last - sep12_first
 
-			new_sep21_first = sep21_first + max(0, min(cut_k1, cut_k1 + delta_sep21)) + max(0, min(delta_sep21, delta_sep21 + cut_k1))
-		elif multiPointsStatus == 3:
-			#they are opposite
-			new_sep12_first = (t_k1_last - t_k1_first) + (t_k2_first - t_k2_last) + sep12_last
-			new_sep21_first = sep21_first
-		conflict = (k1, k2, t_k1_first, t_k2_first, new_sep12_first, new_sep21_first)
-	
-	horizontal_shared_nodes_list.append(conflict)
-	print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
-	
-def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
+            new_sep12_first = sep12_first + max(0, min(cut_k2, cut_k2 + delta_sep12)) + max(0, min(delta_sep12,
+                                                                                                   delta_sep12 + cut_k2))
+
+            cut_k1 = (t_k2_last - t_k2_first) - (t_k1_last - t_k1_first)
+            delta_sep21 = sep21_last - sep21_first
+
+            new_sep21_first = sep21_first + max(0, min(cut_k1, cut_k1 + delta_sep21)) + max(0, min(delta_sep21,
+                                                                                                   delta_sep21 + cut_k1))
+        elif multiPointsStatus == 3:
+            # they are opposite
+            new_sep12_first = (t_k1_last - t_k1_first) + (t_k2_first - t_k2_last) + sep12_last
+            new_sep21_first = sep21_first
+        conflict = (k1, k2, t_k1_first, t_k2_first, new_sep12_first, new_sep21_first)
+
+    horizontal_shared_nodes_list.append(conflict)
+    # print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
+
+
+def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph,
+                                 graph_dual, raw_graph):
     """Generate intersection points between given trajectories"""
 
     protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
@@ -130,7 +144,7 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     descent_horiz_list = []
     climb_climb_list = []
     descent_descent_list = []
-    
+
     '''Intersection dicts has key=interescting_point_id (e.g. node, dep, arr, or edge id) 
     and value that is another dict whose key is time_id and value is list of trajectories 
     (plus additional elements that are further needed e.g. time over a point, speeds,etc.)
@@ -141,20 +155,24 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     * Hence, it is given by a sum of max_delay and max sep in time, plus any addition time shift,
     such as level distances, etc. (this depends on the type of intersection)
     Atention!!! always use the same norm to filter and to indentify intersection'''
-    #horizontal-horizontal
-    delta_time_horizontal = math.ceil(delay_max + model.protection_area/Drone.speeds_dict["turn2"])
+    # horizontal-horizontal
+    delta_time_horizontal = math.ceil(delay_max + model.protection_area / Drone.speeds_dict_model1["turn2"])
     horizontal_intersection_grid = {}
-    #vertical-horizontal
-    delta_time_clmb_hor = math.ceil(delay_max + Drone.vertical_speed/(2*Drone.vertical_accel) + model.protection_area/Drone.speeds_dict["turn2"])
+    # vertical-horizontal
+    delta_time_clmb_hor = math.ceil(
+        delay_max + Drone.vertical_speed / (2 * Drone.vertical_accel) + model.protection_area / Drone.speeds_dict_model1[
+            "turn2"])
     clmb_intersection_grid = {}
     clmb_hor_intersection_grid = {}
-    delta_time_desc_hor = math.ceil(delay_max + 2*max_delta_fl*FL_sep/Drone.vertical_speed + Drone.vertical_speed/(2*Drone.vertical_accel) + model.protection_area/Drone.speeds_dict["turn2"])
+    delta_time_desc_hor = math.ceil(
+        delay_max + 2 * max_delta_fl * FL_sep / Drone.vertical_speed + Drone.vertical_speed / (
+                2 * Drone.vertical_accel) + model.protection_area / Drone.speeds_dict_model1["turn2"])
     desc_intersection_grid = {}
     desc_hor_intersection_grid = {}
-    #vertical-vertical
+    # vertical-vertical
     delta_time_dep = math.ceil(delay_max + temps_sep_vertiport)
     dep_intersection_grid = {}
-    delta_time_arr = math.ceil(delay_max + 2*max_delta_fl*FL_sep/Drone.vertical_speed + temps_sep_vertiport)
+    delta_time_arr = math.ceil(delay_max + 2 * max_delta_fl * FL_sep / Drone.vertical_speed + temps_sep_vertiport)
     arr_intersection_grid = {}
     '''Loop over all drones, trajectories and their nodes and fill the grids 
     by adding concerned trajectories and respective passage time over intersecting point (and any other required data)
@@ -163,543 +181,558 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     (edge_id is the one in which middle the vertiport is located)
     * dep_intersection_grid and arr_intersection_grid indexed by vertiport_id and normalized time'''
     for drone in model.droneList:
-        #initialize clmb_intersection_grid
+        # initialize clmb_intersection_grid
         dep_edge = drone.dep_edge
-        if dep_edge: #vertiport in the unconstrained airspace are not linked with edge, hence no intersection
+        if dep_edge:  # vertiport in the unconstrained airspace are not linked with edge, hence no intersection
             if dep_edge[0] > dep_edge[1]:
                 dep_edge = (dep_edge[1], dep_edge[0])
             if not dep_edge in clmb_intersection_grid:
                 clmb_intersection_grid[dep_edge] = {}
-        #initialize desc_intersection_grid
+        # initialize desc_intersection_grid
         arr_edge = drone.arr_edge
-        if arr_edge: #vertiport in the unconstrained airspace are not linked with edge, hence no intersection
+        if arr_edge:  # vertiport in the unconstrained airspace are not linked with edge, hence no intersection
             if arr_edge[0] > arr_edge[1]:
                 arr_edge = (arr_edge[1], arr_edge[0])
             if not arr_edge in desc_intersection_grid:
                 desc_intersection_grid[arr_edge] = {}
-        #initialize dep_intersection_grid
+        # initialize dep_intersection_grid
         dep = drone.dep
+        # TODO dep vertiport plutot
         if not dep in dep_intersection_grid:
             dep_intersection_grid[dep] = {}
-        #initialize arr_intersection_grid
+        # initialize arr_intersection_grid
         arr = drone.arr
         if not arr in arr_intersection_grid:
             arr_intersection_grid[arr] = {}
-            
+
         drone_fn = drone.flight_number
         for traj_id in drone_trajectories_dict[drone_fn]:
             traj_path = drone_trajectories_dict[drone_fn][traj_id][0]
-            #fill clmb_intersection_grid
+            # fill clmb_intersection_grid
             if dep_edge:
-                time_id = traj_path.dep_time//delta_time_clmb_hor
+                time_id = traj_path.dep_time // delta_time_clmb_hor
                 if not time_id in clmb_intersection_grid[dep_edge]:
                     clmb_intersection_grid[dep_edge][time_id] = []
                 clmb_intersection_grid[dep_edge][time_id].append((traj_id, traj_path.dep_time))
-            #fill desc_intersection_grid
+            # fill desc_intersection_grid
             if arr_edge:
-                time_id = traj_path.arr_time//delta_time_desc_hor
+                time_id = traj_path.arr_time // delta_time_desc_hor
                 if not time_id in desc_intersection_grid[arr_edge]:
                     desc_intersection_grid[arr_edge][time_id] = []
                 desc_intersection_grid[arr_edge][time_id].append((traj_id, traj_path.arr_time))
-            #fill dep_intersection_grid
-            time_id = traj_path.dep_time//delta_time_dep #integer division
+            # fill dep_intersection_grid
+            time_id = traj_path.dep_time // delta_time_dep  # integer division
             if not time_id in dep_intersection_grid[dep]:
                 dep_intersection_grid[dep][time_id] = []
             dep_intersection_grid[dep][time_id].append((traj_id, traj_path.dep_time))
-            #fill arr_intersection_grid
-            time_id = traj_path.arr_time//delta_time_arr #integer division
+            # fill arr_intersection_grid
+            time_id = traj_path.arr_time // delta_time_arr  # integer division
             if not time_id in arr_intersection_grid[arr]:
                 arr_intersection_grid[arr][time_id] = []
             arr_intersection_grid[arr][time_id].append((traj_id, traj_path.arr_time))
-            
+
             for t, node_id in traj_path.path_dict.items():
-                #initialize horizontal_intersection_grid
-                time_id = t//delta_time_horizontal #integer division
+                # initialize horizontal_intersection_grid
+                time_id = t // delta_time_horizontal  # integer division
                 if not node_id in horizontal_intersection_grid:
                     horizontal_intersection_grid[node_id] = {}
                 if not time_id in horizontal_intersection_grid[node_id]:
                     horizontal_intersection_grid[node_id][time_id] = []
-                #fill horizontal_intersection_grid
+                # fill horizontal_intersection_grid
                 horizontal_intersection_grid[node_id][time_id].append((traj_id, t))
 
-            #!!!ATTENTION!!!We could avoid this second loop if path_dict is already ordered by time and then edges are created on the fly
+            # !!!ATTENTION!!!We could avoid this second loop if path_dict is already ordered by time and then edges are created on the fly
             for edge_id, (t, speed) in traj_path.edge_middle_dict.items():
                 if edge_id[0] > edge_id[1]:
                     edge_id = (edge_id[1], edge_id[0])
-                #initialize clmb_hor_intersection_grid
-                time_id = t//delta_time_clmb_hor
+                # initialize clmb_hor_intersection_grid
+                time_id = t // delta_time_clmb_hor
                 if not edge_id in clmb_hor_intersection_grid:
                     clmb_hor_intersection_grid[edge_id] = {}
                 if not time_id in clmb_hor_intersection_grid[edge_id]:
                     clmb_hor_intersection_grid[edge_id][time_id] = []
-                #fill clmb_hor_intersection_grid
+                # fill clmb_hor_intersection_grid
                 clmb_hor_intersection_grid[edge_id][time_id].append((traj_id, t, speed))
-                
-                #initialize desc_hor_intersection_grid
-                time_id = t//delta_time_desc_hor
+
+                # initialize desc_hor_intersection_grid
+                time_id = t // delta_time_desc_hor
                 if not edge_id in desc_hor_intersection_grid:
                     desc_hor_intersection_grid[edge_id] = {}
                 if not time_id in desc_hor_intersection_grid[edge_id]:
                     desc_hor_intersection_grid[edge_id][time_id] = []
-                #fill desc_hor_intersection_grid
+                # fill desc_hor_intersection_grid
                 desc_hor_intersection_grid[edge_id][time_id].append((traj_id, t, speed))
-                
+
     '''DETECTION OF HORIZONTAL INTERSECTION POINTS
-    Now it is simply necessary to loop over the grid and for every node_id and every time_id 
-    then verify all trajectory pairs in this cell and neighbouring ones
-    i.e. one time_id before and after are potential interactions
-    * If we want to avoid to conservative consideration of intersections, we need to filter further 
-    all pairs by the actual time separation whether it is less than delta_time_horizontal
-    To avoid duplicates, for every time_id we check all combinations of:
-    * trajs in time_id
-    * trajs in time_id vs time_id+1
-    
-    Intersection points could be imediatelly created for every filtered pair,
-    but to avoid multiple intersection points (in the case when two trajs share part of their routes)
-    we first store all intersecting point for every pair of trajs and apply additional filters.
-    So let's buid a new dictionary that will keep all intersecting points for a pair of trajs
-    with passage time of first and second trajectory over the points'''
+	Now it is simply necessary to loop over the grid and for every node_id and every time_id 
+	then verify all trajectory pairs in this cell and neighbouring ones
+	i.e. one time_id before and after are potential interactions
+	* If we want to avoid to conservative consideration of intersections, we need to filter further 
+	all pairs by the actual time separation whether it is less than delta_time_horizontal
+	To avoid duplicates, for every time_id we check all combinations of:
+	* trajs in time_id
+	* trajs in time_id vs time_id+1
+	
+	Intersection points could be imediatelly created for every filtered pair,
+	but to avoid multiple intersection points (in the case when two trajs share part of their routes)
+	we first store all intersecting point for every pair of trajs and apply additional filters.
+	So let's buid a new dictionary that will keep all intersecting points for a pair of trajs
+	with passage time of first and second trajectory over the points'''
     horizontal_intersections = {}
     for node_id in horizontal_intersection_grid:
         for time_id in horizontal_intersection_grid[node_id]:
 
             potential_intersections = list(itertools.combinations(horizontal_intersection_grid[node_id][time_id], 2))
-            if time_id+1 in horizontal_intersection_grid[node_id]:
-                potential_intersections.extend(itertools.product(horizontal_intersection_grid[node_id][time_id], horizontal_intersection_grid[node_id][time_id+1]))
+            if time_id + 1 in horizontal_intersection_grid[node_id]:
+                potential_intersections.extend(itertools.product(horizontal_intersection_grid[node_id][time_id],
+                                                                 horizontal_intersection_grid[node_id][time_id + 1]))
 
             for pair in potential_intersections:
-                if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]: #not the same flight intention i.e. drone
-                    if abs(pair[0][1] - pair[1][1]) <= delta_time_horizontal: #further fillterig per actual separation
+                if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:  # not the same flight intention i.e. drone
+                    if abs(pair[0][1] - pair[1][1]) <= delta_time_horizontal:  # further fillterig per actual separation
                         key = (pair[0][0], pair[1][0])
                         val = (node_id, pair[0][1], pair[1][1])
                         if pair[0][0] > pair[1][0]:
                             key = (pair[1][0], pair[0][0])
                             val = (node_id, pair[1][1], pair[0][1])
-                            
+
                         if not key in horizontal_intersections:
                             horizontal_intersections[key] = []
                         horizontal_intersections[key].append(val)
 
     '''now for every pair of trajectories remove multiple points (that could be consecutive or opposite)
-    and save the intersection point(s)'''
+	and save the intersection point(s)'''
     for (k1, k2), points in horizontal_intersections.items():
-        print("k1 k2")
-        print(k1, k2)
+        # print("k1 k2")
+        # print(k1, k2)
 
         if len(points) == 1:
-            #this is just simple intersection
-            #save intersecting point and continue
-            print("points initial")
-            print(points)
+            # this is just simple intersection
+            # save intersecting point and continue
+            # print("points initial")
+            # print(points)
             save_intersection(trajectories_to_path, k1, k2, points, 1, horizontal_shared_nodes_list)
-            #t1 = points[0][1]
-            #t2 = points[0][2]
-            #conflict = (k1, k2, t1, t2, protection_area / trajectories_to_path[k1].speed_time_stamps[t1], protection_area / trajectories_to_path[k2].speed_time_stamps[t2])
+        # t1 = points[0][1]
+        # t2 = points[0][2]
+        # conflict = (k1, k2, t1, t2, protection_area / trajectories_to_path[k1].speed_time_stamps[t1], protection_area / trajectories_to_path[k2].speed_time_stamps[t2])
         else:
-            #there are multiple points, but they could be still: independent or
-            #part of the consecutive or opossite portion of traj
-            #detect the case, reduce points if needed and save results
+            # there are multiple points, but they could be still: independent or
+            # part of the consecutive or opossite portion of traj
+            # detect the case, reduce points if needed and save results
 
-            #sort the points by passage time of first traj
-            points.sort(key=lambda x:x[1])
-            print("points initial")
-            print(points)
-            
+            # sort the points by passage time of first traj
+            points.sort(key=lambda x: x[1])
+            # print("points initial")
+            # print(points)
+
             multiPoints = [points[0]]
-            multiPointsStatus = 1 #1 if independant, 2 if consecutive, 3 if opposite
+            multiPointsStatus = 1  # 1 if independant, 2 if consecutive, 3 if opposite
             point_index = 1
             while point_index < len(points):
                 if (multiPoints[-1][1], multiPoints[-1][0]) in trajectories_to_path[k1].next_node_dict:
-                    if trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])] == (points[point_index][1], points[point_index][0]):
-                        #Potentially there is multiplication
+                    if trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])] == (
+                            points[point_index][1], points[point_index][0]):
+                        # Potentially there is multiplication
                         if (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].next_node_dict:
-                            if trajectories_to_path[k2].next_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (points[point_index][2], points[point_index][0]):
-                                #consecutive multiple points
+                            if trajectories_to_path[k2].next_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (
+                                    points[point_index][2], points[point_index][0]):
+                                # consecutive multiple points
                                 multiPoints.append(points[point_index])
                                 multiPointsStatus = 2
                                 point_index += 1
                                 continue
                         if (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].previous_node_dict:
-                            if trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (points[point_index][2], points[point_index][0]):
-                                #opposite multiple points
+                            if trajectories_to_path[k2].previous_node_dict[
+                                (multiPoints[-1][2], multiPoints[-1][0])] == (
+                                    points[point_index][2], points[point_index][0]):
+                                # opposite multiple points
                                 multiPoints.append(points[point_index])
                                 multiPointsStatus = 3
                                 point_index += 1
                                 continue
 
-                #multi point chain is broken
-                #save intersection(s)
-                save_intersection(trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, horizontal_shared_nodes_list)
-                #print("Connected :", multiPoints)
-                #if multiPointsStatus == 1: #this could be verified with len of multiPoints
-                    ##save independent intersecting point
-                    #t1 = multiPoints[0][1]
-                    #t2 = multiPoints[0][2]
-                    #conflict = (k1, k2, t1, t2, protection_area / trajectories_to_path[k1].speed_time_stamps[t1], protection_area / trajectories_to_path[k2].speed_time_stamps[t2])
-                #else:
-                    #first_node = multiPoints[0]
-                    #last_node = multiPoints[-1]
+                # multi point chain is broken
+                # save intersection(s)
+                save_intersection(trajectories_to_path, k1, k2, multiPoints, multiPointsStatus,
+                                  horizontal_shared_nodes_list)
+                # print("Connected :", multiPoints)
+                # if multiPointsStatus == 1: #this could be verified with len of multiPoints
+                ##save independent intersecting point
+                # t1 = multiPoints[0][1]
+                # t2 = multiPoints[0][2]
+                # conflict = (k1, k2, t1, t2, protection_area / trajectories_to_path[k1].speed_time_stamps[t1], protection_area / trajectories_to_path[k2].speed_time_stamps[t2])
+                # else:
+                # first_node = multiPoints[0]
+                # last_node = multiPoints[-1]
 
-                    #t_k1_first = first_node[1]
-                    #t_k1_last = last_node[1]
-                    #sep12_first = protection_area / trajectories_to_path[k1].speed_time_stamps[t_k1_first]
-                    #sep12_last = protection_area / trajectories_to_path[k1].speed_time_stamps[t_k1_last]
+                # t_k1_first = first_node[1]
+                # t_k1_last = last_node[1]
+                # sep12_first = protection_area / trajectories_to_path[k1].speed_time_stamps[t_k1_first]
+                # sep12_last = protection_area / trajectories_to_path[k1].speed_time_stamps[t_k1_last]
 
-                    #t_k2_first = first_node[2]
-                    #t_k2_last = last_node[2]
-                    #sep21_first = protection_area / trajectories_to_path[k2].speed_time_stamps[t_k2_first]
-                    #sep21_last = protection_area / trajectories_to_path[k2].speed_time_stamps[t_k2_last]
+                # t_k2_first = first_node[2]
+                # t_k2_last = last_node[2]
+                # sep21_first = protection_area / trajectories_to_path[k2].speed_time_stamps[t_k2_first]
+                # sep21_last = protection_area / trajectories_to_path[k2].speed_time_stamps[t_k2_last]
 
-                    #if multiPointsStatus == 2:
-                        ##they are consecutive, take fist and last and create single intersection condition
-                        #cut_k2 = (t_k1_last - t_k1_first) - (t_k2_last - t_k2_first)
-                        #delta_sep12 = sep12_last - sep12_first
+                # if multiPointsStatus == 2:
+                ##they are consecutive, take fist and last and create single intersection condition
+                # cut_k2 = (t_k1_last - t_k1_first) - (t_k2_last - t_k2_first)
+                # delta_sep12 = sep12_last - sep12_first
 
-                        #new_sep12_first = sep12_first + max(0, min(cut_k2, cut_k2 + delta_sep12)) + max(0, min(delta_sep12, delta_sep12 + cut_k2))
+                # new_sep12_first = sep12_first + max(0, min(cut_k2, cut_k2 + delta_sep12)) + max(0, min(delta_sep12, delta_sep12 + cut_k2))
 
-                        #cut_k1 = (t_k2_last - t_k2_first) - (t_k1_last - t_k1_first)
-                        #delta_sep21 = sep21_last - sep21_first
+                # cut_k1 = (t_k2_last - t_k2_first) - (t_k1_last - t_k1_first)
+                # delta_sep21 = sep21_last - sep21_first
 
-                        #new_sep21_first = sep21_first + max(0, min(cut_k1, cut_k1 + delta_sep21)) + max(0, min(delta_sep21, delta_sep21 + cut_k1))
-                    #elif multiPointsStatus == 3:
-                        ##they are opposite
-                        #new_sep12_first = (t_k1_last - t_k1_first) + (t_k2_first - t_k2_last) + sep12_last
-                        #new_sep21_first = sep21_first
-                    #conflict = (k1, k2, t_k1_first, t_k2_first, new_sep12_first, new_sep21_first)
-                
-                #horizontal_shared_nodes_list.append(conflict)
-                #print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
+                # new_sep21_first = sep21_first + max(0, min(cut_k1, cut_k1 + delta_sep21)) + max(0, min(delta_sep21, delta_sep21 + cut_k1))
+                # elif multiPointsStatus == 3:
+                ##they are opposite
+                # new_sep12_first = (t_k1_last - t_k1_first) + (t_k2_first - t_k2_last) + sep12_last
+                # new_sep21_first = sep21_first
+                # conflict = (k1, k2, t_k1_first, t_k2_first, new_sep12_first, new_sep21_first)
 
-                #reinitialise multiPoints and multiPointsStatus
+                # horizontal_shared_nodes_list.append(conflict)
+                # print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
+
+                # reinitialise multiPoints and multiPointsStatus
                 multiPoints = [points[point_index]]
                 multiPointsStatus = 1
                 point_index += 1
-            
-            #make last saving
-            save_intersection(trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, horizontal_shared_nodes_list)
-            
-    
+
+            # make last saving
+            save_intersection(trajectories_to_path, k1, k2, multiPoints, multiPointsStatus,
+                              horizontal_shared_nodes_list)
+
     '''DETECTION OF VERT_HOR INTERSECTION POINTS
-    Loop over the vertical greed (containing all clmb and desc trajs) and for every edge_id and every time_id 
-    verify if vertical trajs are in interaction with horizontal in the neighbourhood.
-    To avoid duplicates for every time_id we check all combinations of:
-    * vert[time_id] vs hor[time_id]
-    * vert[time_id] vs hor[time_id+1]
-    * vert[time_id+1] vs hor[time_id]
-    The principle is the same for clmb_hor_intersection_grid and desc_hor_intersection_grid just time norm is different'''
+	Loop over the vertical greed (containing all clmb and desc trajs) and for every edge_id and every time_id 
+	verify if vertical trajs are in interaction with horizontal in the neighbourhood.
+	To avoid duplicates for every time_id we check all combinations of:
+	* vert[time_id] vs hor[time_id]
+	* vert[time_id] vs hor[time_id+1]
+	* vert[time_id+1] vs hor[time_id]
+	The principle is the same for clmb_hor_intersection_grid and desc_hor_intersection_grid just time norm is different'''
 
     for dep_edge in clmb_intersection_grid:
         for time_id in clmb_intersection_grid[dep_edge]:
-            if dep_edge in clmb_hor_intersection_grid: #if no hor drones no intersections
+            if dep_edge in clmb_hor_intersection_grid:  # if no hor drones no intersections
                 potential_intersections = []
                 if time_id in clmb_hor_intersection_grid[dep_edge]:
-                    #add interaction of current clmb and hor
-                    potential_intersections.extend(itertools.product(clmb_intersection_grid[dep_edge][time_id],clmb_hor_intersection_grid[dep_edge][time_id]))
-                    #add interaction of next clmb and current hor
-                    if time_id+1 in clmb_intersection_grid[dep_edge]:
-                        potential_intersections.extend(itertools.product(clmb_intersection_grid[dep_edge][time_id+1],clmb_hor_intersection_grid[dep_edge][time_id]))
-                
-                #add interaction of current clmb and next hor
-                if time_id+1 in clmb_hor_intersection_grid[dep_edge]:
-                    potential_intersections.extend(itertools.product(clmb_intersection_grid[dep_edge][time_id],clmb_hor_intersection_grid[dep_edge][time_id+1]))
-                    
-                for pair in potential_intersections:    
+                    # add interaction of current clmb and hor
+                    potential_intersections.extend(itertools.product(clmb_intersection_grid[dep_edge][time_id],
+                                                                     clmb_hor_intersection_grid[dep_edge][time_id]))
+                    # add interaction of next clmb and current hor
+                    if time_id + 1 in clmb_intersection_grid[dep_edge]:
+                        potential_intersections.extend(itertools.product(clmb_intersection_grid[dep_edge][time_id + 1],
+                                                                         clmb_hor_intersection_grid[dep_edge][time_id]))
+
+                # add interaction of current clmb and next hor
+                if time_id + 1 in clmb_hor_intersection_grid[dep_edge]:
+                    potential_intersections.extend(itertools.product(clmb_intersection_grid[dep_edge][time_id],
+                                                                     clmb_hor_intersection_grid[dep_edge][time_id + 1]))
+
+                for pair in potential_intersections:
                     if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
-                        if abs(pair[0][1] - pair[1][1]) <= delta_time_clmb_hor: #further fillterig per actual separation
-                            #create intersecting point
-                            conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, protection_area / pair[1][2])
+                        if abs(pair[0][1] - pair[1][1]) <= delta_time_clmb_hor:  # further fillterig per actual separation
+                            # create intersecting point
+                            conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport,
+                                        protection_area / pair[1][2])
                             climb_horiz_list.append(conflict)
 
     '''DETECTION OF VERTICAL INTERSECTION POINTS
-    Loop over the dep_intersection_grid and for every dep point and every time_id 
-    verify all pairs of trajectories in the neighbourhood.
-    To avoid duplicates for every time_id we check all combinations:
-    * in deps[time_id]
-    * of deps[time_id] vs deps[time_id+1]
-    The principle is the same for arr_intersection_grid just time norm is different.'''
-    
-    #DETECTION OF DEP INTERSECTION POINTS
+	Loop over the dep_intersection_grid and for every dep point and every time_id 
+	verify all pairs of trajectories in the neighbourhood.
+	To avoid duplicates for every time_id we check all combinations:
+	* in deps[time_id]
+	* of deps[time_id] vs deps[time_id+1]
+	The principle is the same for arr_intersection_grid just time norm is different.'''
+
+    # DETECTION OF DEP INTERSECTION POINTS
     for dep in dep_intersection_grid:
         for time_id in dep_intersection_grid[dep]:
             potential_intersections = list(itertools.combinations(dep_intersection_grid[dep][time_id], 2))
-            if time_id+1 in dep_intersection_grid[dep]:
-                potential_intersections.extend(itertools.product(dep_intersection_grid[dep][time_id], dep_intersection_grid[dep][time_id+1]))
-                    
+            if time_id + 1 in dep_intersection_grid[dep]:
+                potential_intersections.extend(
+                    itertools.product(dep_intersection_grid[dep][time_id], dep_intersection_grid[dep][time_id + 1]))
+
             for pair in potential_intersections:
                 if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
-                    if abs(pair[0][1] - pair[1][1]) <= delta_time_dep: #further fillterig per actual separation
-                        #create intersecting point
-                        conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, temps_sep_vertiport)
+                    if abs(pair[0][1] - pair[1][1]) <= delta_time_dep:  # further fillterig per actual separation
+                        # create intersecting point
+                        conflict = (
+                            pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, temps_sep_vertiport)
                         climb_climb_list.append(conflict)
-    
-    #DETECTION OF ARR INTERSECTION POINTS
+
+    # DETECTION OF ARR INTERSECTION POINTS
     for arr in arr_intersection_grid:
         for time_id in arr_intersection_grid[arr]:
             potential_intersections = list(itertools.combinations(arr_intersection_grid[arr][time_id], 2))
-            if time_id+1 in arr_intersection_grid[arr]:
-                potential_intersections.extend(itertools.product(arr_intersection_grid[arr][time_id], arr_intersection_grid[arr][time_id+1]))
-                
+            if time_id + 1 in arr_intersection_grid[arr]:
+                potential_intersections.extend(
+                    itertools.product(arr_intersection_grid[arr][time_id], arr_intersection_grid[arr][time_id + 1]))
+
             for pair in potential_intersections:
                 if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
-                    if abs(pair[0][1] - pair[1][1]) <= delta_time_arr: #further fillterig per actual separation
-                        #create intersecting point
-                        conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, temps_sep_vertiport)
+                    if abs(pair[0][1] - pair[1][1]) <= delta_time_arr:  # further fillterig per actual separation
+                        # create intersecting point
+                        conflict = (
+                            pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, temps_sep_vertiport)
                         descent_descent_list.append(conflict)
-
-    sys.exit(0)
-    
-    
-    
-    
-    
-    
-    
-    
-    size = 0
-    for drone_fn in drone_trajectories_dict:
-        for traj in drone_trajectories_dict[drone_fn]:
-            size += 1
-    ####
-    # Check for shared nodes between trajectories
-    # print("Check for shared nodes on horizontal route")
-    # print("size", size)
-
-    first_conflict = None
-    conflict_id = None
-    who_was_first = None
-    count_fused_nodes = 0
-    for i in range(size):
-        # print(i)
-        for j in range(i + 1, size):
-            flight_number1 = trajectories_to_fn_dict[i]
-            flight_number2 = trajectories_to_fn_dict[j]
-            if flight_number1 == flight_number2:
-                continue
-            drone1 = return_drone_from_flight_number(model, flight_number1)
-            drone2 = return_drone_from_flight_number(model, flight_number2)
-            drone1.path_object = drone_trajectories_dict[flight_number1][i][0]
-            drone2.path_object = drone_trajectories_dict[flight_number2][j][0]
-            traj1 = i
-            traj2 = j
-
-            # Nodes that both trajectories use
-            consecutive_nodes = [drone1.path_object.path[0]]
-            for index1, node in enumerate(drone1.path_object.path):
-                if node in drone2.path_object.path:
-                    index2 = drone2.path_object.path.index(node)
-                    t1 = None
-                    for t in drone1.path_object.path_dict:
-                        if drone1.path_object.path_dict[t] == node:
-                            t1 = t
-                            break
-                    t2 = None
-                    for t in drone2.path_object.path_dict:
-                        if drone2.path_object.path_dict[t] == node:
-                            t2 = t
-                            break
-                    v1 = get_drone_speed_after_node(model, drone1, graph, graph_dual, node)
-                    v2 = get_drone_speed_after_node(model, drone2, graph, graph_dual, node)
-
-                    # conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
-                    # if check_if_conflict_is_possible(conflict, model):
-                    #     horizontal_shared_nodes_list.append(conflict)
-
-                    # drone_shared_nodes_tab[i][j].append((t1, t2, protection_area/v1, protection_area/v2))
-                    t_stamps_d1 = sorted(list(drone1.path_object.path_dict.keys()))
-                    t_stamps_d2 = sorted(list(drone2.path_object.path_dict.keys()))
-                    # Same way
-                    if t1 != t_stamps_d1[-1] and t2 != t_stamps_d2[-1]:
-                        d1_t_next_node = t_stamps_d1[t_stamps_d1.index(t1) + 1]
-                        d2_t_next_node = t_stamps_d2[t_stamps_d2.index(t2) + 1]
-                        d1_next_node = drone1.path_object.path_dict[d1_t_next_node]
-                        d2_next_node = drone2.path_object.path_dict[d2_t_next_node]
-                        # same way
-                        if d1_next_node == d2_next_node:
-                            d1_previous_node = drone1.path_object.path[index1 - 1]
-                            d2_previous_node = drone2.path_object.path[index2 - 1]
-                            # if t1 <= t2:
-                            # Check it's the same node, and same order and consecutive
-                            if d1_previous_node == d2_previous_node and d1_previous_node in consecutive_nodes and who_was_first == drone1.flight_number:
-                                # delta_2 = max(protection_area / v1, (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
-                                delta_1 = max(protection_area / v1, protection_area / v1 + (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
-                                delta_2 = max(protection_area / v2, protection_area / v2 + (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
-                                conflict = (traj1, traj2, t1, t2, delta_1, delta_2)
-                                consecutive_nodes.append(node)
-                                cut2 = (t1 - first_conflict[2]) - (t2 - first_conflict[3])
-                                delta_sep12 = conflict[4] - first_conflict[4]
-                                cut1 = - cut2
-                                delta_sep21 = conflict[5] - first_conflict[5]
-                                new_sep12 = first_conflict[4] + max(min(cut2, cut2 + delta_sep12), 0) + max(min(delta_sep12, delta_sep12 + cut2), 0)
-                                new_sep21 = first_conflict[5] + max(min(cut1, cut1 + delta_sep21), 0) + max(min(delta_sep21, delta_sep21 + cut1), 0)
-                                conflict = (traj1, traj2, first_conflict[2], first_conflict[3], new_sep12, new_sep21)
-                                horizontal_shared_nodes_list[conflict_id] = conflict
-                                count_fused_nodes += 1
-
-                            else:
-                                # If drone1 goes first we need to make sure the delta2 is enough for drone2 not to catch up
-                                consecutive_nodes = [node]
-                                # (t1-d1_t_next_node)-(t2-d2_t_next_node) > 0 if 2 is faster
-                                # TODO A VERIFIER
-                                delta_1 = max(protection_area / v1, protection_area / v1 + (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
-                                delta_2 = max(protection_area / v2, protection_area / v2 + (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
-                                conflict = (traj1, traj2, t1, t2, delta_1, delta_2)
-                                first_conflict = conflict
-                                if check_if_conflict_is_possible(conflict, model):
-                                    horizontal_shared_nodes_list.append(conflict)
-                                    conflict_id = len(horizontal_shared_nodes_list) - 1
-                            who_was_first = drone1.flight_number
-                        else:
-                            #TODO EN FAIT c'eST MAX (V1/SEP , V2/SEP) avec un des deux qui est v apres le noeud et l'autre v avant le noeud
-                            conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
-                            if check_if_conflict_is_possible(conflict, model):
-                                horizontal_shared_nodes_list.append(conflict)
-                                conflict_id = len(horizontal_shared_nodes_list) - 1
-                    else:
-                        conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
-                        if check_if_conflict_is_possible(conflict, model):
-                            horizontal_shared_nodes_list.append(conflict)
-                            conflict_id = len(horizontal_shared_nodes_list) - 1
-
-                            # if t2 < t1:
-                            #     if d1_previous_node == d2_previous_node and d1_previous_node in consecutive_nodes and who_was_first == drone1.flight_number:
-                            #         delta_1 = max(protection_area / v2, (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
-                            #         conflict = (traj1, traj2, t1, t2, delta_1, protection_area / v2)
-                            #         consecutive_nodes.append(node)
-                            #         cut2 = (t1 - first_conflict[2]) - (t2 - first_conflict[3])
-                            #         delta_sep12 = conflict[4] - first_conflict[4]
-                            #         cut1 = - cut2
-                            #         delta_sep21 = conflict[5] - first_conflict[5]
-                            #         new_sep12 = first_conflict[4] + max(min(cut2, cut2 + delta_sep12), 0) + max(min(delta_sep12, delta_sep12 + cut2), 0)
-                            #         new_sep21 = first_conflict[5] + max(min(cut1, cut1 + delta_sep21), 0) + max(min(delta_sep21, delta_sep21 + cut1), 0)
-                            #         conflict = (traj1, traj2, first_conflict[2], first_conflict[3], new_sep12, new_sep21)
-                            #         horizontal_shared_nodes_list[conflict_id] = conflict
-                            #         count_fused_nodes += 1
-                            #     else:
-                            #         # If drone2 goes first we need to make sure the delta1 is enough for drone2 not to catch up
-                            #         consecutive_nodes = [node]
-                            #         delta_1 = max(protection_area / v2, (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
-                            #         conflict = (traj1, traj2, t1, t2, delta_1, protection_area / v2)
-                            #         if check_if_conflict_is_possible(conflict, model):
-                            #             horizontal_shared_nodes_list.append(conflict)
-                            #             conflict_id = len(horizontal_shared_nodes_list) - 1
-                            #     who_was_first = drone2.flight_number
-                        # else:
-                        #     conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
-                        #     if check_if_conflict_is_possible(conflict, model):
-                        #         horizontal_shared_nodes_list.append(conflict)
-                    # else:
-                    #     conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
-                    #     if check_if_conflict_is_possible(conflict, model):
-                    #         horizontal_shared_nodes_list.append(conflict)
-
-                    # Opposite ways
-                    # If D1 goes first
-                    if t1 != t_stamps_d1[-1] and t2 != t_stamps_d2[0]:
-                        if t1 < t2:
-                            d1_t_next_node = t_stamps_d1[t_stamps_d1.index(t1) + 1]
-                            d2_t_prev_node = t_stamps_d2[t_stamps_d2.index(t2) - 1]
-                            d1_next_node = drone1.path_object.path_dict[d1_t_next_node]
-                            d2_prev_node = drone2.path_object.path_dict[d2_t_prev_node]
-                            if d1_next_node == d2_prev_node:
-                                delta_1 = (t2 - d2_t_prev_node) + (d1_t_next_node - t1)
-                                conflict = (traj1, traj2, t1, t2, delta_1, protection_area / v2)
-                                if check_if_conflict_is_possible(conflict, model):
-                                    horizontal_shared_nodes_list.append(conflict)
-                    # if D2 goes first
-                    if t2 != t_stamps_d2[-1] and t1 != t_stamps_d1[0]:
-                        if t2 < t1:
-                            d2_t_next_node = t_stamps_d2[t_stamps_d2.index(t2) + 1]
-                            d1_t_prev_node = t_stamps_d1[t_stamps_d1.index(t1) - 1]
-                            d2_next_node = drone2.path_object.path_dict[d2_t_next_node]
-                            d1_prev_node = drone1.path_object.path_dict[d1_t_prev_node]
-                            if d2_next_node == d1_prev_node:
-                                delta_2 = (t1 - d1_t_prev_node) + (d2_t_next_node - t2)
-                                conflict = (traj1, traj2, t1, t2, protection_area / v1, delta_2)
-                                if check_if_conflict_is_possible(conflict, model):
-                                    horizontal_shared_nodes_list.append(conflict)
-    # print("NB OF FUSED NODES = ", count_fused_nodes)
-    ####
-    # Horizontal/Vertical shared nodes
-    # TODO est ce qu'on veut les deux i,j j,i ou que un des deux suffit
-    # print("Searching for departure and arrival edges for each drone")
-    dep_edge_dict, arrival_edge_dict = get_all_dep_and_arr_edges(model, raw_graph)
-    # print("Check for vertically shared nodes with horizontal route")
-    for i in range(size):
-        # print("D" + str(1 + (i // number_of_traj_to_keep)))
-        flight_number1 = trajectories_to_fn_dict[i]
-        drone1 = return_drone_from_flight_number(model, flight_number1)
-        drone1.path_object = drone_trajectories_dict[flight_number1][i][0]
-        dep_edge = dep_edge_dict[drone1.flight_number]
-        arr_edge = arrival_edge_dict[drone1.flight_number]
-        for j in range(size):
-            flight_number2 = trajectories_to_fn_dict[j]
-            if flight_number1 == flight_number2:
-                continue
-            drone2 = return_drone_from_flight_number(model, flight_number2)
-            drone2.path_object = drone_trajectories_dict[flight_number2][j][0]
-            # Find the edges the drone start and end on
-            # Check if either is part of the other drone path
-            # print(dep_edge)
-            # TODO Faire les delta t
-            for n in range(1, len(drone2.path_object.path)):
-                if dep_edge == (drone2.path_object.path[n - 1], drone2.path_object.path[n]) or (
-                dep_edge[1], dep_edge[0]) == (drone2.path_object.path[n - 1], drone2.path_object.path[n]):
-                    # k1, k2, t1, t2, delta1, delta2
-                    # k1, k2 = i + 1, j + 1
-                    k1, k2 = i, j
-                    t1 = drone1.dep_time
-                    drone2_t_stamps = sorted(list(drone2.path_object.path_dict.keys()))
-                    # Use the expected time at half edge
-                    t2 = (drone2_t_stamps[n - 1] + drone2_t_stamps[n]) / 2
-                    delta1 = model.vertical_protection / drone1.vertical_speed
-                    delta2 = model.protection_area / get_drone_speed_after_node(model, drone2, graph, graph_dual,drone2.path_object.path[n - 1])
-                    conflict = (k1, k2, t1, t2, delta1, delta2)
-                    if check_if_conflict_is_possible(conflict, model):
-                        climb_horiz_list.append(conflict)
-                if arr_edge == (drone2.path_object.path[n - 1], drone2.path_object.path[n]) or (
-                arr_edge[1], arr_edge[0]) == (drone2.path_object.path[n - 1], drone2.path_object.path[n]):
-                    # k1, k2, t1, t2, delta1, delta2
-                    k1, k2 = i, j
-                    drone1_t_stamps = sorted(list(drone1.path_object.path_dict.keys()))
-                    t1 = drone1_t_stamps[-1]
-                    drone2_t_stamps = sorted(list(drone2.path_object.path_dict.keys()))
-                    # Use the expected time at half edge
-                    t2 = (drone2_t_stamps[n - 1] + drone2_t_stamps[n]) / 2
-                    delta1 = model.vertical_protection / drone1.vertical_speed
-                    delta2 = model.protection_area / get_drone_speed_after_node(model, drone2, graph, graph_dual,
-                                                                                drone2.path_object.path[n - 1])
-                    conflict = (k1, k2, t1, t2, delta1, delta2)
-                    if check_if_conflict_is_possible(conflict, model):
-                        descent_horiz_list.append(conflict)
-    ####
-    # Verti/verti nodes
-    # print("Check for verti/verti shared nodes")
-    # TODO remove duplicates
-    for i in range(len(model.droneList)):
-        drone1 = model.droneList[i]
-        for j in range(i + 1, len(model.droneList)):
-            drone2 = model.droneList[j]
-            if drone1.flight_number == drone2.flight_number:
-                continue
-            if drone1.dep == drone2.dep:
-                for k1 in drone_trajectories_dict[drone1.flight_number]:
-                    for k2 in drone_trajectories_dict[drone2.flight_number]:
-                        # todo speed exacte en f de distance du next node si virage
-                        conflict = (k1, k2, drone1.dep_time, drone2.dep_time,temps_sep_vertiport, temps_sep_vertiport)
-                        if check_if_conflict_is_possible(conflict, model):
-                            climb_climb_list.append(conflict)
-            if drone1.arr == drone2.arr:
-                for k1 in drone_trajectories_dict[drone1.flight_number]:
-                    for k2 in drone_trajectories_dict[drone2.flight_number]:
-                        drone2_arr_time = max(drone_trajectories_dict[drone2.flight_number][k2][0].path_dict.keys())
-                        drone1_arr_time = max(drone_trajectories_dict[drone1.flight_number][k1][0].path_dict.keys())
-                        conflict = (k1, k2, drone1_arr_time, drone2_arr_time,temps_sep_vertiport, temps_sep_vertiport)
-                        if check_if_conflict_is_possible(conflict, model):
-                            descent_descent_list.append(conflict)
+    return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
+    # sys.exit(0)
+    #
+    # size = 0
+    # for drone_fn in drone_trajectories_dict:
+    #     for traj in drone_trajectories_dict[drone_fn]:
+    #         size += 1
+    # ####
+    # # Check for shared nodes between trajectories
+    # # print("Check for shared nodes on horizontal route")
+    # # print("size", size)
+    #
+    # first_conflict = None
+    # conflict_id = None
+    # who_was_first = None
+    # count_fused_nodes = 0
+    # for i in range(size):
+    #     # print(i)
+    #     for j in range(i + 1, size):
+    #         flight_number1 = trajectories_to_fn_dict[i]
+    #         flight_number2 = trajectories_to_fn_dict[j]
+    #         if flight_number1 == flight_number2:
+    #             continue
+    #         drone1 = return_drone_from_flight_number(model, flight_number1)
+    #         drone2 = return_drone_from_flight_number(model, flight_number2)
+    #         drone1.path_object = drone_trajectories_dict[flight_number1][i][0]
+    #         drone2.path_object = drone_trajectories_dict[flight_number2][j][0]
+    #         traj1 = i
+    #         traj2 = j
+    #
+    #         # Nodes that both trajectories use
+    #         consecutive_nodes = [drone1.path_object.path[0]]
+    #         for index1, node in enumerate(drone1.path_object.path):
+    #             if node in drone2.path_object.path:
+    #                 index2 = drone2.path_object.path.index(node)
+    #                 t1 = None
+    #                 for t in drone1.path_object.path_dict:
+    #                     if drone1.path_object.path_dict[t] == node:
+    #                         t1 = t
+    #                         break
+    #                 t2 = None
+    #                 for t in drone2.path_object.path_dict:
+    #                     if drone2.path_object.path_dict[t] == node:
+    #                         t2 = t
+    #                         break
+    #                 v1 = get_drone_speed_after_node(model, drone1, graph, graph_dual, node)
+    #                 v2 = get_drone_speed_after_node(model, drone2, graph, graph_dual, node)
+    #
+    #                 # conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
+    #                 # if check_if_conflict_is_possible(conflict, model):
+    #                 #     horizontal_shared_nodes_list.append(conflict)
+    #
+    #                 # drone_shared_nodes_tab[i][j].append((t1, t2, protection_area/v1, protection_area/v2))
+    #                 t_stamps_d1 = sorted(list(drone1.path_object.path_dict.keys()))
+    #                 t_stamps_d2 = sorted(list(drone2.path_object.path_dict.keys()))
+    #                 # Same way
+    #                 if t1 != t_stamps_d1[-1] and t2 != t_stamps_d2[-1]:
+    #                     d1_t_next_node = t_stamps_d1[t_stamps_d1.index(t1) + 1]
+    #                     d2_t_next_node = t_stamps_d2[t_stamps_d2.index(t2) + 1]
+    #                     d1_next_node = drone1.path_object.path_dict[d1_t_next_node]
+    #                     d2_next_node = drone2.path_object.path_dict[d2_t_next_node]
+    #                     # same way
+    #                     if d1_next_node == d2_next_node:
+    #                         d1_previous_node = drone1.path_object.path[index1 - 1]
+    #                         d2_previous_node = drone2.path_object.path[index2 - 1]
+    #                         # if t1 <= t2:
+    #                         # Check it's the same node, and same order and consecutive
+    #                         if d1_previous_node == d2_previous_node and d1_previous_node in consecutive_nodes and who_was_first == drone1.flight_number:
+    #                             # delta_2 = max(protection_area / v1, (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
+    #                             delta_1 = max(protection_area / v1,
+    #                                           protection_area / v1 + (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
+    #                             delta_2 = max(protection_area / v2,
+    #                                           protection_area / v2 + (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
+    #                             conflict = (traj1, traj2, t1, t2, delta_1, delta_2)
+    #                             consecutive_nodes.append(node)
+    #                             cut2 = (t1 - first_conflict[2]) - (t2 - first_conflict[3])
+    #                             delta_sep12 = conflict[4] - first_conflict[4]
+    #                             cut1 = - cut2
+    #                             delta_sep21 = conflict[5] - first_conflict[5]
+    #                             new_sep12 = first_conflict[4] + max(min(cut2, cut2 + delta_sep12), 0) + max(
+    #                                 min(delta_sep12, delta_sep12 + cut2), 0)
+    #                             new_sep21 = first_conflict[5] + max(min(cut1, cut1 + delta_sep21), 0) + max(
+    #                                 min(delta_sep21, delta_sep21 + cut1), 0)
+    #                             conflict = (traj1, traj2, first_conflict[2], first_conflict[3], new_sep12, new_sep21)
+    #                             horizontal_shared_nodes_list[conflict_id] = conflict
+    #                             count_fused_nodes += 1
+    #
+    #                         else:
+    #                             # If drone1 goes first we need to make sure the delta2 is enough for drone2 not to catch up
+    #                             consecutive_nodes = [node]
+    #                             # (t1-d1_t_next_node)-(t2-d2_t_next_node) > 0 if 2 is faster
+    #                             # TODO A VERIFIER
+    #                             delta_1 = max(protection_area / v1,
+    #                                           protection_area / v1 + (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
+    #                             delta_2 = max(protection_area / v2,
+    #                                           protection_area / v2 + (t1 - d1_t_next_node) - (t2 - d2_t_next_node))
+    #                             conflict = (traj1, traj2, t1, t2, delta_1, delta_2)
+    #                             first_conflict = conflict
+    #                             if check_if_conflict_is_possible(conflict, model):
+    #                                 horizontal_shared_nodes_list.append(conflict)
+    #                                 conflict_id = len(horizontal_shared_nodes_list) - 1
+    #                         who_was_first = drone1.flight_number
+    #                     else:
+    #                         # TODO EN FAIT c'eST MAX (V1/SEP , V2/SEP) avec un des deux qui est v apres le noeud et l'autre v avant le noeud
+    #                         conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
+    #                         if check_if_conflict_is_possible(conflict, model):
+    #                             horizontal_shared_nodes_list.append(conflict)
+    #                             conflict_id = len(horizontal_shared_nodes_list) - 1
+    #                 else:
+    #                     conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
+    #                     if check_if_conflict_is_possible(conflict, model):
+    #                         horizontal_shared_nodes_list.append(conflict)
+    #                         conflict_id = len(horizontal_shared_nodes_list) - 1
+    #
+    #                     # if t2 < t1:
+    #                     #     if d1_previous_node == d2_previous_node and d1_previous_node in consecutive_nodes and who_was_first == drone1.flight_number:
+    #                     #         delta_1 = max(protection_area / v2, (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
+    #                     #         conflict = (traj1, traj2, t1, t2, delta_1, protection_area / v2)
+    #                     #         consecutive_nodes.append(node)
+    #                     #         cut2 = (t1 - first_conflict[2]) - (t2 - first_conflict[3])
+    #                     #         delta_sep12 = conflict[4] - first_conflict[4]
+    #                     #         cut1 = - cut2
+    #                     #         delta_sep21 = conflict[5] - first_conflict[5]
+    #                     #         new_sep12 = first_conflict[4] + max(min(cut2, cut2 + delta_sep12), 0) + max(min(delta_sep12, delta_sep12 + cut2), 0)
+    #                     #         new_sep21 = first_conflict[5] + max(min(cut1, cut1 + delta_sep21), 0) + max(min(delta_sep21, delta_sep21 + cut1), 0)
+    #                     #         conflict = (traj1, traj2, first_conflict[2], first_conflict[3], new_sep12, new_sep21)
+    #                     #         horizontal_shared_nodes_list[conflict_id] = conflict
+    #                     #         count_fused_nodes += 1
+    #                     #     else:
+    #                     #         # If drone2 goes first we need to make sure the delta1 is enough for drone2 not to catch up
+    #                     #         consecutive_nodes = [node]
+    #                     #         delta_1 = max(protection_area / v2, (t2 - d2_t_next_node) - (t1 - d1_t_next_node))
+    #                     #         conflict = (traj1, traj2, t1, t2, delta_1, protection_area / v2)
+    #                     #         if check_if_conflict_is_possible(conflict, model):
+    #                     #             horizontal_shared_nodes_list.append(conflict)
+    #                     #             conflict_id = len(horizontal_shared_nodes_list) - 1
+    #                     #     who_was_first = drone2.flight_number
+    #                 # else:
+    #                 #     conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
+    #                 #     if check_if_conflict_is_possible(conflict, model):
+    #                 #         horizontal_shared_nodes_list.append(conflict)
+    #                 # else:
+    #                 #     conflict = (traj1, traj2, t1, t2, protection_area / v1, protection_area / v2)
+    #                 #     if check_if_conflict_is_possible(conflict, model):
+    #                 #         horizontal_shared_nodes_list.append(conflict)
+    #
+    #                 # Opposite ways
+    #                 # If D1 goes first
+    #                 if t1 != t_stamps_d1[-1] and t2 != t_stamps_d2[0]:
+    #                     if t1 < t2:
+    #                         d1_t_next_node = t_stamps_d1[t_stamps_d1.index(t1) + 1]
+    #                         d2_t_prev_node = t_stamps_d2[t_stamps_d2.index(t2) - 1]
+    #                         d1_next_node = drone1.path_object.path_dict[d1_t_next_node]
+    #                         d2_prev_node = drone2.path_object.path_dict[d2_t_prev_node]
+    #                         if d1_next_node == d2_prev_node:
+    #                             delta_1 = (t2 - d2_t_prev_node) + (d1_t_next_node - t1)
+    #                             conflict = (traj1, traj2, t1, t2, delta_1, protection_area / v2)
+    #                             if check_if_conflict_is_possible(conflict, model):
+    #                                 horizontal_shared_nodes_list.append(conflict)
+    #                 # if D2 goes first
+    #                 if t2 != t_stamps_d2[-1] and t1 != t_stamps_d1[0]:
+    #                     if t2 < t1:
+    #                         d2_t_next_node = t_stamps_d2[t_stamps_d2.index(t2) + 1]
+    #                         d1_t_prev_node = t_stamps_d1[t_stamps_d1.index(t1) - 1]
+    #                         d2_next_node = drone2.path_object.path_dict[d2_t_next_node]
+    #                         d1_prev_node = drone1.path_object.path_dict[d1_t_prev_node]
+    #                         if d2_next_node == d1_prev_node:
+    #                             delta_2 = (t1 - d1_t_prev_node) + (d2_t_next_node - t2)
+    #                             conflict = (traj1, traj2, t1, t2, protection_area / v1, delta_2)
+    #                             if check_if_conflict_is_possible(conflict, model):
+    #                                 horizontal_shared_nodes_list.append(conflict)
+    # # print("NB OF FUSED NODES = ", count_fused_nodes)
+    # ####
+    # # Horizontal/Vertical shared nodes
+    # # TODO est ce qu'on veut les deux i,j j,i ou que un des deux suffit
+    # # print("Searching for departure and arrival edges for each drone")
+    # dep_edge_dict, arrival_edge_dict = get_all_dep_and_arr_edges(model, raw_graph)
+    # # print("Check for vertically shared nodes with horizontal route")
+    # for i in range(size):
+    #     # print("D" + str(1 + (i // number_of_traj_to_keep)))
+    #     flight_number1 = trajectories_to_fn_dict[i]
+    #     drone1 = return_drone_from_flight_number(model, flight_number1)
+    #     drone1.path_object = drone_trajectories_dict[flight_number1][i][0]
+    #     dep_edge = dep_edge_dict[drone1.flight_number]
+    #     arr_edge = arrival_edge_dict[drone1.flight_number]
+    #     for j in range(size):
+    #         flight_number2 = trajectories_to_fn_dict[j]
+    #         if flight_number1 == flight_number2:
+    #             continue
+    #         drone2 = return_drone_from_flight_number(model, flight_number2)
+    #         drone2.path_object = drone_trajectories_dict[flight_number2][j][0]
+    #         # Find the edges the drone start and end on
+    #         # Check if either is part of the other drone path
+    #         # print(dep_edge)
+    #         # TODO Faire les delta t
+    #         for n in range(1, len(drone2.path_object.path)):
+    #             if dep_edge == (drone2.path_object.path[n - 1], drone2.path_object.path[n]) or (
+    #                     dep_edge[1], dep_edge[0]) == (drone2.path_object.path[n - 1], drone2.path_object.path[n]):
+    #                 # k1, k2, t1, t2, delta1, delta2
+    #                 # k1, k2 = i + 1, j + 1
+    #                 k1, k2 = i, j
+    #                 t1 = drone1.dep_time
+    #                 drone2_t_stamps = sorted(list(drone2.path_object.path_dict.keys()))
+    #                 # Use the expected time at half edge
+    #                 t2 = (drone2_t_stamps[n - 1] + drone2_t_stamps[n]) / 2
+    #                 delta1 = model.vertical_protection / drone1.vertical_speed
+    #                 delta2 = model.protection_area / get_drone_speed_after_node(model, drone2, graph, graph_dual,
+    #                                                                             drone2.path_object.path[n - 1])
+    #                 conflict = (k1, k2, t1, t2, delta1, delta2)
+    #                 if check_if_conflict_is_possible(conflict, model):
+    #                     climb_horiz_list.append(conflict)
+    #             if arr_edge == (drone2.path_object.path[n - 1], drone2.path_object.path[n]) or (
+    #                     arr_edge[1], arr_edge[0]) == (drone2.path_object.path[n - 1], drone2.path_object.path[n]):
+    #                 # k1, k2, t1, t2, delta1, delta2
+    #                 k1, k2 = i, j
+    #                 drone1_t_stamps = sorted(list(drone1.path_object.path_dict.keys()))
+    #                 t1 = drone1_t_stamps[-1]
+    #                 drone2_t_stamps = sorted(list(drone2.path_object.path_dict.keys()))
+    #                 # Use the expected time at half edge
+    #                 t2 = (drone2_t_stamps[n - 1] + drone2_t_stamps[n]) / 2
+    #                 delta1 = model.vertical_protection / drone1.vertical_speed
+    #                 delta2 = model.protection_area / get_drone_speed_after_node(model, drone2, graph, graph_dual,
+    #                                                                             drone2.path_object.path[n - 1])
+    #                 conflict = (k1, k2, t1, t2, delta1, delta2)
+    #                 if check_if_conflict_is_possible(conflict, model):
+    #                     descent_horiz_list.append(conflict)
+    # ####
+    # # Verti/verti nodes
+    # # print("Check for verti/verti shared nodes")
+    # # TODO remove duplicates
+    # for i in range(len(model.droneList)):
+    #     drone1 = model.droneList[i]
+    #     for j in range(i + 1, len(model.droneList)):
+    #         drone2 = model.droneList[j]
+    #         if drone1.flight_number == drone2.flight_number:
+    #             continue
+    #         if drone1.dep == drone2.dep:
+    #             for k1 in drone_trajectories_dict[drone1.flight_number]:
+    #                 for k2 in drone_trajectories_dict[drone2.flight_number]:
+    #                     # todo speed exacte en f de distance du next node si virage
+    #                     conflict = (k1, k2, drone1.dep_time, drone2.dep_time, temps_sep_vertiport, temps_sep_vertiport)
+    #                     if check_if_conflict_is_possible(conflict, model):
+    #                         climb_climb_list.append(conflict)
+    #         if drone1.arr == drone2.arr:
+    #             for k1 in drone_trajectories_dict[drone1.flight_number]:
+    #                 for k2 in drone_trajectories_dict[drone2.flight_number]:
+    #                     drone2_arr_time = max(drone_trajectories_dict[drone2.flight_number][k2][0].path_dict.keys())
+    #                     drone1_arr_time = max(drone_trajectories_dict[drone1.flight_number][k1][0].path_dict.keys())
+    #                     conflict = (k1, k2, drone1_arr_time, drone2_arr_time, temps_sep_vertiport, temps_sep_vertiport)
+    #                     if check_if_conflict_is_possible(conflict, model):
+    #                         descent_descent_list.append(conflict)
 
     # print("Nb pt conflits :")
     # print(len(horizontal_shared_nodes_list), len(climb_horiz_list), len(descent_horiz_list), len(climb_climb_list), len(descent_descent_list))
-    return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
+    # return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
 
 
 def remove_impossible_conflicts(conflict_nodes_list, model):
@@ -734,8 +767,6 @@ def check_if_conflict_is_possible(conflict, model):
         return False
     else:
         return True
-
-
 
 
 #
@@ -1162,21 +1193,23 @@ def get_all_dep_and_arr_edges(model, raw_graph):
         # count += 1
         hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = model.hash_map
         x_dep, y_dep = drone.departure_vertiport[0], drone.departure_vertiport[1]
-        list_of_potential_closest_edges = tools.find_list_of_closest_with_hash(x_dep, y_dep,hash_edges, min_x, min_y, x_step, y_step, resolution)
+        list_of_potential_closest_edges = tools.find_list_of_closest_with_hash(x_dep, y_dep, hash_edges, min_x, min_y,
+                                                                               x_step, y_step, resolution)
         dep = tools.find_closest_edge_in_list(x_dep, y_dep, list_of_potential_closest_edges, model.graph)
         x_arr, y_arr = drone.arrival_vertiport[0], drone.arrival_vertiport[1]
-        list_of_potential_closest_edges = tools.find_list_of_closest_with_hash(x_arr, y_arr,hash_edges, min_x, min_y, x_step, y_step, resolution)
+        list_of_potential_closest_edges = tools.find_list_of_closest_with_hash(x_arr, y_arr, hash_edges, min_x, min_y,
+                                                                               x_step, y_step, resolution)
         arr = tools.find_closest_edge_in_list(x_arr, y_arr, list_of_potential_closest_edges, model.graph)
         dep_edge_dict[drone.flight_number] = dep
         arrival_edge_dict[drone.flight_number] = arr
-        # with warnings.catch_warnings():
-        #     warnings.simplefilter("ignore")
-        #     dep_edge = osmnx.get_nearest_edge(raw_graph, (drone.departure_vertiport[1], drone.departure_vertiport[0]))[0:2]
-        #     dep_edge = (str(dep_edge[0]), str(dep_edge[1]))
-        #     dep_edge_dict[drone.flight_number] = dep_edge
-        #     arr_edge = osmnx.get_nearest_edge(raw_graph, (drone.arrival_vertiport[1], drone.arrival_vertiport[0]))[0:2]
-        #     arr_edge = (str(arr_edge[0]), str(arr_edge[1]))
-        #     arrival_edge_dict[drone.flight_number] = arr_edge
+    # with warnings.catch_warnings():
+    #     warnings.simplefilter("ignore")
+    #     dep_edge = osmnx.get_nearest_edge(raw_graph, (drone.departure_vertiport[1], drone.departure_vertiport[0]))[0:2]
+    #     dep_edge = (str(dep_edge[0]), str(dep_edge[1]))
+    #     dep_edge_dict[drone.flight_number] = dep_edge
+    #     arr_edge = osmnx.get_nearest_edge(raw_graph, (drone.arrival_vertiport[1], drone.arrival_vertiport[0]))[0:2]
+    #     arr_edge = (str(arr_edge[0]), str(arr_edge[1]))
+    #     arrival_edge_dict[drone.flight_number] = arr_edge
     return dep_edge_dict, arrival_edge_dict
 
 
@@ -1196,7 +1229,7 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
 
     heading, _back_azimuth1, _distance = geodesic.inv(x_dep, y_dep, x_arr, y_arr)
     nodes_to_deviate_from = []
-    for i in range(1, step+1):
+    for i in range(1, step + 1):
         nodes_to_deviate_from.append(shortest_path.path[i * (len(shortest_path.path) // (step + 1))])
     # print("path and nodes to deviate from",  shortest_path.path, nodes_to_deviate_from)
     count = 0
@@ -1207,7 +1240,7 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
         tries += 1
         if tries == 20:
             pass
-            # print("COULDN'T PRODUCE ENOUGH ALTERNATIVE TRAJS")
+        # print("COULDN'T PRODUCE ENOUGH ALTERNATIVE TRAJS")
         nodes_to_visit = []
 
         if count % 2 == 1:
@@ -1221,19 +1254,21 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
             pt = (graph.nodes[node]["x"], graph.nodes[node]["y"])
             north_factor = math.cos(new_heading)
             east_factor = math.sin(new_heading)
-            new_pt = tools.m_displacement_to_lat_lon(pt, north_factor * dist * (1 + count // 2), east_factor * dist * (1 + count // 2))
+            new_pt = tools.m_displacement_to_lat_lon(pt, north_factor * dist * (1 + count // 2),
+                                                     east_factor * dist * (1 + count // 2))
             new_x = new_pt[0]
             new_y = new_pt[1]
-            new_node = tools.find_closest_node_with_hash(new_x, new_y, hash_nodes, min_x, min_y, x_step, y_step, resolution, model.graph)
+            new_node = tools.find_closest_node_with_hash(new_x, new_y, hash_nodes, min_x, min_y, x_step, y_step,
+                                                         resolution, model.graph)
             nodes_to_visit.append(new_node)
-            # get closest node
+        # get closest node
 
         drone_dep_dual = ("S" + drone.dep, drone.dep)
         drone_arr_dual = (nodes_to_visit[0], nodes_to_visit[0] + "T")
         trajectory = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path
-        for i in range(len(nodes_to_visit)-1):
+        for i in range(len(nodes_to_visit) - 1):
             node = nodes_to_visit[i]
-            next_node = nodes_to_visit[i+1]
+            next_node = nodes_to_visit[i + 1]
             drone_dep_dual = ("S" + node, node)
             drone_arr_dual = (next_node, next_node + "T")
             _path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path[1:]
@@ -1248,15 +1283,15 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
             # print(trajectory)
             # for i in range(len(trajectory)):
             #     if trajectory[i] in trajectory[i+1:]:
-                    # print(trajectory[i])
+            # print(trajectory[i])
             index = 1
             while index < len(trajectory) - 2:
-                if trajectory[index] == trajectory[index+1]:
+                if trajectory[index] == trajectory[index + 1]:
                     trajectory.pop(index)
                 if trajectory[index - 1] == trajectory[index + 1]:
                     trajectory.pop(index)
                     trajectory.pop(index)
-                index +=1
+                index += 1
             # print(trajectory)
             if len(set(trajectory)) != len(trajectory):
                 # print("traj still has doublons")
@@ -1321,11 +1356,12 @@ def get_drone_speed_after_node(model, drone, graph, graph_dual, node):
 
 
 def return_drone_from_flight_number(model, flight_number):
-    for drone in model.droneList:
-        if drone.flight_number == flight_number:
-            return drone
-    print("Drone not in list", flight_number, model.droneList)
-    raise Exception
+    return model.total_drone_dict[flight_number]
+    # for drone in model.total_drone_list:
+    #     if drone.flight_number == flight_number:
+    #         return drone
+    # print("Drone not in list", flight_number, [d.flight_number for d in model.droneList])
+    # raise Exception
 
 
 def generate_one_point_trajectories(drone, graph, graph_dual, points_to_explore, model):
@@ -1346,8 +1382,8 @@ def generate_one_point_trajectories(drone, graph, graph_dual, points_to_explore,
             trajectories.append(trajectory)
         elif len(trajectory) == len(set(trajectory)) + 1:
             # Means the drone does a u-turn at the intermediary point, if so removes it and the duplicated node
-            trajectory.pop(len(first_part)-1)
-            trajectory.pop(len(first_part)-1)
+            trajectory.pop(len(first_part) - 1)
+            trajectory.pop(len(first_part) - 1)
             if not check_traj_is_possible(graph, trajectory):
                 if trajectory not in trajectories:
                     trajectories.append(trajectory)
@@ -1379,7 +1415,7 @@ def generate_multiple_point_trajectories(drone, graph, list_of_points_to_explore
         path_is_none = False
         for waypoint_index in range(len(waypoints) - 1):
             dep_dual = ("S" + waypoints[waypoint_index], waypoints[waypoint_index])
-            arr_dual = (waypoints[waypoint_index+1], waypoints[waypoint_index+1] + "T")
+            arr_dual = (waypoints[waypoint_index + 1], waypoints[waypoint_index + 1] + "T")
             if (dep_dual, arr_dual) in already_calculated_intervals_dict:
                 path = already_calculated_intervals_dict[(dep_dual, arr_dual)]
             elif (arr_dual, dep_dual) in already_calculated_intervals_dict:
@@ -1402,11 +1438,11 @@ def generate_multiple_point_trajectories(drone, graph, list_of_points_to_explore
                     trajectories.append(traj)
     # print(len(trajectories))
     # Remove duplicates
-    for index in range(len(trajectories)-1, 0, -1):
+    for index in range(len(trajectories) - 1, 0, -1):
         if trajectories[index] in trajectories[0:index]:
             trajectories.pop(index)
     # Keep only the right number of trajectories
-    while len(trajectories)>nb_traj_to_keep:
+    while len(trajectories) > nb_traj_to_keep:
         trajectories.pop(-1)
     # print("len :", len(trajectories))
     return trajectories
@@ -1419,8 +1455,8 @@ def generate_points_from_shortest_path(model, drone, graph, steps, depth):
     drone_dep_dual = ("S" + drone.dep, drone.dep)
     drone_arr_dual = (drone.arr, drone.arr + "T")
     shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path
-    index_list = [(i+1)*(len(shortest_path)//(steps+1)) for i in range(steps)]
-    nodes_list=[]
+    index_list = [(i + 1) * (len(shortest_path) // (steps + 1)) for i in range(steps)]
+    nodes_list = []
     for index in index_list:
         current_node_list = []
         temp_node_list = []
@@ -1450,15 +1486,16 @@ def generate_points_to_pass_by_for_one_point(graph, steps):
         min_x = min(min_x, graph.nodes[node]["x"])
         max_y = max(max_y, graph.nodes[node]["y"])
         min_y = min(min_y, graph.nodes[node]["y"])
-    x_range = [min_x + i*(max_x-min_x)/(steps - 1) for i in range(steps)]
-    y_range = [min_y + i*(max_y-min_y)/(steps - 1) for i in range(steps)]
+    x_range = [min_x + i * (max_x - min_x) / (steps - 1) for i in range(steps)]
+    y_range = [min_y + i * (max_y - min_y) / (steps - 1) for i in range(steps)]
     x_y_pos = [[(x, y) for y in y_range] for x in x_range]
     for x in range(len(x_y_pos)):
         for y in range(len(x_y_pos[0])):
             best_dist = 5000000
             closest_node = None
             for node in graph.nodes:
-                dist = math.sqrt((x_y_pos[x][y][0] - graph.nodes[node]["x"])**2 + (x_y_pos[x][y][1] - graph.nodes[node]["y"])**2)
+                dist = math.sqrt(
+                    (x_y_pos[x][y][0] - graph.nodes[node]["x"]) ** 2 + (x_y_pos[x][y][1] - graph.nodes[node]["y"]) ** 2)
                 if dist < best_dist:
                     closest_node = node
                     best_dist = dist
@@ -1468,8 +1505,8 @@ def generate_points_to_pass_by_for_one_point(graph, steps):
 
 
 def check_traj_is_possible(graph, traj):
-    for index in range(len(traj)-1):
-        if (traj[index], traj[index+1]) not in graph.edges and (traj[index+1], traj[index]) not in graph.edges:
+    for index in range(len(traj) - 1):
+        if (traj[index], traj[index + 1]) not in graph.edges and (traj[index + 1], traj[index]) not in graph.edges:
             return False
     return True
 
