@@ -138,6 +138,7 @@ class Model:
                 if len(line) > 9:
                     if line[9] != '':
                         drone.is_loitering_mission = True
+                        drone.loitering_geofence = [float(_i) for _i in line[9:14]]
 
                 # Check that the drone isn't already in the list
                 drone_in_list = False

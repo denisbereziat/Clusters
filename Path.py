@@ -14,7 +14,6 @@ class Path:
         self.first_segment = None
         self.last_segment = None
         # Previous path is used to store the last path that was taken
-        # TODO passer les attributs en private et forcer l'utilisation des setters et getters
         self.previous_path = []
         # Path dict contain a path with the time as keys and the node as value
         self.path_dict = {}
@@ -46,7 +45,7 @@ class Path:
         speeds_dict = self.drone.speeds_dict
         # We need to know if we are in the constrained or unconstrained airspace, we use the length of the node
         # to know if it's part of the unconstrained airspace ( == 6)
-        if len(self.path[0]) == 6 or dep_edge is None:
+        if len(self.path[0]) == 6 or self.drone.is_unconstrained_departure:
             # Then we are in the unconstrained airspace and don't need to worry about turns
             drone_speed_next_node = speeds_dict["cruise"]
             next_node = self.path[0]
@@ -186,7 +185,7 @@ class Path:
 
             # If the last node was a turn but not the coming one
             elif last_node_was_turn and not current_node_is_turn:
-                accel_distance_last_node = (Drone.return_braking_distance(speed_at_previous_node, speeds_dict["cruise"])) *over_estimate_turn_factor
+                accel_distance_last_node = (Drone.return_braking_distance(speed_at_previous_node, speeds_dict["cruise"])) * over_estimate_turn_factor
                 travel_time = Drone.return_accel_time(speed_at_previous_node, speeds_dict["cruise"])
                 travel_time += (length - accel_distance_last_node)/speeds_dict["cruise"]
                 t_sep = model.protection_area / speeds_dict["cruise"]
@@ -244,7 +243,7 @@ class Path:
         speeds_dict = self.drone.speeds_dict
         len_previous_edge = model.graph.edges[(self.path[-2], self.path[-1])]["length"]
         # Unconstrained or constrained airspace ?
-        if arr_edge is None:
+        if self.drone.is_unconstrained_arrival:
             current_node = self.path[-1]
             x_node, y_node = model.graph.nodes[current_node]["x"], model.graph.nodes[current_node]["y"]
             dist_to_arr = tools.distance(x_arr, y_arr, x_node, y_node)

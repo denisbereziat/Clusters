@@ -18,14 +18,13 @@ class Drone:
         self.vertical_accel = vertical_accel  # m/s**2
         self.braking_distance = 30  # m
         self.deposit_time = None
-        self.is_loitering_mission = None
         self.dep = dep  # Departure node in the path_dict
         self.arr = arr  # Arrival node in the path_dict
         self.drone_type = None
-        # TODO edge depart et edge arr != NONE SI ON EST DANS UNCONSTRAINED
         self.dep_edge = None
         self.arr_edge = None
         self.dep_time = hDep
+
         self.type = droneType
         if droneType == 'MP30':
             self.speeds_dict = speeds_dict_model1
@@ -33,6 +32,10 @@ class Drone:
             self.speeds_dict = speeds_dict_model2
         else:
             raise Exception
+
+        # Stores if this is a mission that creates a geofence
+        self.is_loitering_mission = None
+        self.loitering_geofence = None  # [duration, x1, y2, x2, y2]
 
         self.departure_vertiport = None
         self.is_unconstrained_departure = None

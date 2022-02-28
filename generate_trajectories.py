@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import itertools
 import Drone
 import sys
+from Param2 import delayStep, vVert
 
 
 # # graph_file_path = "graph_files/processed_graphM2.graphml"
@@ -23,7 +24,7 @@ import sys
 # # vertical_protection_area = 7.62 # 25 ft
 
 
-def generate_trajectories(model, graph, raw_graph, graph_dual, current_param=None):
+def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param=None):
     """Generate alternative trajectories for all drones in the model
     OUTPUT :
     drone_trajectories_dict[drone_fn][traj_id] = [path_object, total_time]
@@ -42,15 +43,11 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, current_param=Non
 
     generated_trajectories = dict()
     # Generate alternate trajectories for all drones.
-    # print("Trajectories generation")
     # If the drone doesn't already have trajectories generated we generate some
     for drone in model.droneList:
         if drone.flight_number not in drone_trajectories_dict:
-            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, graph, model, 6, 500,
-                                                                                         nb_alternative_traj)
-        else:
-            pass
-        # print("drone already has generated traj")
+            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, model, 6, 500,
+                                                                                         nb_alternative_traj, geofence_time_intervals)
 
     # Compute total time for each trajectory
     fn_order = []
@@ -1213,34 +1210,81 @@ def get_all_dep_and_arr_edges(model, raw_graph):
     return dep_edge_dict, arrival_edge_dict
 
 
-def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_generate):
+def generate_parallel_trajectories(drone, model, step, dist, number_to_generate, geofence_time_intervals):
     trajectories = []
-    # trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order =
     drone_dep_dual = ("S" + drone.dep, drone.dep)
     drone_arr_dual = (drone.arr, drone.arr + "T")
     # print(drone_dep_dual, drone_arr_dual)
     shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time)
-    # print(shortest_path.path)
+    shortest_path.set_path(shortest_path.path, model)
+
+    #Check that there are no nodes in the geofenced_nodes list
+    protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
+    max_time = drone.dep_time + max(shortest_path.path_dict.keys()) + delay_max * delayStep + nb_FL * FL_sep / vVert
+    modified_edges_primal, modified_edges_dual = dict(), dict()
+    at_least_one_edge_modified = False
+    for interval in geofence_time_intervals:
+        # Then there's potentially a geofence breach
+        if drone.dep_time <= interval[0] <= max_time or drone.dep_time <= interval[1] <= max_time:
+            for node in geofence_time_intervals[interval]:
+                # Edges to modify in primal graph
+                edges_primal = []
+                for edge in model.graph.edges(node):
+                    if edge[0] > edge[1]:
+                        edge = (edge[1], edge[0])
+                    if edge not in modified_edges_primal:
+                        edges_primal.append(edge)
+                # Edges to modify in dual graph
+                edges_dual = []
+                for edge in edges_primal:
+                    for edge_dual_in in model.graph_dual.in_edges(edge):
+                        if edge_dual_in not in modified_edges_dual:
+                            edges_dual.append(edge_dual_in)
+                    for edge_dual_out in model.graph_dual.out_edges(edge):
+                        if edge_dual_out not in modified_edges_dual:
+                            edges_dual.append(edge_dual_out)
+
+                # Modify and save original length
+                for edge in edges_primal:
+                    if edge in modified_edges_primal:
+                        pass
+                    else:
+                        modified_edges_primal[edge] = model.graph.edges[edge]["length"]
+                        model.graph.edges[edge]["length"] = model.graph.edges[edge]["length"] * 100
+                        # print("saved and modified :",edge, modified_edges_primal[edge], model.graph.edges[edge]["length"])
+                        # if model.graph.edges[edge]["length"] > 1000000:
+                        #     print(model.graph.edges[edge]["length"])
+                for edge_dual in edges_dual:
+                    if edge_dual in modified_edges_dual:
+                        pass
+                    else:
+                        modified_edges_dual[edge_dual] = model.graph_dual.edges[edge_dual]["length"]
+                        # print("Before :", modified_edges_dual[edge_dual], model.graph_dual.edges[edge_dual]["length"])
+                        model.graph_dual.edges[edge_dual]["length"] = model.graph_dual.edges[edge_dual]["length"] * 100
+                        # if model.graph_dual.edges[edge_dual]["length"] > 1000000:
+                        #     print(model.graph_dual.edges[edge_dual]["length"])
+                        # print("After : ", modified_edges_dual[edge_dual], model.graph_dual.edges[edge_dual]["length"])
+    if len(modified_edges_dual.keys()) > 0 or len(modified_edges_primal.keys()) > 0 :
+        at_least_one_edge_modified = True
+    # If at least one edge was modified then we need to recompute the shortest path
+    if at_least_one_edge_modified:
+        shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time)
     trajectories.append(shortest_path.path)
 
+    # GENERATE ALL THE OTHER TRAJS
     geodesic = pyproj.Geod(ellps='WGS84')
-    x_dep, y_dep = graph.nodes[drone.dep]["x"], graph.nodes[drone.dep]["y"]
-    x_arr, y_arr = graph.nodes[drone.arr]["x"], graph.nodes[drone.arr]["y"]
+    x_dep, y_dep = model.graph.nodes[drone.dep]["x"], model.graph.nodes[drone.dep]["y"]
+    x_arr, y_arr = model.graph.nodes[drone.arr]["x"], model.graph.nodes[drone.arr]["y"]
 
     heading, _back_azimuth1, _distance = geodesic.inv(x_dep, y_dep, x_arr, y_arr)
     nodes_to_deviate_from = []
     for i in range(1, step + 1):
         nodes_to_deviate_from.append(shortest_path.path[i * (len(shortest_path.path) // (step + 1))])
-    # print("path and nodes to deviate from",  shortest_path.path, nodes_to_deviate_from)
     count = 0
     tries = 0
     trajectory = []
-    # plt.show()
     while len(trajectories) < number_to_generate and tries < 20:
         tries += 1
-        if tries == 20:
-            pass
-        # print("COULDN'T PRODUCE ENOUGH ALTERNATIVE TRAJS")
         nodes_to_visit = []
 
         if count % 2 == 1:
@@ -1251,7 +1295,7 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
         for node in nodes_to_deviate_from:
             # generer un noeud dans une direction
             hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = model.hash_map
-            pt = (graph.nodes[node]["x"], graph.nodes[node]["y"])
+            pt = (model.graph.nodes[node]["x"], model.graph.nodes[node]["y"])
             north_factor = math.cos(new_heading)
             east_factor = math.sin(new_heading)
             new_pt = tools.m_displacement_to_lat_lon(pt, north_factor * dist * (1 + count // 2),
@@ -1279,11 +1323,6 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
         trajectory_ok = True
 
         if len(set(trajectory)) != len(trajectory):
-            # print("trajectory has doublons")
-            # print(trajectory)
-            # for i in range(len(trajectory)):
-            #     if trajectory[i] in trajectory[i+1:]:
-            # print(trajectory[i])
             index = 1
             while index < len(trajectory) - 2:
                 if trajectory[index] == trajectory[index + 1]:
@@ -1294,25 +1333,23 @@ def generate_parallel_trajectories(drone, graph, model, step, dist, number_to_ge
                 index += 1
             # print(trajectory)
             if len(set(trajectory)) != len(trajectory):
-                # print("traj still has doublons")
-                # print(trajectory)
-                # for i in range(len(trajectory)):
-                #     if trajectory[i] in trajectory[i+1:]:
-                #         print(trajectory[i])
                 trajectory_ok = False
-            if not check_traj_is_possible(graph, trajectory):
+            if not check_traj_is_possible(model.graph, trajectory):
                 print("TRAJ impossible")
                 trajectory_ok = False
-
-        # tools.scatter_graph(graph)
-        # tools.plot_traj(shortest_path.path, graph)
-        # tools.plot_traj(nodes_to_visit, graph, color='purple', marker='*')
-        # tools.plot_traj(trajectory, graph, color='blue', marker='x')
-        # plt.show()
 
         if trajectory not in trajectories and trajectory_ok:
             trajectories.append(trajectory)
         count += 1
+
+    # Set the edges back to their initial values :
+    if at_least_one_edge_modified:
+        for edge in modified_edges_primal:
+            # print("BEFORE :", model.graph.edges[edge]["length"])
+            model.graph.edges[edge]["length"] = modified_edges_primal[edge]
+            # print("AFTER :", model.graph.edges[edge]["length"])
+        for edge_dual in modified_edges_dual:
+            model.graph_dual.edges[edge_dual]["length"] = modified_edges_dual[edge_dual]
 
     return trajectories
 
