@@ -19,10 +19,10 @@ class Drone:
         self.braking_distance = 30  # m
         self.deposit_time = None
         self.is_loitering_mission = None
-        self.dep = dep
-        self.arr = arr
+        self.dep = dep  # Departure node in the path_dict
+        self.arr = arr  # Arrival node in the path_dict
         self.drone_type = None
-        # TODO edge depart et edge arr = NONE SI ON EST DANS UNCONSTRAINED
+        # TODO edge depart et edge arr != NONE SI ON EST DANS UNCONSTRAINED
         self.dep_edge = None
         self.arr_edge = None
         self.dep_time = hDep
@@ -35,7 +35,9 @@ class Drone:
             raise Exception
 
         self.departure_vertiport = None
+        self.is_unconstrained_departure = None
         self.arrival_vertiport = None
+        self.is_unconstrained_arrival = None
         # A path object that will be used to store the drone current path
         self.path_object = None
 

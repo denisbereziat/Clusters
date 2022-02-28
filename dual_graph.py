@@ -39,13 +39,10 @@ def create_dual(graph, turn_cost_function):
                     # v2 = (x3 - x2, y3 - y2)
                     # angle = tools.angle_btw_vectors(v1, v2)
                     if len(node1[0]) == 6 and len(node1[1]) == 6 and len(node2[1]) == 6:
-                        # print("hex", node1, node2)
                         angle = 0
                         is_turn = False
                     else:
-                        angle = tools.angle_btw_vectors((x1, y1),(x2, y2),(x3, y3))
-                    # print(node1, node2, angle)
-
+                        angle = tools.angle_btw_vectors((x1, y1), (x2, y2), (x3, y3))
                 edge_length = float(digraph.edges[node1[0], node1[1]]["length"])
                 # le turn cost est ajouté de base il faut retirer le post_cost pour avoir le cout au moment ou on passe le node
                 dual_graph.edges[node1, node2]["length"] = edge_length + total_turn_cost

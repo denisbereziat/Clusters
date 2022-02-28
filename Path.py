@@ -1,6 +1,5 @@
 # import tools as tools
 import math
-
 import Drone
 import tools
 
@@ -401,7 +400,7 @@ def compute_segment(v_prev, v_next, length, drone):
             t3 = return_t_at_d(length, -Drone.accel_max, v_prev)
             v3 = v_prev + Drone.accel_max * t3
             d3 = Drone.return_braking_distance(v_prev, v3)
-        if v_next > v_prev:
+        if v_next >= v_prev:
             t1 = return_t_at_d(length, Drone.accel_max, v_prev)
             v1 = v_prev + Drone.accel_max * t1
             d1 = Drone.return_braking_distance(v_prev, v1)

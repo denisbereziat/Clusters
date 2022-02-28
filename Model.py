@@ -96,30 +96,45 @@ class Model:
                 dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
                 arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
                 hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
+
                 # Find departure edge and node of drone
-                x_dep, y_dep = float(dep_vertiport_coordinates[0]), float(dep_vertiport_coordinates[1])
+                x_dep, y_dep = dep_vertiport_coordinates[0], dep_vertiport_coordinates[1]
                 list_of_possible_closest_edges = tools.find_list_of_closest_with_hash(x_dep, y_dep, hash_edges, min_x, min_y, x_step, y_step, resolution)
                 dep_edge, dist_dep_edge = tools.find_closest_edge_in_list(x_dep, y_dep, list_of_possible_closest_edges, self.graph)
-                x_arr, y_arr = float(arr_vertiport_coordinates[0]), float(arr_vertiport_coordinates[1])
+
+                x_arr, y_arr = arr_vertiport_coordinates[0], arr_vertiport_coordinates[1]
                 list_of_possible_closest_edges = tools.find_list_of_closest_with_hash(x_arr, y_arr, hash_edges, min_x, min_y, x_step, y_step, resolution)
                 arr_edge, dist_arr_edge = tools.find_closest_edge_in_list(x_arr, y_arr, list_of_possible_closest_edges, self.graph)
-                # TODO choisir mieux le dep_node et le arr _node
+
                 dep = dep_edge[0]
                 arr = arr_edge[0]
-                # If the departure is too far from the edge we store the dep or arr edge as None
+
+                # If the departure is too far from the edge we store the dep or arr edge as departure/arrival_vertiport and
+                # Set the value of is_departure_in_unconstrained
                 if dist_arr_edge > self.protection_area:
-                    arr_edge = None
+                    arr_edge = arr_vertiport_coordinates
+                    is_unconstrained_arrival = True
+                else:
+                    is_unconstrained_arrival = False
                 if dist_dep_edge > self.protection_area:
-                    dep_edge = None
+                    dep_edge = dep_vertiport_coordinates
+                    is_unconstrained_departure = True
+                else:
+                    is_unconstrained_departure = False
+
                 dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
                 flight_number = line[1]
+
+                # Create drone object
                 drone = dr.Drone(flight_number, dep, arr, dep_time, drone_model)
                 drone.departure_vertiport = dep_vertiport_coordinates
                 drone.arrival_vertiport = arr_vertiport_coordinates
                 drone.deposit_time = deposit_time
-                # print(dep_edge)
+                drone.is_unconstrained_departure = is_unconstrained_departure
+                drone.is_unconstrained_arrival = is_unconstrained_arrival
                 drone.dep_edge = dep_edge
                 drone.arr_edge = arr_edge
+
                 if len(line) > 9:
                     if line[9] != '':
                         drone.is_loitering_mission = True
@@ -245,15 +260,10 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
 
 
 def turn_bool_function(node1, node2, node3, turn_enabled=None):
-    # if turn_enabled is None:
-    #      turn_enabled = turn_bool_enabled
     minimum_angle_to_apply_added_weight = 25
     x1, y1 = float(node1[0]), float(node1[1])
     x2, y2 = float(node2[0]), float(node2[1])
     x3, y3 = float(node3[0]), float(node3[1])
-    # v1 = (x2 - x1, y2 - y1)
-    # v2 = (x3 - x2, y3 - y2)
-    # angle = tools.angle_btw_vectors(v1, v2)
     angle = tools.angle_btw_vectors((x1, y1),(x2, y2),(x3, y3))
     if angle > minimum_angle_to_apply_added_weight:
         return True
@@ -270,9 +280,6 @@ def turn_cost_function(node1, node2, node3):
     x1, y1 = float(node1["x"]), float(node1["y"])
     x2, y2 = float(node2["x"]), float(node2["y"])
     x3, y3 = float(node3["x"]), float(node3["y"])
-    # v1 = (x2 - x1, y2 - y1)
-    # v2 = (x3 - x2, y3 - y2)
-    # angle = tools.angle_btw_vectors(v1, v2)
     angle = tools.angle_btw_vectors((x1, y1), (x2, y2), (x3, y3))
     if angle > turn_angle:
         return 0, 0, 0, True
