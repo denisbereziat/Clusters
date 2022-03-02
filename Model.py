@@ -1,3 +1,5 @@
+import shapely.geometry
+
 import Drone as dr
 import math
 import tools
@@ -6,6 +8,8 @@ import csv
 import dual_graph
 import geopandas
 from shapely.geometry import Point
+
+import matplotlib.pyplot as plt
 
 turn_angle = 25
 
@@ -112,11 +116,13 @@ class Model:
                 # If the departure is too far from the edge we store the dep or arr edge as departure/arrival_vertiport and
                 # Set the value of is_departure_in_unconstrained
                 if dist_arr_edge > self.protection_area:
+                    surrounging_polygon = self.find_surrounging_polygon(arr_vertiport_coordinates)
                     arr_edge = arr_vertiport_coordinates
                     is_unconstrained_arrival = True
                 else:
                     is_unconstrained_arrival = False
                 if dist_dep_edge > self.protection_area:
+                    surrounging_polygon = self.find_surrounging_polygon(dep_vertiport_coordinates)
                     dep_edge = dep_vertiport_coordinates
                     is_unconstrained_departure = True
                 else:
@@ -194,9 +200,46 @@ class Model:
                         conflict_list.append((i, j, t_node))
         return conflict_list
 
-    def open_all_nodes(self):
-        for edge in self.graph.edges:
-            self.graph.edges[edge]['open'] = True
+    def find_surrounging_polygon(self, vertiport_coords):
+        # Find the node closest to the vertiport :
+        x, y = vertiport_coords[0], vertiport_coords[1]
+        verti_point = shapely.geometry.Point(x, y)
+        hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
+        nodes_list = tools.find_list_of_closest_with_hash(x,y,hash_nodes, min_x, min_y, x_step, y_step, resolution)
+        start_node = tools.find_closest_node_in_list(x,y,nodes_list, self.graph)
+        # print("STARTING NODE :", start_node)
+        # Add the nodes neighbors until it loops AND creates a polygon that contains it
+        open_list = [[start_node]]
+        while len(open_list) > 0:
+            current_step = open_list.pop(0)
+            if len(current_step) > 9:
+                # print("ON periphery")
+                return None
+            for neighbor_node in self.graph.neighbors(current_step[-1]):
+                if len(current_step) > 3 and neighbor_node == current_step[0]:
+                    new_step = current_step.copy()
+                    new_step.append(neighbor_node)
+                    pt_list = []
+                    for node_idx in range(len(new_step)):
+                        x1,y1 = self.graph.nodes[new_step[node_idx-1]]["x"], self.graph.nodes[new_step[node_idx-1]]["y"]
+                        pt_list.append([x1, y1])
+                    # print("CHECK POLYGON : ", new_step)
+                    current_polygon = shapely.geometry.Polygon(pt_list)
+                    # tools.scatter_graph(self.graph)
+                    # plt.scatter(x, y, marker="o")
+                    # plt.plot([pt[0] for pt in pt_list], [pt[1] for pt in pt_list])
+                    # plt.show()
+                    if current_polygon.contains(verti_point):
+                        # print("CONTAINS")
+                        return new_step
+                    pass  # CHECK THAT POLYGON CONTAINS x,y VERTIPORT
+                else:
+                    new_step = current_step.copy()
+                    if neighbor_node not in new_step:
+                        new_step = current_step.copy()
+                        new_step.append(neighbor_node)
+                        open_list.append(new_step)
+            open_list.sort(key=len)
 
 
 def generate_scenarios(model, alts=None, turn_speeds = None):

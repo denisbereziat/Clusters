@@ -78,3 +78,12 @@ def return_accel_time(v1, v2):
     return accel_time
 
 
+def return_vertical_accel_dist(v1, v2):
+    avg_speed = (v1 + v2) / 2
+    return avg_speed * abs(v1 - v2) / vertical_accel
+
+
+def return_vertical_accel_time(v1, v2):
+    accel_time = abs(v1 - v2) / vertical_accel
+    return accel_time
+

@@ -1230,6 +1230,7 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
                 # Edges to modify in primal graph
                 edges_primal = []
                 for edge in model.graph.edges(node):
+                    # Make sure that the edge is always written the same way since we are in an undirected graph
                     if edge[0] > edge[1]:
                         edge = (edge[1], edge[0])
                     if edge not in modified_edges_primal:
@@ -1251,19 +1252,13 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
                     else:
                         modified_edges_primal[edge] = model.graph.edges[edge]["length"]
                         model.graph.edges[edge]["length"] = model.graph.edges[edge]["length"] * 100
-                        # print("saved and modified :",edge, modified_edges_primal[edge], model.graph.edges[edge]["length"])
-                        # if model.graph.edges[edge]["length"] > 1000000:
-                        #     print(model.graph.edges[edge]["length"])
                 for edge_dual in edges_dual:
                     if edge_dual in modified_edges_dual:
                         pass
                     else:
                         modified_edges_dual[edge_dual] = model.graph_dual.edges[edge_dual]["length"]
-                        # print("Before :", modified_edges_dual[edge_dual], model.graph_dual.edges[edge_dual]["length"])
                         model.graph_dual.edges[edge_dual]["length"] = model.graph_dual.edges[edge_dual]["length"] * 100
-                        # if model.graph_dual.edges[edge_dual]["length"] > 1000000:
-                        #     print(model.graph_dual.edges[edge_dual]["length"])
-                        # print("After : ", modified_edges_dual[edge_dual], model.graph_dual.edges[edge_dual]["length"])
+
     if len(modified_edges_dual.keys()) > 0 or len(modified_edges_primal.keys()) > 0 :
         at_least_one_edge_modified = True
     # If at least one edge was modified then we need to recompute the shortest path
@@ -1282,11 +1277,11 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
         nodes_to_deviate_from.append(shortest_path.path[i * (len(shortest_path.path) // (step + 1))])
     count = 0
     tries = 0
-    trajectory = []
     while len(trajectories) < number_to_generate and tries < 20:
         tries += 1
         nodes_to_visit = []
 
+        # Define the heading in which to deviate
         if count % 2 == 1:
             new_heading = (heading + 90) % 360
         else:
@@ -1394,11 +1389,6 @@ def get_drone_speed_after_node(model, drone, graph, graph_dual, node):
 
 def return_drone_from_flight_number(model, flight_number):
     return model.total_drone_dict[flight_number]
-    # for drone in model.total_drone_list:
-    #     if drone.flight_number == flight_number:
-    #         return drone
-    # print("Drone not in list", flight_number, [d.flight_number for d in model.droneList])
-    # raise Exception
 
 
 def generate_one_point_trajectories(drone, graph, graph_dual, points_to_explore, model):
