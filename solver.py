@@ -1,9 +1,8 @@
-import Param
 import generate_trajectories
 import Model as md
 import osmnx
-import Param2
-import PLNE2
+import Param
+import PLNE
 import tools
 import BlueskySCNTools
 import networkx
@@ -17,12 +16,7 @@ save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 drone_list_file_path = 'graph_files/Intentions/1000drones.csv'
 output_scenario = "PLNE OUTPUT/scenario.scn"
 output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
-protection_area = 32
-nb_FL = 16
-delay_max = 100
-FL_sep = 9.14  # in m
-FL_min = 25
-temps_sep_vertiport = 5
+
 T_MAX_OPTIM = 180
 MIP_GAP = 0.3
 ms_to_knots = 1.94384
@@ -153,7 +147,7 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     # Create param
     param = create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_order,Afix,Kfix,yfix,delayfix,h_h_list,climb_h_list,descent_h_list,c_c_list,d_d_list,fixed_flights_dict)
     # Create Problem
-    problem = PLNE2.ProblemGlobal(param)
+    problem = PLNE.ProblemGlobal(param)
     problem.model.setParam("TimeLimit", T_MAX_OPTIM)
     # problem.model.setParam("MIPGap", MIP_GAP)
     # Solve
@@ -399,64 +393,6 @@ def compute_rta(path, problem):
     return all_rta
 
 
-def generate_output(trajectories, horizontal_shared_nodes_list,climb_horiz_list, descent_horiz_list, climb_climb_list,descent_descent_list, model):
-    with open("./PLNE OUTPUT/output.dat", 'w') as file:
-        file.write("param nbflights := " + str(len(trajectories)) + ";\n")
-        file.write("\nparam nbFL := " + str(nb_FL) + ";\n")
-        file.write("param maxDelay := " + str(delay_max) + ";\n")
-        file.write("param nbTrajs := " + str(sum([len(trajectories[d]) for d in trajectories])) + ";\n")
-        file.write("param nbPtHor := " + str(len(horizontal_shared_nodes_list)) + ";\n")
-        file.write("param nbPtClmb := " + str(len(climb_horiz_list)) + ";\n")
-        file.write("param nbPtDesc := " + str(len(descent_horiz_list)) + ";\n")
-        file.write("param nbPtDep := " + str(len(climb_climb_list)) + ";\n")
-        file.write("param nbPtArr := " + str(len(descent_descent_list)) + ";\n")
-        file.write("\n")
-        file.write("param: d mon_vol :=")
-        for drone in trajectories:
-            for traj_id in trajectories[drone]:
-                idx = generate_trajectories.get_drone_index_in_model_list(drone, model)
-                file.write(
-                    "\n" + str(traj_id + 1) + " " + str(int(trajectories[drone][traj_id][1])) + " " + str(idx + 1))
-        file.write(";\n\n")
-        file.write("param: k1 k2 t1 t2 sep12 sep21 :=")
-        for index, traj in enumerate(horizontal_shared_nodes_list):
-            file.write("\n")
-            file.write(str(index + 1))
-            file.write(" " + str(traj[0]) + " " + str(traj[1]))
-            file.write(" " + str(round(traj[2], 1)) + " " + str(round(traj[3], 1)))
-            file.write(" " + str(round(traj[4], 1)) + " " + str(round(traj[5], 1)))
-        last_index = len(horizontal_shared_nodes_list)
-        for index, traj in enumerate(climb_horiz_list):
-            file.write("\n")
-            file.write(str(last_index + index + 1))
-            file.write(" " + str(traj[0]) + " " + str(traj[1]))
-            file.write(" " + str(round(traj[2], 1)) + " " + str(round(traj[3], 1)))
-            file.write(" " + str(round(traj[4], 1)) + " " + str(round(traj[5], 1)))
-        last_index += len(climb_horiz_list)
-        for index, traj in enumerate(descent_horiz_list):
-            file.write("\n")
-            file.write(str(last_index + index + 1))
-            file.write(" " + str(traj[0]) + " " + str(traj[1]))
-            file.write(" " + str(round(traj[2], 1)) + " " + str(round(traj[3], 1)))
-            file.write(" " + str(round(traj[4], 1)) + " " + str(round(traj[5], 1)))
-        last_index += len(descent_horiz_list)
-        for index, traj in enumerate(climb_climb_list):
-            file.write("\n")
-            file.write(str(last_index + index + 1))
-            file.write(" " + str(traj[0]) + " " + str(traj[1]))
-            file.write(" " + str(round(traj[2], 1)) + " " + str(round(traj[3], 1)))
-            file.write(" " + str(round(traj[4], 1)) + " " + str(round(traj[5], 1)))
-        last_index += len(climb_climb_list)
-        for index, traj in enumerate(descent_descent_list):
-            file.write("\n")
-            file.write(str(last_index + index + 1))
-            file.write(" " + str(traj[0]) + " " + str(traj[1]))
-            file.write(" " + str(round(traj[2], 1)) + " " + str(round(traj[3], 1)))
-            file.write(" " + str(round(traj[4], 1)) + " " + str(round(traj[5], 1)))
-        last_index += len(descent_descent_list)
-        file.write(";\n")
-
-
 def create_param(trajectories,trajectories_to_duration,trajectories_to_fn,fn_order,Afix, Kfix,yfix, delayfix,horizontal_shared_nodes_list,climb_horiz_list,descent_horiz_list,climb_climb_list,descent_descent_list, fixed_flights_dict):
     maxDelay = delay_max
     nbPt = [len(horizontal_shared_nodes_list), len(climb_horiz_list), len(descent_horiz_list), len(climb_climb_list),
@@ -506,6 +442,9 @@ def create_fixed_param(problem, model, trajectories, trajectories_to_path, traje
 
 
 def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_file):
+    VerticalIntegrator.integrate(problem.y[a].x * FL_sep).end_time()
+    
+    
     graph = model.graph
     with open(output_file, 'w') as file:
         to_write = "00:00:00>CDMETHOD STATEBASED\n00:00:00>DTLOOK 20\n00:00:00>HOLD\n00:00:00>PAN 48.223775 16.337976\n00:00:00>ZOOM 50\n"

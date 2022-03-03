@@ -1,45 +1,208 @@
-# import tools as tools
 import math
 import Drone
 import tools
+from Drone import Integrator
 
 over_estimate_turn_factor = 1.2
 
-
 class Path:
     def __init__(self, hStart, path, drone):
-        self.path = path
         self.drone = drone
+        #Path contains the ordered list of graph nodes (no dep and arr)
+        self.path = path
+        #departure and arrival time at dep/arr vertiports (horizontal path considered only)
+        self.dep_time = hStart
+        self.arr_time = None
         # Contains informations on the first and last segment (from and to vertiports)
         self.first_segment = None
         self.last_segment = None
-        # Previous path is used to store the last path that was taken
-        self.previous_path = []
-        # Path dict contain a path with the time as keys and the node as value
+        # Path dict contains a path with the time as keys and the node as value
+        # only graph nodes are considered (no dep and arr)
         self.path_dict = {}
+        #previous/next_node dicts for all nodes (including dep and arr) provide it's next or previous
+        #'nodes' are given as pair of (time, node_id) 
         self.previous_node_dict = dict()
         self.next_node_dict = dict()
+        #sep dict contains time as a key and (sep_before, sep_after) the node coresponding to time as value
+        #all nodes are included (dep and arr too)
         self.separation_dict = dict()
-        self.edge_dict = dict()
-        # edge_middle_dict = {edge_id : t_middle, v_middle}
+        #edge_middle dict for each edge that is a key contains (t_middle, (sep_before, sep_after)) as value
         self.edge_middle_dict = dict()
-        # Store the fixed speed at this node, None if there's none
-        self.fixed_speed_wpt = []
-        # Speed ate time stamp after the node
-        self.speed_time_stamps = dict()
+        #self.edge_dict = dict()
+        #ordered list of turn angles len(turns) == len(path)
         self.turns = []
+        #list of Integrator objects for each segment of horizontal path
+        self.segments = []
         # The discretized version of the path with time as key and position x,y as value
-        self.path_dict_discretized = {}
-        self.delay = {}
-        self.dep_time = hStart
-        self.arr_time = None
-        self.flightTime = 0
-        self.flightDistance = 0
+        #self.path_dict_discretized = {}
+        #self.delay = {}
+        #self.flightTime = 0
+        #self.flightDistance = 0
+        # Previous path is used to store the last path that was taken
+        #self.previous_path = []
+        # Store the fixed speed at this node, None if there's none
+        #self.fixed_speed_wpt = []
+        # Speed ate time stamp after the node
+        #self.speed_time_stamps = dict()
+        
+    def __str__(self):
+        res = "Drone: " + self.drone.type + "\n"
+        res += str(self.drone.departure_vertiport) + " -- " + str(self.path) + " -- " + str(self.drone.arrival_vertiport) + "\n" 
+        res += str(self.path_dict) + "\n"
+        for segment in self.segments:
+            res += str(segment) + "\n"
+        return res
+    
+    def new_set_path(self, node_list, model):
+        """Adds a new path to the drone, in terms of waypoints (self.path) and waypoints
+        and timestamps (self.pathDict) using the dual graph to set the timestamps with
+        the added turning times into account"""
+        graph_dual = model.graph_dual
+        graph = model.graph
 
+        #ASSUMPTION: nodel_list contains only graph nodes and doesn't over-pass dep/arr
+        #dep_edge, arr_edge = Path.fix_start_end_nodes(node_list, self.drone)
+        self.path = node_list
+        dep_edge = self.drone.dep_edge
+        if dep_edge[0] == self.path[0]:#inverse dep_edge
+            dep_edge = (dep_edge[1], dep_edge[0])
+        arr_edge = self.drone.arr_edge
+        if arr_edge[1] == self.path[-1]:#inverse arr_edge
+            arr_edge = (arr_edge[1], arr_edge[0])
+        
+        dep = self.drone.departure_vertiport
+        arr = self.drone.arrival_vertiport
+        
+        #ASSUMPTION: there is at least one traj point beside dep and arr
+        #determine edge of the first segment and it's lenght 
+        if not self.drone.is_unconstrained_departure:
+            edge1 = dep_edge
+            d1 = model.graph.edges[edge1]["length"]/2
+        else:
+            edge1 = None
+            x_dep, y_dep = dep[0], dep[1]
+            x_next, y_next = model.graph.nodes[node_list[0]]["x"], model.graph.nodes[node_list[0]]["y"]
+            d1 = tools.distance(x_dep, y_dep, x_next, y_next)
+        
+        #determine edge of the second segment and it's lenght
+        edge2, d2 = Path.path_next_segment(0, node_list, arr, arr_edge, not(self.drone.is_unconstrained_arrival), model)
+
+        p = [None, dep, node_list[0]]
+        v = [None, 0, self.drone.speeds_dict["cruise"]]
+        self.turns.append(0)
+        #calculate the real speed at first node in node_list
+        #if we are 'entering' in constrained airspace
+        if edge2:
+            if not(len(edge2[0]) == 6 or len(edge2[1]) == 6): #if edge2 is in constrained
+                #we need to compute the angle and coresponding speed
+                if edge1:
+                    #find angle from the dual
+                    angle = graph_dual.edges[(edge1, edge2)]["angle"]
+                else:
+                    #compute angle as heading difference of (dep, edge2[0]) and edge2
+                    pt1 = model.graph.nodes[edge2[0]]["x"], model.graph.nodes[edge2[0]]["y"]
+                    pt2 = model.graph.nodes[edge2[1]]["x"], model.graph.nodes[edge2[1]]["y"]
+                    angle = tools.angle_btw_vectors(dep, pt1, pt2)
+                v[-1] = Drone.return_speed_from_angle(angle, self.drone)
+                self.turns[-1] = angle
+
+        t = self.dep_time
+        self.separation_dict[t] = [0, 0] #initialize next sep_dict key
+        current_node = (t, p[1])
+        index = 1
+        while index < len(node_list):
+            #take out the first node and cooresponding speed
+            p.pop(0); v.pop(0)
+            #append the next node and cooresponding speed
+            p.append(node_list[index])
+            edge1 = edge2
+            edge2, d2_next = Path.path_next_segment(index, node_list, arr, arr_edge, not(self.drone.is_unconstrained_arrival), model)
+            #calculate the real speed at node_list[index]
+            v.append(self.drone.speeds_dict["cruise"])
+            self.turns.append(0)
+            if edge2:
+                if not(len(edge2[0]) == 6 or len(edge2[1]) == 6): #if edge2 is in constrained
+                    #we need to compute the angle and coresponding speed
+                    angle = graph_dual.edges[(edge1, edge2)]["angle"]
+                    v[-1] = Drone.return_speed_from_angle(angle, self.drone)
+                    self.turns[-1] = angle
+            
+            #integrate segment and save path fields
+            t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, model.protection_area, dep, arr)
+                
+            #set next node
+            index += 1
+            d1 = d2
+            d2 = d2_next
+            current_node = next_node
+        
+        #take out the first node and cooresponding speed
+        p.pop(0); v.pop(0)
+        #add the arrival node and cooresponding speed
+        p.append(arr)
+        v.append(0)
+        #integrate segment and save path fields
+        t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, model.protection_area, dep, arr)
+        
+        #treate last segment
+        d1 = d2
+        d2 = None
+        current_node = next_node
+        #take out the first node and cooresponding speed, and don't add anything
+        p.pop(0); v.pop(0)
+        #integrate last segment and save path fields except path_dict
+        t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, model.protection_area, dep, arr, False)
+        
+        #set Path object arrival time
+        self.arr_time = t
+
+    def integrate_segment(self, t, current_node, p, v, d1, d2, sep_norm, dep, arr, save_path_dict=True):
+        #integrate segment between p[0] and p[1]
+        integrator = Integrator.integrate(p, v, d1, d2, self.drone)
+        self.segments.append(integrator)
+        
+        #set after_sep for current node
+        self.separation_dict[t][1] = integrator.time_at_distance_after_begin(sep_norm)
+        
+        t += integrator.end_time()
+        #set next node and fill next/previous node dicts
+        next_node = (t, p[1])
+        self.next_node_dict[current_node]  = next_node
+        self.previous_node_dict[next_node] = current_node
+        
+        #add path_dict (no dep/arr)
+        if save_path_dict: self.path_dict[t] = p[1]
+        
+        #initialize and set before_sep for next node
+        self.separation_dict[t] = [integrator.time_at_distance_before_end(sep_norm), 0]
+        
+        #initialize and set middle_edge_dict
+        #Attention: don't save dep_vert-xxx and xxx-arr_vert, since may cause error later
+        if p[0] != dep and p[1] != arr:
+            self.edge_middle_dict[p[0], p[1]] = (integrator.middle_time(), (integrator.time_at_distance_before_middle(sep_norm), integrator.time_at_distance_after_middle(sep_norm)))
+        
+        return t, next_node
+    
+    
+    def path_next_segment(index, path, arr, arr_edge, arr_in_constraint, model):
+        if index < len(path) - 1:
+            edge = (path[index], path[index+1])
+            d = model.graph.edges[edge]["length"]
+        elif arr_in_constraint:
+            edge = arr_edge
+            d = model.graph.edges[edge]["length"]/2
+        else:
+            edge = None
+            x_curr, y_curr = model.graph.nodes[path[index]]["x"], model.graph.nodes[path[index]]["y"]
+            x_arr, y_arr = arr[0], arr[1]
+            d = tools.distance(x_curr, y_curr, x_arr, y_arr)
+        return edge, d
+    
+    
     def set_first_segment(self, model):
         """Compute first segment and return time of exit, speed, separation at node and the turn angle"""
         # TODO : return SEP
-        dep_edge = invert_dep_edge_if_needed(self.path, self.drone)
+        dep_edge = drone.dep_edge
         dep_vertiport = self.drone.departure_vertiport
         x_dep, y_dep = float(dep_vertiport[0]), float(dep_vertiport[1])
         speeds_dict = self.drone.speeds_dict
@@ -104,11 +267,11 @@ class Path:
         self.turns = [0]
         # Compute time to travel the first segment and the speed at the first node
         self.first_segment = self.set_first_segment(model)
-        self.speed_time_stamps[self.dep_time] = speeds_dict["cruise"]
+        #self.speed_time_stamps[self.dep_time] = speeds_dict["cruise"]
         t = self.dep_time + self.first_segment[0]
         self.separation_dict[t] = self.first_segment[3]
-        self.speed_time_stamps[t] = speeds_dict["cruise"]
-        self.fixed_speed_wpt.append(None)
+        #self.speed_time_stamps[t] = speeds_dict["cruise"]
+        #self.fixed_speed_wpt.append(None)
         self.path_dict[t] = new_path[0]
         # TODO ajouter le premier point dans le sep_dict car maintenant le premier point c'est plus le depart
         speed_at_current_node = speeds_dict["cruise"]
@@ -195,14 +358,14 @@ class Path:
                 travel_time = length / speeds_dict["cruise"]
                 t_sep = model.protection_area / speeds_dict["cruise"]
 
-            self.fixed_speed_wpt.append(fixed_speed)
+            #self.fixed_speed_wpt.append(fixed_speed)
 
             previous_t = t
             t += travel_time
             self.path_dict[t] = new_path[index]
-            self.speed_time_stamps[t] = speed_at_current_node
+            #self.speed_time_stamps[t] = speed_at_current_node
             self.separation_dict[t] = (t_sep, t_sep)
-            self.edge_dict[current_edge] = (previous_t, t)
+            #self.edge_dict[current_edge] = (previous_t, t)
             t_at_middle = (t+previous_t)/2
             if speed_at_previous_node is not None:
                 speed_middle = (speed_at_previous_node + speed_at_current_node)/2
@@ -218,7 +381,7 @@ class Path:
         time_to_arr, last_sep, _angle = self.last_segment
         self.separation_dict[t] = last_sep
         self.arr_time = t + time_to_arr
-        self.speed_time_stamps[self.arr_time] = speeds_dict["cruise"]
+        #self.speed_time_stamps[self.arr_time] = speeds_dict["cruise"]
         self.turns.append(0)
 
         # creating next and previous node path :
@@ -272,26 +435,6 @@ class Path:
             v1, v2, v3 = self.drone.speeds_dict["cruise"], self.drone.speeds_dict["cruise"], 0
             sep = return_sep(model, self.drone, v1, v2, v3, len_previous_edge, dist_to_arr)
             return time_to_arr, sep, angle
-
-    def flight_time_and_distance(self, graph):
-        self.flightDistance = 0
-        for i in range(len(self.path)-1):
-            self.flightDistance += graph.edges[self.path[i], self.path[i+1]]['length']
-        self.flightTime = self.speed_time_stamps[-1][0]
-        for node in self.delay:
-            self.flightTime += self.delay[node]
-
-    #     self.path_dict_discretized[t] = (xEnd, yEnd)
-
-
-def reverse_geometry_list(listGeo):
-    reversedList = []
-    for i in range(len(listGeo)-1,0,-2):
-        reversedList.append(listGeo[i-1])
-        reversedList.append(listGeo[i])
-        
-    return reversedList
-
 
 def return_sep(model, drone, v1, v2, v3, l1, l2):
     v_cruise = drone.speeds_dict["cruise"]
@@ -366,26 +509,6 @@ def return_t_at_d(dist, a, v0):
         return (-v0 - math.sqrt(v0 ** 2 + 2 * a * dist)) / (2 * a)
 
 
-def invert_dep_edge_if_needed(new_path, drone):
-    dep_edge = drone.dep_edge
-    # print(dep_edge, (new_path[0], new_path[1]))
-    if drone.dep_edge is not None:
-        if drone.dep_edge == (new_path[0], new_path[1]):
-            # print("Inverting dep_edge")
-            # print(new_path)
-            new_path.pop(0)
-            # new_dep_edge = (dep_edge[1], dep_edge[0])
-            # print(new_dep_edge, (new_path[0], new_path[1]))
-            # print("invert and supp")
-            return dep_edge
-        if drone.dep_edge[0] == new_path[0]:
-            new_dep_edge = (dep_edge[1], dep_edge[0])
-            # print(new_dep_edge, (new_path[0], new_path[1]))
-            # print("inverting")
-            return new_dep_edge
-    return dep_edge
-
-
 def compute_segment(v_prev, v_next, length, drone):
 
     t0, t1, t2, t3 = 0, None, None, None
@@ -431,4 +554,3 @@ def compute_segment(v_prev, v_next, length, drone):
         v1, v2, v3 = cruise, cruise, v_next
 
     return [t0, t1, t2, t3], [v0, v1, v2, v3, d0], [d0, d1, d2, d3]
-

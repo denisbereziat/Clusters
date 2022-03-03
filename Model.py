@@ -11,8 +11,13 @@ from shapely.geometry import Point
 
 import matplotlib.pyplot as plt
 
-turn_angle = 25
-
+protection_area = 32
+vertical_protection = 7.62  # 25 ft
+nb_FL = 16
+delay_max = 100
+FL_sep = 9.14  # in m
+FL_min = 25
+temps_sep_vertiport = 5
 
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph, safety parameters
@@ -26,7 +31,6 @@ class Model:
         self.total_drone_dict = dict()
         self.drone_order = []
         self.protection_area = protection_area
-        self.vertical_protection = 7.62  # 25 ft
         # Initial constraints contains the constraints caused by the currently
         # flying drones when the model is initialised
         self.initial_constraints_dict = initial_constraints

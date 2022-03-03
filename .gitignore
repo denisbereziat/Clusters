@@ -1,0 +1,3 @@
+*.pyc
+graph_files/*
+solver_test.py
