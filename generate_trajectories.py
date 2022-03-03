@@ -1215,7 +1215,7 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
 
     #Check that there are no nodes in the geofenced_nodes list
     protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
-    max_time = drone.dep_time + max(shortest_path.path_dict.keys()) + delay_max * delayStep + nb_FL * FL_sep / vVert
+    max_time = drone.dep_time + max(shortest_path.path_dict.keys()) + delay_max + nb_FL * FL_sep / vVert
     modified_edges_primal, modified_edges_dual = dict(), dict()
     at_least_one_edge_modified = False
     for interval in geofence_time_intervals:
