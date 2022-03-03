@@ -18,8 +18,8 @@ class Drone:
         self.vertical_accel = vertical_accel  # m/s**2
         self.braking_distance = 30  # m
         self.deposit_time = None
-        self.dep = dep  # Departure node in the path_dict
-        self.arr = arr  # Arrival node in the path_dict
+        self.dep = dep  # Departure nodes list in the path_dict
+        self.arr = arr  # Arrival nodes list in the path_dict
         self.drone_type = None
         self.dep_edge = None
         self.arr_edge = None

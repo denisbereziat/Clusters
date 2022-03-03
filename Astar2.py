@@ -5,26 +5,27 @@ import tools
 import Model
 
 
-def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_constraint_nodes_dict=None):
+def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, primal_constraint_nodes_dict=None):
     graph_dual = model.graph_dual
     closed_nodes_list = []
     if primal_constraint_nodes_dict is None:
         primal_constraint_nodes_dict = dict()
-    current_node = nd.Node(dep_node_id)
-    current_node_inv = nd.Node((dep_node_id[1], dep_node_id[0]))
-    current_node.cost, current_node_inv.cost = 0, 0
-    # Everytime a node time is mentioned it's equivalent to the time at the first node of the dual node in the primal
-    # graph
-    current_node.time, current_node_inv.cost = departure_time, departure_time
-    current_node.heuristic, current_node_inv.heuristic = current_node.dist_to_node(arr_node_id, graph_dual), current_node.dist_to_node(arr_node_id, graph_dual)
+    priority_queue = []
+    for dep_node_id in dep_node_list:
+        current_node = nd.Node(dep_node_id)
+        current_node.cost = 0
+        current_node.time = departure_time
+        # TODO modify heuristic to be towards vertiport instead
+        current_node.heuristic = current_node.dist_to_node(arr_node_list[0], graph_dual)
+        priority_queue.append(current_node)
     # TODO priority_queue = [current_node, inverse_current_node]
-    priority_queue = [current_node, current_node_inv]
+
     # print("current node :", current_node.id)
     while len(priority_queue) > 0:
         current_node = priority_queue.pop(0)
         closed_nodes_list.append(current_node.id)
         # TERMINATION CONDITION : Having reached the arrival node
-        if current_node.id == arr_node_id or current_node.id == (arr_node_id[1], arr_node_id[0]):
+        if current_node.id in arr_node_list:
             # TODO current_node = arr_node_id ou inverse_arr_node_id
             solution_dual_path = current_node.path()
             # Turning the path back in the normal graph path
@@ -53,7 +54,7 @@ def astar_dual(model, dep_node_id, arr_node_id, drone, departure_time, primal_co
                 neighbor.time = new_time
                 neighbor.cost = new_cost
                 # RQ on peut ajouter le cout du neighbor avec le virage a l'heuristic
-                neighbor.heuristic = neighbor.dist_to_node(arr_node_id, graph_dual)
+                neighbor.heuristic = neighbor.dist_to_node(arr_node_list[0], graph_dual)
                 neighbor.parent = current_node
         priority_queue.sort(key=lambda x: x.f())
 

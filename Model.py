@@ -110,19 +110,25 @@ class Model:
                 list_of_possible_closest_edges = tools.find_list_of_closest_with_hash(x_arr, y_arr, hash_edges, min_x, min_y, x_step, y_step, resolution)
                 arr_edge, dist_arr_edge = tools.find_closest_edge_in_list(x_arr, y_arr, list_of_possible_closest_edges, self.graph)
 
-                dep = dep_edge[0]
-                arr = arr_edge[0]
+                dep = list(dep_edge)
+                # print("before :", dep)
+                arr = list(arr_edge)
 
                 # If the departure is too far from the edge we store the dep or arr edge as departure/arrival_vertiport and
                 # Set the value of is_departure_in_unconstrained
                 if dist_arr_edge > self.protection_area:
-                    surrounging_polygon = self.find_surrounging_polygon(arr_vertiport_coordinates)
+                    surrounging_arr_polygon = self.find_surrounging_polygon(arr_vertiport_coordinates)
+                    if surrounging_arr_polygon:
+                        arr = surrounging_arr_polygon
                     arr_edge = arr_vertiport_coordinates
                     is_unconstrained_arrival = True
                 else:
                     is_unconstrained_arrival = False
                 if dist_dep_edge > self.protection_area:
-                    surrounging_polygon = self.find_surrounging_polygon(dep_vertiport_coordinates)
+                    surrounging_dep_polygon = self.find_surrounging_polygon(dep_vertiport_coordinates)
+                    if surrounging_dep_polygon:
+                        dep = surrounging_dep_polygon
+                        # print("after :", dep)
                     dep_edge = dep_vertiport_coordinates
                     is_unconstrained_departure = True
                 else:

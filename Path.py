@@ -254,6 +254,11 @@ class Path:
         else:
             # Is there a turn ?
             last_edge = (self.path[-2], self.path[-1])
+            # print("last ",last_edge)
+            # print("arr ",arr_edge)
+            # print(arr_edge in model.graph_dual.nodes)
+            if (last_edge, arr_edge) not in model.graph_dual.edges :
+                arr_edge = (arr_edge[1], arr_edge[0])
             angle = model.graph_dual.edges[last_edge, arr_edge]["angle"]
             dist_to_arr = model.graph.edges[arr_edge]["length"]/2
             # Determine travel time to node :

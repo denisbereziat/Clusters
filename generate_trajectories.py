@@ -10,18 +10,7 @@ import pyproj
 import matplotlib.pyplot as plt
 import itertools
 import Drone
-import sys
 from Param2 import delayStep, vVert
-
-
-# # graph_file_path = "graph_files/processed_graphM2.graphml"
-# graph_file_path = "graph_files/total_graph_200m.graphml"
-# dual_graph_path = "graph_files/dual_total_graph_200m.graphml"
-# # graph_file_path = "graph_files/geo_data/crs_epsg_32633/road_network/crs_4326_cleaned_simplified_network/cleaned_simplified.graphml"
-# # drone_list_file_path = 'graph_files/drones.txt'
-# # drone_list_file_path = 'graph_files/test_flight_intention.csv'
-# drone_list_file_path = 'graph_files/Intentions/100_flight_intention.csv'
-# # vertical_protection_area = 7.62 # 25 ft
 
 
 def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param=None):
@@ -46,8 +35,7 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
     # If the drone doesn't already have trajectories generated we generate some
     for drone in model.droneList:
         if drone.flight_number not in drone_trajectories_dict:
-            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, model, 6, 500,
-                                                                                         nb_alternative_traj, geofence_time_intervals)
+            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, model, 6, 500, nb_alternative_traj, geofence_time_intervals)
 
     # Compute total time for each trajectory
     fn_order = []
@@ -63,7 +51,8 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
             drone = return_drone_from_flight_number(model, drone_fn)
             path = Path.Path(drone.dep_time, [], drone)
             path.set_path(traj, model)
-            total_time = max(list(path.path_dict.keys()))
+            # TODO remove total_time c'est inutile maintenant
+            total_time = None
             trajectories_to_path[traj_id] = path
             trajectories_to_fn[traj_id] = drone_fn
             trajectories_to_duration[traj_id] = total_time
@@ -1212,10 +1201,16 @@ def get_all_dep_and_arr_edges(model, raw_graph):
 
 def generate_parallel_trajectories(drone, model, step, dist, number_to_generate, geofence_time_intervals):
     trajectories = []
-    drone_dep_dual = ("S" + drone.dep, drone.dep)
-    drone_arr_dual = (drone.arr, drone.arr + "T")
+    drone_dep_dual_list = []
+    for node in drone.dep:
+        drone_dep_dual = ("S" + node, node)
+        drone_dep_dual_list.append(drone_dep_dual)
+    drone_arr_dual_list = []
+    for node in drone.arr:
+        drone_arr_dual = (node, node + "T")
+        drone_arr_dual_list.append(drone_arr_dual)
     # print(drone_dep_dual, drone_arr_dual)
-    shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time)
+    shortest_path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time)
     shortest_path.set_path(shortest_path.path, model)
 
     #Check that there are no nodes in the geofenced_nodes list
@@ -1263,13 +1258,13 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
         at_least_one_edge_modified = True
     # If at least one edge was modified then we need to recompute the shortest path
     if at_least_one_edge_modified:
-        shortest_path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time)
+        shortest_path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time)
     trajectories.append(shortest_path.path)
 
     # GENERATE ALL THE OTHER TRAJS
     geodesic = pyproj.Geod(ellps='WGS84')
-    x_dep, y_dep = model.graph.nodes[drone.dep]["x"], model.graph.nodes[drone.dep]["y"]
-    x_arr, y_arr = model.graph.nodes[drone.arr]["x"], model.graph.nodes[drone.arr]["y"]
+    x_dep, y_dep = drone.departure_vertiport
+    x_arr, y_arr = drone.arrival_vertiport
 
     heading, _back_azimuth1, _distance = geodesic.inv(x_dep, y_dep, x_arr, y_arr)
     nodes_to_deviate_from = []
@@ -1301,20 +1296,25 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
                                                          resolution, model.graph)
             nodes_to_visit.append(new_node)
         # get closest node
-
-        drone_dep_dual = ("S" + drone.dep, drone.dep)
-        drone_arr_dual = (nodes_to_visit[0], nodes_to_visit[0] + "T")
-        trajectory = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path
+        drone_dep_dual_list = []
+        for node in drone.dep:
+            drone_dep_dual = ("S" + node, node)
+            drone_dep_dual_list.append(drone_dep_dual)
+        drone_arr_dual_list = [(nodes_to_visit[0], nodes_to_visit[0] + "T")]
+        trajectory = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path
         for i in range(len(nodes_to_visit) - 1):
             node = nodes_to_visit[i]
             next_node = nodes_to_visit[i + 1]
-            drone_dep_dual = ("S" + node, node)
-            drone_arr_dual = (next_node, next_node + "T")
-            _path = a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path[1:]
+            drone_dep_dual_list = [("S" + node, node)]
+            drone_arr_dual_list = [(next_node, next_node + "T")]
+            _path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path[1:]
             trajectory += _path
-        drone_dep_dual = ("S" + nodes_to_visit[-1], nodes_to_visit[-1])
-        drone_arr_dual = (drone.arr, drone.arr + "T")
-        trajectory += a2.astar_dual(model, drone_dep_dual, drone_arr_dual, drone, drone.dep_time).path[1:]
+        drone_dep_dual_list = [("S" + nodes_to_visit[-1], nodes_to_visit[-1])]
+        drone_arr_dual_list = []
+        for node in drone.arr:
+            drone_arr_dual = (node, node + "T")
+            drone_arr_dual_list.append(drone_arr_dual)
+        trajectory += a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path[1:]
         trajectory_ok = True
 
         if len(set(trajectory)) != len(trajectory):
