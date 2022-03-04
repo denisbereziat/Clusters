@@ -526,6 +526,7 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
         if [shortest_path.path[_i - 1], shortest_path.path[_i]] == [drone.dep_edge[1], drone.dep_edge[0]]:
             remove_first = True
     # TODO ENCORE DES A/R DANS LE DEBUT JE SAIS PAS POURQUOI DONC J'ENLEVE ICI
+    # TODO encore demi_tour en milieu d'arrete rare
     if remove_first:
         trajectories.append(shortest_path.path[1:])
     else:
