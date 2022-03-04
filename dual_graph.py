@@ -29,9 +29,7 @@ def create_dual(graph, turn_cost_function):
                     total_turn_cost, pre_turn_cost, post_turn_cost, is_turn = (0, 0, 0, False)
                     angle = 0
                 else:
-                    total_turn_cost, pre_turn_cost, post_turn_cost, is_turn = turn_cost_function(digraph.nodes[node1[0]],
-                                                                                        digraph.nodes[node1[1]],
-                                                                                        digraph.nodes[node2[1]])
+                    total_turn_cost, pre_turn_cost, post_turn_cost, is_turn = turn_cost_function(digraph.nodes[node1[0]],digraph.nodes[node1[1]],digraph.nodes[node2[1]])
                     x1, y1 = float(digraph.nodes[node1[0]]["y"]), float(digraph.nodes[node1[0]]["x"])
                     x2, y2 = float(digraph.nodes[node1[1]]["y"]), float(digraph.nodes[node1[1]]["x"])
                     x3, y3 = float(digraph.nodes[node2[1]]["y"]), float(digraph.nodes[node2[1]]["x"])

@@ -15,7 +15,7 @@ delayStep = 10;						#delay step duration; total delay = number od delay steps (
 
 class Param:
 	def __init__(self, model, A, K, maxDelay, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
-		self.nbFL = model.nbFL
+		self.nbFL = model.nb_FL
 		self.aVert = aVert
 		self.vVert = vVert
 		self.dFL = dFL

@@ -1,5 +1,6 @@
 import shapely.geometry
 
+import Drone
 import Drone as dr
 import math
 import tools
@@ -18,11 +19,12 @@ delay_max = 100
 FL_sep = 9.14  # in m
 FL_min = 25
 temps_sep_vertiport = 5
+turn_angle_mini = Drone.angle_intervals[0]
 
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph, safety parameters
      and find conflicts."""
-    def __init__(self, graph, protection_area, dt=5, drones=[], initial_constraints=None):
+    def __init__(self, graph, dt=5, drones=[], initial_constraints=None):
         self.graph = init_graph(graph)
         self.graph_dual = None
         self.timeInterval = dt
@@ -31,6 +33,12 @@ class Model:
         self.total_drone_dict = dict()
         self.drone_order = []
         self.protection_area = protection_area
+        self.vertical_protection = vertical_protection
+        self.nb_FL = nb_FL
+        self.delay_max = delay_max
+        self.FL_sep = FL_sep
+        self.FL_min = FL_min
+        self.temps_sep_vertiport = temps_sep_vertiport
         # Initial constraints contains the constraints caused by the currently
         # flying drones when the model is initialised
         self.initial_constraints_dict = initial_constraints
@@ -329,13 +337,12 @@ def turn_cost_function(node1, node2, node3):
     """The function used to determine the cost to add to the edge in the dual graph to take into account the effect
     of turns on the drone speed and flight_time, it returns the 2 parts of the added cost of the turn (deceleration
     and acceleration) and the total added cost in time"""
-    # TODO as of now we consider only one speed profile, we can either make a graph per drone, or
-    #  just return the turn angle and do calculations each time
+    # TODO A changer en meme temps que le A*
     x1, y1 = float(node1["x"]), float(node1["y"])
     x2, y2 = float(node2["x"]), float(node2["y"])
     x3, y3 = float(node3["x"]), float(node3["y"])
     angle = tools.angle_btw_vectors((x1, y1), (x2, y2), (x3, y3))
-    if angle > turn_angle:
+    if angle > turn_angle_mini:
         return 0, 0, 0, True
 
     else:
@@ -518,10 +525,10 @@ def get_closest_node(x, y, graph):
     return closest_node
 
 
-def init_model(graph, graph_dual, drone_list_path, protection_area_size, graph_hash, current_sim_time=None):
+def init_model(graph, graph_dual, drone_list_path, graph_hash, current_sim_time=None):
     """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
     into account the current_time so the drones announced after this time aren't loaded."""
-    model = Model(graph, protection_area_size)
+    model = Model(graph)
     model.hash_map = graph_hash
     model.droneList = []
     model.add_drones_from_file(drone_list_path, current_sim_time)

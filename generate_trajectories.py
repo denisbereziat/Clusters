@@ -9,6 +9,8 @@ import itertools
 import Drone
 from Drone import VerticalIntegrator
 
+verbose = False
+
 
 def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param=None):
     """Generate alternative trajectories for all drones in the model
@@ -20,7 +22,6 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
     fn_order = list of flight_number of the list of model.droneList
     """
 
-    protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
     if current_param is not None:
         drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = current_param
     else:
@@ -48,6 +49,9 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
             drone = return_drone_from_flight_number(model, drone_fn)
             path = Path.Path(drone.dep_time, [], drone)
             path.new_set_path(traj, model) #!!!we may directly call it from constructor
+            # print("PATH :", path.path_dict)
+            # path.set_path(traj, model)
+            # print("OLDPATH :", path.path_dict)
             total_time = path.arr_time - path.dep_time
             trajectories_to_path[traj_id] = path
             trajectories_to_fn[traj_id] = drone_fn
@@ -60,9 +64,11 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
             traj_id += 1
     return drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order
 
+
 def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, horizontal_shared_nodes_list):
     #check what is situation and save intersection(s)
-    print("Connected :", multiPoints)
+    if verbose:
+        print("Connected :", multiPoints)
     if multiPointsStatus == 1: #this could be verified with len of multiPoints
         #save independent intersecting point
         t1 = multiPoints[0][1]
@@ -102,62 +108,73 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
         conflict = (k1, k2, t_k1_first, t_k2_first, new_sep12_first, new_sep21_first)
     
     horizontal_shared_nodes_list.append(conflict)
-    print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
+    if verbose:
+        print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
     
 def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersection_grid, delta_time, intersection_list, trajectories_to_fn_dict, model):
     #final object in vert_intersection_grid and vert_hor_intersection_grid are
     #triplets (traj_id, time_at_intersection, (hor_time_separation_before, hor_time_separation_before))
     for dep_edge in vert_intersection_grid:
         for time_id in vert_intersection_grid[dep_edge]:
-            print('Current vertical ', vert_intersection_grid[dep_edge][time_id])
+            if verbose:
+                print('Current vertical ', vert_intersection_grid[dep_edge][time_id])
             if dep_edge in vert_hor_intersection_grid: #if no hor drones no intersections
                 potential_intersections = []
                 if time_id in vert_hor_intersection_grid[dep_edge]:
-                    print('Current hor ', vert_hor_intersection_grid[dep_edge][time_id])
+                    if verbose:
+                        print('Current hor ', vert_hor_intersection_grid[dep_edge][time_id])
                     #add interaction of current clmb and hor
                     potential_intersections.extend(itertools.product(vert_intersection_grid[dep_edge][time_id], vert_hor_intersection_grid[dep_edge][time_id]))
                     #add interaction of next clmb and current hor
                     if time_id+1 in vert_intersection_grid[dep_edge]:
-                        print('Next vertical ', vert_intersection_grid[dep_edge][time_id+1])
+                        if verbose:
+                            print('Next vertical ', vert_intersection_grid[dep_edge][time_id+1])
                         potential_intersections.extend(itertools.product(vert_intersection_grid[dep_edge][time_id+1], vert_hor_intersection_grid[dep_edge][time_id]))
                 
                 #add interaction of current clmb and next hor
                 if time_id+1 in vert_hor_intersection_grid[dep_edge]:
-                    print('Next hor ', vert_hor_intersection_grid[dep_edge][time_id+1])
+                    if verbose:
+                        print('Next hor ', vert_hor_intersection_grid[dep_edge][time_id+1])
                     potential_intersections.extend(itertools.product(vert_intersection_grid[dep_edge][time_id],vert_hor_intersection_grid[dep_edge][time_id+1]))
                     
                 for pair in potential_intersections:
-                    print(pair)   
+                    if verbose:
+                        print(pair)
                     if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
                         if abs(pair[0][1] - pair[1][1]) <= delta_time: #further fillter per actual separation
                             #create intersecting point
                             conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], max(pair[0][2][1], pair[1][2][0]), max(pair[1][2][1], pair[0][2][0]))
-                            print("It's an conflict ", conflict)
+                            if verbose:
+                                print("It's an conflict ", conflict)
                             intersection_list.append(conflict)
 
 def generate_vertiport_intersections(vert_intersection_grid, delta_time, intersection_list, temps_sep_vertiport, trajectories_to_fn_dict):
     for vertiport in vert_intersection_grid:
         for time_id in vert_intersection_grid[vertiport]:
-            print("Current operations ", vert_intersection_grid[vertiport][time_id])
+            if verbose:
+                print("Current operations ", vert_intersection_grid[vertiport][time_id])
             potential_intersections = list(itertools.combinations(vert_intersection_grid[vertiport][time_id], 2))
             if time_id+1 in vert_intersection_grid[vertiport]:
-                print("Next operations ", vert_intersection_grid[vertiport][time_id+1])
+                if verbose:
+                    print("Next operations ", vert_intersection_grid[vertiport][time_id+1])
                 potential_intersections.extend(itertools.product(vert_intersection_grid[vertiport][time_id], vert_intersection_grid[vertiport][time_id+1]))
                     
             for pair in potential_intersections:
-                print(pair)   
+                if verbose:
+                    print(pair)
                 if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
                     if abs(pair[0][1] - pair[1][1]) <= delta_time: #further fillter per actual separation
                         #create intersecting point
                         conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, temps_sep_vertiport)
-                        print("It's an conflict ", conflict)
+                        if verbose:
+                            print("It's an conflict ", conflict)
                         intersection_list.append(conflict)
 
 def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
     """Generate intersection points between given trajectories"""
 
-    protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
-    max_delta_fl = nb_FL - 1
+    # protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
+    max_delta_fl = model.nb_FL - 1
     horizontal_shared_nodes_list = []
     climb_horiz_list = []
     descent_horiz_list = []
@@ -168,10 +185,10 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     worse_hor_time_sep = model.protection_area / Drone.speeds_dict_model1["turn2"]
     #we take into account acceleration (or deceleration) and climb at max speed for the rest
     #use when drone that is climbing/descending is leveling up at next flight level
-    worse_vert_time_sep = VerticalIntegrator.integrate(FL_sep, 0, Drone.vertical_speed).time_at_distance_before_end(model.vertical_protection)
+    worse_vert_time_sep = VerticalIntegrator.integrate(model.FL_sep, 0, Drone.vertical_speed).time_at_distance_before_end(model.vertical_protection)
     #we take into account both acceleration and deceleration and climb at max speed for the rest
     #use when drone is climbing only one level
-    worse_vert_time_sep_onelevel = VerticalIntegrator.integrate(FL_sep).time_at_distance_before_end(model.vertical_protection)
+    worse_vert_time_sep_onelevel = VerticalIntegrator.integrate(model.FL_sep).time_at_distance_before_end(model.vertical_protection)
     
     '''Intersection dicts has key=interescting_point_id (e.g. node, dep, arr, or edge id) 
     and value that is another dict whose key is time_id and value is list of trajectories 
@@ -184,20 +201,20 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     such as level distances, etc. (this depends on the type of intersection)
     Atention!!! always use the same norm to filter and to indentify intersection'''
     # horizontal-horizontal
-    delta_time_horizontal = math.ceil(delay_max + worse_hor_time_sep)
+    delta_time_horizontal = math.ceil(model.delay_max + worse_hor_time_sep)
     horizontal_intersection_grid = {}
     # vertical-horizontal
-    delta_time_clmb_hor = math.ceil(delay_max + Drone.vertical_speed / (2 * Drone.vertical_accel) + worse_hor_time_sep)
+    delta_time_clmb_hor = math.ceil(model.delay_max + Drone.vertical_speed / (2 * Drone.vertical_accel) + worse_hor_time_sep)
     clmb_intersection_grid = {}
     clmb_hor_intersection_grid = {}
-    delta_time_desc_hor = math.ceil(delay_max + 2 * max_delta_fl * FL_sep / Drone.vertical_speed + 
+    delta_time_desc_hor = math.ceil(model.delay_max + 2 * max_delta_fl * model.FL_sep / Drone.vertical_speed +
                          Drone.vertical_speed / (2 * Drone.vertical_accel) + worse_hor_time_sep)
     desc_intersection_grid = {}
     desc_hor_intersection_grid = {}
     # vertical-vertical
-    delta_time_dep = math.ceil(delay_max + temps_sep_vertiport)
+    delta_time_dep = math.ceil(model.delay_max + model.temps_sep_vertiport)
     dep_intersection_grid = {}
-    delta_time_arr = math.ceil(delay_max + 2 * max_delta_fl * FL_sep / Drone.vertical_speed + temps_sep_vertiport)
+    delta_time_arr = math.ceil(model.delay_max + 2 * max_delta_fl * model.FL_sep / Drone.vertical_speed + model.temps_sep_vertiport)
     arr_intersection_grid = {}
     '''Loop over all drones, trajectories and their nodes and fill the grids 
     by adding concerned trajectories and respective passage time over intersecting point (and any other required data)
@@ -350,14 +367,16 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     '''now for every pair of trajectories remove multiple points (that could be consecutive or opposite)
     and save the intersection point(s)'''
     for (k1, k2), points in horizontal_intersections.items():
-        print("k1 k2")
-        print(k1, k2)
+        if verbose:
+            print("k1 k2")
+            print(k1, k2)
 
         if len(points) == 1:
             #this is just simple intersection
             #save intersecting point and continue
-            print("points initial")
-            print(points)
+            if verbose:
+                print("points initial")
+                print(points)
             save_hor_intersection(trajectories_to_path, k1, k2, points, 1, horizontal_shared_nodes_list)
         else:
             # there are multiple points, but they could be still: independent or
@@ -428,12 +447,11 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     * between deps[time_id] vs deps[time_id+1]
     The principle is the same for arr_intersection_grid just time norm is different.'''
     #DETECTION OF DEP INTERSECTION POINTS
-    generate_vertiport_intersections(dep_intersection_grid, delta_time_dep, climb_climb_list, temps_sep_vertiport, trajectories_to_fn_dict)
+    generate_vertiport_intersections(dep_intersection_grid, delta_time_dep, climb_climb_list, model.temps_sep_vertiport, trajectories_to_fn_dict)
     #DETECTION OF ARR INTERSECTION POINTS
-    generate_vertiport_intersections(arr_intersection_grid, delta_time_arr, descent_descent_list, temps_sep_vertiport, trajectories_to_fn_dict)
+    generate_vertiport_intersections(arr_intersection_grid, delta_time_arr, descent_descent_list, model.temps_sep_vertiport, trajectories_to_fn_dict)
 
     return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
-
 
 
 def generate_parallel_trajectories(drone, model, step, dist, number_to_generate, geofence_time_intervals):
@@ -446,13 +464,17 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
     for node in drone.arr:
         drone_arr_dual = (node, node + "T")
         drone_arr_dual_list.append(drone_arr_dual)
+    if len(drone_dep_dual_list) < 2:
+        print("TOOSHORT1")
+        print(drone_dep_dual_list)
     # print(drone_dep_dual, drone_arr_dual)
     shortest_path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time)
-    shortest_path.set_path(shortest_path.path, model)
+    shortest_path.new_set_path(shortest_path.path, model)
+    # shortest_path.set_path(shortest_path.path, model)
 
     #Check that there are no nodes in the geofenced_nodes list
-    protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
-    max_time = drone.dep_time + max(shortest_path.path_dict.keys()) + delay_max + nb_FL * FL_sep / Drone.vertical_speed
+    # protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
+    max_time = drone.dep_time + max(shortest_path.path_dict.keys()) + model.delay_max + model.nb_FL * model.FL_sep / Drone.vertical_speed
     modified_edges_primal, modified_edges_dual = dict(), dict()
     at_least_one_edge_modified = False
     for interval in geofence_time_intervals:
@@ -491,13 +513,23 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
                         modified_edges_dual[edge_dual] = model.graph_dual.edges[edge_dual]["length"]
                         model.graph_dual.edges[edge_dual]["length"] = model.graph_dual.edges[edge_dual]["length"] * 100
 
-    if len(modified_edges_dual.keys()) > 0 or len(modified_edges_primal.keys()) > 0 :
+    if len(modified_edges_dual.keys()) > 0 or len(modified_edges_primal.keys()) > 0:
         at_least_one_edge_modified = True
     # If at least one edge was modified then we need to recompute the shortest path
     if at_least_one_edge_modified:
         shortest_path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time)
-    trajectories.append(shortest_path.path)
 
+    remove_first = False
+    for _i in range(1, len(shortest_path.path) - 1):
+        if [shortest_path.path[_i - 1], shortest_path.path[_i]] == [drone.dep_edge[0], drone.dep_edge[1]]:
+            remove_first = True
+        if [shortest_path.path[_i - 1], shortest_path.path[_i]] == [drone.dep_edge[1], drone.dep_edge[0]]:
+            remove_first = True
+    # TODO ENCORE DES A/R DANS LE DEBUT JE SAIS PAS POURQUOI DONC J'ENLEVE ICI
+    if remove_first:
+        trajectories.append(shortest_path.path[1:])
+    else:
+        trajectories.append(shortest_path.path)
     # GENERATE ALL THE OTHER TRAJS
     geodesic = pyproj.Geod(ellps='WGS84')
     x_dep, y_dep = drone.departure_vertiport
@@ -506,6 +538,8 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
     heading, _back_azimuth1, _distance = geodesic.inv(x_dep, y_dep, x_arr, y_arr)
     nodes_to_deviate_from = []
     for i in range(1, step + 1):
+        # if shortest_path.path[i * (len(shortest_path.path) // (step + 1))] in drone.arr:
+        #     print("IZDPODQPDZQD")
         nodes_to_deviate_from.append(shortest_path.path[i * (len(shortest_path.path) // (step + 1))])
     count = 0
     tries = 0
@@ -531,14 +565,26 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
             new_y = new_pt[1]
             new_node = tools.find_closest_node_with_hash(new_x, new_y, hash_nodes, min_x, min_y, x_step, y_step,
                                                          resolution, model.graph)
+            if new_node in drone.arr:
+                continue
+            if new_node in drone.dep:
+                continue
             nodes_to_visit.append(new_node)
         # get closest node
         drone_dep_dual_list = []
         for node in drone.dep:
             drone_dep_dual = ("S" + node, node)
             drone_dep_dual_list.append(drone_dep_dual)
+        if len(drone_dep_dual_list) < 2:
+            print("TOOSHORT2")
+            print(drone_dep_dual_list)
         drone_arr_dual_list = [(nodes_to_visit[0], nodes_to_visit[0] + "T")]
         trajectory = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path
+        # print([trajectory[0], trajectory[1]] , [drone.dep_edge[0], drone.dep_edge[1]])
+        if [trajectory[0], trajectory[1]] == [drone.dep_edge[0], drone.dep_edge[1]]:
+            print("OZIDHOIQDHPZQPDJQPDOZQ")
+        if [trajectory[0], trajectory[1]] == [drone.dep_edge[1], drone.dep_edge[0]]:
+            print("dzqdpzqdjzqkqp")
         for i in range(len(nodes_to_visit) - 1):
             node = nodes_to_visit[i]
             next_node = nodes_to_visit[i + 1]
@@ -570,7 +616,15 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
                 print("TRAJ impossible")
                 trajectory_ok = False
 
-        if trajectory not in trajectories and trajectory_ok:
+        # TODO faire plus rapide ou juste faire que ça arrive pas
+        # Check dep_edge isn't in traj
+        for _i in range(1, len(trajectory)-1):
+            if [trajectory[_i-1], trajectory[_i]] == [drone.dep_edge[0], drone.dep_edge[1]]:
+                trajectory_ok = False
+            if [trajectory[_i-1], trajectory[_i]] == [drone.dep_edge[1], drone.dep_edge[0]]:
+                trajectory_ok = False
+
+        if (trajectory not in trajectories) and trajectory_ok:
             trajectories.append(trajectory)
         count += 1
 

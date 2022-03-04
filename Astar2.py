@@ -1,11 +1,19 @@
+import math
+
+import Drone
 import Node as nd
 import networkx as nx
 import Path as pt
 import tools
 import Model
 
+# TODO Faire A* precis avec bonne estim des virages et reaccel plus tard
+
 
 def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, primal_constraint_nodes_dict=None):
+    # print("drone : ", drone.arr)
+    # print(arr_node_list)
+
     graph_dual = model.graph_dual
     closed_nodes_list = []
     if primal_constraint_nodes_dict is None:
@@ -29,18 +37,42 @@ def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, prima
             # TODO current_node = arr_node_id ou inverse_arr_node_id
             solution_dual_path = current_node.path()
             # Turning the path back in the normal graph path
+            # last_iter = False
+            # for arrnd in arr_node_list:
+            #     if arrnd[0] in drone.arr_edge:
+            #         last_iter = True
+            # if last_iter:
+            #     if drone.arr_edge in [n.id for n in solution_dual_path[-3:]] or (drone.arr_edge[1], drone.arr_edge[0]) in [n.id for n in solution_dual_path[-3:]]:
+            #         print("drone FN", drone.flight_number)
+            #         print("last nodes : ", [n.id for n in solution_dual_path[-3:]])
+            #         print("heuri :", [n.heuristic for n in solution_dual_path[-3:]])
+            #         print("pos nodes :", [(graph_dual.nodes[n.id]["x"],graph_dual.nodes[n.id]["y"]) for n in solution_dual_path[-3:]])
+            #         print("pos arr :", [(graph_dual.nodes[n]["x"],graph_dual.nodes[n]["y"]) for n in arr_node_list])
+            #         for _nd in solution_dual_path[-3:]:
+            #             print("nd id :", _nd.id)
+            #             for nd_arr in arr_node_list:
+            #                 print(_nd.dist_to_node(nd_arr, graph_dual))
+            #
+            #         # print("costs :", [n.cost for n in solution_dual_path[-3:]])
+            #         print("arr_edge :", drone.arr_edge)
+            #         print("arr nodes :", arr_node_list)
+                # print("arr_node ", arr_node_list)
+                # print((solution_dual_path[-3].id[1], solution_dual_path[-2].id[1]), " ::: ", drone.arr_edge)
+            #
+            # if (solution_dual_path[-3].id[1], solution_dual_path[-2].id[1]) == drone.arr_edge:
+            #     print("TSOINSOINS")
             shortest_path = pt.Path(drone.dep_time, [node.id[1] for node in solution_dual_path[:-1]], drone)
             return shortest_path
         neighbors = get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, drone, model)
         for neighbor in neighbors:
             edge = (current_node.id, neighbor)
-            speed_on_neighbor = drone.cruise_speed
+            speed_on_neighbor = drone.speeds_dict["cruise"]
             # TODO Mettre les bonnes v de virage
             if graph_dual.edges[current_node.id, neighbor]["is_turn"]:
-                speed_on_neighbor = drone.turn_speed
+                speed_on_neighbor = drone.speeds_dict["turn1"]
             if current_node.parent is not None:
                 if graph_dual.edges[current_node.parent.id, current_node.id]["is_turn"]:
-                    speed_on_neighbor = drone.turn_speed
+                    speed_on_neighbor = drone.speeds_dict["turn1"]
             # If current node was AB and neighbor is BC, the time we set here is the arrival time at B taking into
             # account pre and post turn added cost
             new_time = current_node.time + graph_dual.edges[edge]["length"] / speed_on_neighbor
@@ -53,8 +85,15 @@ def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, prima
             if neighbor.time >= new_time:
                 neighbor.time = new_time
                 neighbor.cost = new_cost
+
                 # RQ on peut ajouter le cout du neighbor avec le virage a l'heuristic
-                neighbor.heuristic = neighbor.dist_to_node(arr_node_list[0], graph_dual)
+                min_heuristic = math.inf
+                for arr_nd in arr_node_list:
+                    heuri = neighbor.dist_to_node(arr_nd, graph_dual)
+                    if heuri < min_heuristic:
+                        min_heuristic = heuri
+                neighbor.heuristic = min_heuristic
+
                 neighbor.parent = current_node
         priority_queue.sort(key=lambda x: x.f())
 
@@ -72,6 +111,8 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
     constraints (primal_constraint_nodes_dict)"""
     neighbors = []
     graph_dual, graph_primal = model.graph_dual, model.graph
+    # TODO A modifier plus tard pour A* precis
+    braking_distance = Drone.return_braking_distance(drone.speeds_dict["cruise"], drone.speeds_dict["turn1"])
     # Since it's a directed graph, graph.successors is used
     for neighbor in graph_dual.successors(current_node.id):
         # print("node succesors :", list(graph_dual.successors(current_node.id)))
@@ -80,15 +121,6 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
         neighbor_exit_node = neighbor[1]
         dual_edge = (current_node.id, neighbor)
         current_edge = current_node.id
-        # We need the current drone speed after exiting the entry node of the neighbor (= entering the neighbor edge)
-        # along with it's arrival time at the entry node
-        # To have the entry time we need the speed on the last edge
-        # Ex : if current node is AB and neighbor is BC, the time of arrival at BC would be
-        # time at A + time to travel through AB with the right speed to take the turn
-        # We can't check if BC is actually feasible now because we don't know if the node C will be a turn or not
-        # If the current node is a source the length is 0 so entry time is the same as current_node.time
-        # So we also need the drone speed on the last edge
-
         # Determine the drone time of arrival on the current edge :
         # Was the last node a turn point :
         neighbor_edge_entry_time = None
@@ -99,20 +131,20 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
             current_edge_length = graph_primal.edges[current_edge]["length"]
         if current_node.parent is not None:
             if graph_dual.edges[current_node.parent.id, current_node.id]["is_turn"]:
-                neighbor_edge_entry_time = current_node.time + current_edge_length / drone.turn_speed
+                neighbor_edge_entry_time = current_node.time + current_edge_length / drone.speeds_dict["turn1"]
         # Is the coming node a turning point
         if graph_dual.edges[current_node.id, neighbor]["is_turn"] and not current_edge_length == 0:
-            if current_edge_length < model.protection_area + drone.braking_distance:
-                neighbor_edge_entry_time = current_node.time + current_edge_length / drone.turn_speed
+            if current_edge_length < model.protection_area + braking_distance:
+                neighbor_edge_entry_time = current_node.time + current_edge_length / drone.speeds_dict["turn1"]
             else:
                 # Check that the last node wasn't a turn point
                 if neighbor_edge_entry_time is None:
                     neighbor_edge_entry_time = (current_node.time
-                                                + (current_edge_length - drone.braking_distance)/drone.cruise_speed
-                                                + 2*drone.braking_distance / (drone.cruise_speed - drone.turn_speed))
+                                                + (current_edge_length - braking_distance)/drone.speeds_dict["cruise"]
+                                                + 2*braking_distance / (drone.speeds_dict["cruise"] - drone.speeds_dict["turn1"]))
         # If time is still None then neither the previous node was a turn or the coming one
         if neighbor_edge_entry_time is None:
-            neighbor_edge_entry_time = current_node.time + current_edge_length / drone.cruise_speed
+            neighbor_edge_entry_time = current_node.time + current_edge_length / drone.speeds_dict["cruise"]
 
         # Drone speed on the neighbor edge :
         # We can't know if the node at the end of the neighbor edge is a turnpoint, so if the edge is too short we have
@@ -124,14 +156,14 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
         else:
             neighbor_length = 0
         if graph_dual.edges[current_node.id, neighbor]["is_turn"]:
-            drone1_speed_on_neighbor = drone.turn_speed
+            drone1_speed_on_neighbor = drone.speeds_dict["turn1"]
         else:
-            if neighbor_length > model.protection_area + drone.braking_distance and not neighbor_length == 0:
-                drone1_speed_on_neighbor = drone.cruise_speed
+            if neighbor_length > model.protection_area + braking_distance and not neighbor_length == 0:
+                drone1_speed_on_neighbor = drone.speeds_dict["cruise"]
             else:
-                drone1_speed_on_neighbor = drone.turn_speed
+                drone1_speed_on_neighbor = drone.speeds_dict["turn1"]
         # if drone1_speed_on_neighbor is None:
-        #     drone1_speed_on_neighbor = drone.cruise_speed
+        #     drone1_speed_on_neighbor = drone.speeds_dict["cruise"]
 
         # Is there a conflict on the node or on the edge by going both ways ?
         if neighbor[0] in primal_constraint_nodes_dict:
@@ -148,18 +180,18 @@ def get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, dro
                 if d2_entry_time_index > 0 and not next_constrained_node == neighbor[0]:
                     d2_node_minus1 = drone2_path.path_dict[drone2_time_stamps[d2_entry_time_index-1]]
                     if graph_dual.edges[(d2_node_minus1, neighbor[0]), (neighbor[0], next_constrained_node)]["is_turn"]:
-                        drone2_speed_on_neighbor = drone2.turn_speed
+                        drone2_speed_on_neighbor = drone2.speeds_dict["turn1"]
                 # Check if next node is a turn
                 if d2_entry_time_index + 2 < len(drone2_path.path) - 1:
                     d2_node_plus2 = drone2_path.path_dict[drone2_time_stamps[d2_entry_time_index+2]]
                     if graph_dual.edges[(neighbor[0], next_constrained_node), (next_constrained_node, d2_node_plus2)]["is_turn"]:
                         if neighbor_length < model.protection_area + drone2.braking_distance and not neighbor_length == 0:
-                            drone2_speed_on_neighbor = drone2.turn_speed
+                            drone2_speed_on_neighbor = drone2.speeds_dict["turn1"]
                         else:
                             if drone2_speed_on_neighbor is not None:
-                                drone2_speed_on_neighbor = drone2.cruise_speed
+                                drone2_speed_on_neighbor = drone2.speeds_dict["cruise"]
                 if drone2_speed_on_neighbor is None:
-                    drone2_speed_on_neighbor = drone2.cruise_speed
+                    drone2_speed_on_neighbor = drone2.speeds_dict["cruise"]
                 if Model.check_conflict_on_node(neighbor_edge_entry_time, enter_time_drone2, drone1_speed_on_neighbor, drone2_speed_on_neighbor, model.protection_area) is not None:
                     neighbor_to_be_added = False
                 # Check if there was a drone going the other way on the edge

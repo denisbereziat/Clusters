@@ -46,7 +46,7 @@ class Path:
         #self.speed_time_stamps = dict()
         
     def __str__(self):
-        res = "Drone: " + self.drone.type + "\n"
+        res = "Drone: " + self.drone.drone_type + "\n"
         res += str(self.drone.departure_vertiport) + " -- " + str(self.path) + " -- " + str(self.drone.arrival_vertiport) + "\n" 
         res += str(self.path_dict) + "\n"
         for segment in self.segments:
@@ -182,8 +182,7 @@ class Path:
             self.edge_middle_dict[p[0], p[1]] = (integrator.middle_time(), (integrator.time_at_distance_before_middle(sep_norm), integrator.time_at_distance_after_middle(sep_norm)))
         
         return t, next_node
-    
-    
+
     def path_next_segment(index, path, arr, arr_edge, arr_in_constraint, model):
         if index < len(path) - 1:
             edge = (path[index], path[index+1])
@@ -197,12 +196,11 @@ class Path:
             x_arr, y_arr = arr[0], arr[1]
             d = tools.distance(x_curr, y_curr, x_arr, y_arr)
         return edge, d
-    
-    
+
     def set_first_segment(self, model):
         """Compute first segment and return time of exit, speed, separation at node and the turn angle"""
         # TODO : return SEP
-        dep_edge = drone.dep_edge
+        dep_edge = self.drone.dep_edge
         dep_vertiport = self.drone.departure_vertiport
         x_dep, y_dep = float(dep_vertiport[0]), float(dep_vertiport[1])
         speeds_dict = self.drone.speeds_dict
@@ -229,7 +227,10 @@ class Path:
             # Then this means we are entering in the constrained airspace
             next_edge = (self.path[0], self.path[1])
             # print((dep_edge, next_edge))
-            angle = model.graph_dual.edges[(dep_edge, next_edge)]["angle"]
+            if (dep_edge, next_edge) in model.graph_dual.edges:
+                angle = model.graph_dual.edges[(dep_edge, next_edge)]["angle"]
+            else:
+                angle = model.graph_dual.edges[((dep_edge[1], dep_edge[0]), next_edge)]["angle"]
             dist_to_next_node = model.graph.edges[dep_edge]["length"]/2
             # Determine travel time to node :
             drone_speed_next_node = Drone.return_speed_from_angle(angle, self.drone)
