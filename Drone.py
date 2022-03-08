@@ -1,13 +1,17 @@
 import math
 
+drone_speed_factor = 1
+drone_accel_factor = 0.7
+
 turn_speed = 5.144
 # speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
-speeds_dict_model1 = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
-speeds_dict_model2 = {"cruise": 10.288886666666667, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model1 = {"cruise": 15.4333 * drone_speed_factor, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model2 = {"cruise": 10.288886666666667 * drone_speed_factor, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
 angle_intervals = [25, 100, 150]
-accel_max = 3 # m/s**2
+accel_max = 3 * drone_accel_factor  # m/s**2
 vertical_speed = 5
 vertical_accel = 3.5
+
 
 class Drone:
 

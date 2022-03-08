@@ -95,9 +95,10 @@ class ProblemGlobal:
 		for k in self.param.K:
 			if self.x[k].x == 1:
 				t[self.param.mon_vol[k]] = k
-		
+
+		print(" FN,   traj_id,   fl,   delay")
 		for a in self.param.A:
-			print("Flight ", a, "\t", t[a], "\t", int(self.y[a].x), "\t", int(self.delay[a].x))
+			print(a, "   ", t[a], "   ", int(self.y[a].x), "   ", int(self.delay[a].x))
 
 
 class ProblemLevelChoice:

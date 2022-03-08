@@ -528,8 +528,20 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
     # TODO ENCORE DES A/R DANS LE DEBUT JE SAIS PAS POURQUOI DONC J'ENLEVE ICI
     # TODO encore demi_tour en milieu d'arrete rare
     if remove_first:
+        if len(set(shortest_path.path[1:])) != len(shortest_path.path[1:]):
+            print("ATTENTION1")
+            if at_least_one_edge_modified:
+                print("AND ONE EDGE MODIFIED")
+            else:
+                print("NO EDGES MODIFIED")
         trajectories.append(shortest_path.path[1:])
     else:
+        if len(set(shortest_path.path)) != len(shortest_path.path):
+            print("ATTENTION2")
+            if at_least_one_edge_modified:
+                print("AND ONE EDGE MODIFIED")
+            else:
+                print("NO EDGES MODIFIED")
         trajectories.append(shortest_path.path)
     # GENERATE ALL THE OTHER TRAJS
     geodesic = pyproj.Geod(ellps='WGS84')
@@ -539,8 +551,6 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
     heading, _back_azimuth1, _distance = geodesic.inv(x_dep, y_dep, x_arr, y_arr)
     nodes_to_deviate_from = []
     for i in range(1, step + 1):
-        # if shortest_path.path[i * (len(shortest_path.path) // (step + 1))] in drone.arr:
-        #     print("IZDPODQPDZQD")
         nodes_to_deviate_from.append(shortest_path.path[i * (len(shortest_path.path) // (step + 1))])
     count = 0
     tries = 0
@@ -576,16 +586,8 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
         for node in drone.dep:
             drone_dep_dual = ("S" + node, node)
             drone_dep_dual_list.append(drone_dep_dual)
-        if len(drone_dep_dual_list) < 2:
-            print("TOOSHORT2")
-            print(drone_dep_dual_list)
         drone_arr_dual_list = [(nodes_to_visit[0], nodes_to_visit[0] + "T")]
         trajectory = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path
-        # print([trajectory[0], trajectory[1]] , [drone.dep_edge[0], drone.dep_edge[1]])
-        if [trajectory[0], trajectory[1]] == [drone.dep_edge[0], drone.dep_edge[1]]:
-            print("OZIDHOIQDHPZQPDJQPDOZQ")
-        if [trajectory[0], trajectory[1]] == [drone.dep_edge[1], drone.dep_edge[0]]:
-            print("dzqdpzqdjzqkqp")
         for i in range(len(nodes_to_visit) - 1):
             node = nodes_to_visit[i]
             next_node = nodes_to_visit[i + 1]

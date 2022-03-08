@@ -3,7 +3,8 @@ import Drone
 import tools
 from Drone import Integrator
 
-over_estimate_turn_factor = 1.2
+over_estimate_turn_factor = 1
+
 
 class Path:
     def __init__(self, hStart, path, drone):
@@ -107,7 +108,7 @@ class Path:
                 self.turns[-1] = angle
 
         t = self.dep_time
-        self.separation_dict[t] = [0, 0] #initialize next sep_dict key
+        self.separation_dict[t] = [0, 0]  #initialize next sep_dict key
         current_node = (t, p[1])
         index = 1
         while index < len(node_list):
@@ -216,7 +217,7 @@ class Path:
             v1, v2, v3 = 0, self.drone.speeds_dict["cruise"], self.drone.speeds_dict["cruise"]
             len_next_edge = model.graph.edges[(self.path[0], self.path[1])]["length"]
             sep = return_sep(model, self.drone, v1, v2, v3, dist_to_next_node, len_next_edge)
-            accel_dist = Drone.return_accel_time(speeds_dict["cruise"], 0)
+            accel_dist = Drone.return_braking_distance(speeds_dict["cruise"], 0)
             if accel_dist < dist_to_next_node:
                 accel_time = Drone.return_accel_time(speeds_dict["cruise"], 0)
                 travel_time = accel_time + (dist_to_next_node - accel_dist)/drone_speed_next_node

@@ -21,6 +21,7 @@ FL_min = 25
 temps_sep_vertiport = 5
 turn_angle_mini = Drone.angle_intervals[0]
 
+
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph, safety parameters
      and find conflicts."""
