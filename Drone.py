@@ -1,16 +1,16 @@
 import math
 
-drone_speed_factor = 1
-drone_accel_factor = 0.7
+spd_fctr = 0.8  # Multiplicative factor for sped to allow the drone to follow the RTA times
+accel_factor = 0.7  # Same with acceleration and for a more accurate estimation of turn times
 
 turn_speed = 5.144
 # speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
-speeds_dict_model1 = {"cruise": 15.4333 * drone_speed_factor, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
-speeds_dict_model2 = {"cruise": 10.288886666666667 * drone_speed_factor, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model1 = {"cruise": 15.4333 * spd_fctr, "turn1": 5.144 * spd_fctr, "turn2": 2.5722 * spd_fctr, "turn3": 1.02889 * spd_fctr}
+speeds_dict_model2 = {"cruise": 10.288886666666667 * spd_fctr, "turn1": 5.144 * spd_fctr, "turn2": 2.5722 * spd_fctr, "turn3": 1.02889 * spd_fctr}
 angle_intervals = [25, 100, 150]
-accel_max = 3 * drone_accel_factor  # m/s**2
-vertical_speed = 5
-vertical_accel = 3.5
+accel_max = 3 * accel_factor  # m/s**2
+vertical_accel = 3.5 * accel_factor
+vertical_speed = 5 * spd_fctr
 
 
 class Drone:

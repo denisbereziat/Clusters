@@ -110,7 +110,8 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
     horizontal_shared_nodes_list.append(conflict)
     if verbose:
         print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
-    
+
+
 def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersection_grid, delta_time, intersection_list, trajectories_to_fn_dict, model):
     #final object in vert_intersection_grid and vert_hor_intersection_grid are
     #triplets (traj_id, time_at_intersection, (hor_time_separation_before, hor_time_separation_before))
@@ -148,6 +149,7 @@ def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersectio
                                 print("It's an conflict ", conflict)
                             intersection_list.append(conflict)
 
+
 def generate_vertiport_intersections(vert_intersection_grid, delta_time, intersection_list, temps_sep_vertiport, trajectories_to_fn_dict):
     for vertiport in vert_intersection_grid:
         for time_id in vert_intersection_grid[vertiport]:
@@ -169,6 +171,7 @@ def generate_vertiport_intersections(vert_intersection_grid, delta_time, interse
                         if verbose:
                             print("It's an conflict ", conflict)
                         intersection_list.append(conflict)
+
 
 def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
     """Generate intersection points between given trajectories"""
@@ -581,54 +584,56 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
             if new_node in drone.dep:
                 continue
             nodes_to_visit.append(new_node)
-        # get closest node
-        drone_dep_dual_list = []
-        for node in drone.dep:
-            drone_dep_dual = ("S" + node, node)
-            drone_dep_dual_list.append(drone_dep_dual)
-        drone_arr_dual_list = [(nodes_to_visit[0], nodes_to_visit[0] + "T")]
-        trajectory = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path
-        for i in range(len(nodes_to_visit) - 1):
-            node = nodes_to_visit[i]
-            next_node = nodes_to_visit[i + 1]
-            drone_dep_dual_list = [("S" + node, node)]
-            drone_arr_dual_list = [(next_node, next_node + "T")]
-            _path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path[1:]
-            trajectory += _path
-        drone_dep_dual_list = [("S" + nodes_to_visit[-1], nodes_to_visit[-1])]
-        drone_arr_dual_list = []
-        for node in drone.arr:
-            drone_arr_dual = (node, node + "T")
-            drone_arr_dual_list.append(drone_arr_dual)
-        trajectory += a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path[1:]
-        trajectory_ok = True
+        # Check that at least 1 node to visit was generated
+        if len(nodes_to_visit) > 0:
+            # get closest node
+            drone_dep_dual_list = []
+            for node in drone.dep:
+                drone_dep_dual = ("S" + node, node)
+                drone_dep_dual_list.append(drone_dep_dual)
+            drone_arr_dual_list = [(nodes_to_visit[0], nodes_to_visit[0] + "T")]
+            trajectory = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path
+            for i in range(len(nodes_to_visit) - 1):
+                node = nodes_to_visit[i]
+                next_node = nodes_to_visit[i + 1]
+                drone_dep_dual_list = [("S" + node, node)]
+                drone_arr_dual_list = [(next_node, next_node + "T")]
+                _path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path[1:]
+                trajectory += _path
+            drone_dep_dual_list = [("S" + nodes_to_visit[-1], nodes_to_visit[-1])]
+            drone_arr_dual_list = []
+            for node in drone.arr:
+                drone_arr_dual = (node, node + "T")
+                drone_arr_dual_list.append(drone_arr_dual)
+            trajectory += a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time).path[1:]
+            trajectory_ok = True
 
-        if len(set(trajectory)) != len(trajectory):
-            index = 1
-            while index < len(trajectory) - 2:
-                if trajectory[index] == trajectory[index + 1]:
-                    trajectory.pop(index)
-                if trajectory[index - 1] == trajectory[index + 1]:
-                    trajectory.pop(index)
-                    trajectory.pop(index)
-                index += 1
-            # print(trajectory)
             if len(set(trajectory)) != len(trajectory):
-                trajectory_ok = False
-            if not check_traj_is_possible(model.graph, trajectory):
-                print("TRAJ impossible")
-                trajectory_ok = False
+                index = 1
+                while index < len(trajectory) - 2:
+                    if trajectory[index] == trajectory[index + 1]:
+                        trajectory.pop(index)
+                    if trajectory[index - 1] == trajectory[index + 1]:
+                        trajectory.pop(index)
+                        trajectory.pop(index)
+                    index += 1
+                # print(trajectory)
+                if len(set(trajectory)) != len(trajectory):
+                    trajectory_ok = False
+                if not check_traj_is_possible(model.graph, trajectory):
+                    print("TRAJ impossible")
+                    trajectory_ok = False
 
-        # TODO faire plus rapide ou juste faire que ça arrive pas
-        # Check dep_edge isn't in traj
-        for _i in range(1, len(trajectory)-1):
-            if [trajectory[_i-1], trajectory[_i]] == [drone.dep_edge[0], drone.dep_edge[1]]:
-                trajectory_ok = False
-            if [trajectory[_i-1], trajectory[_i]] == [drone.dep_edge[1], drone.dep_edge[0]]:
-                trajectory_ok = False
+            # TODO faire plus rapide ou juste faire que ça arrive pas
+            # Check dep_edge isn't in traj
+            for _i in range(1, len(trajectory)-1):
+                if [trajectory[_i-1], trajectory[_i]] == [drone.dep_edge[0], drone.dep_edge[1]]:
+                    trajectory_ok = False
+                if [trajectory[_i-1], trajectory[_i]] == [drone.dep_edge[1], drone.dep_edge[0]]:
+                    trajectory_ok = False
 
-        if (trajectory not in trajectories) and trajectory_ok:
-            trajectories.append(trajectory)
+            if (trajectory not in trajectories) and trajectory_ok:
+                trajectories.append(trajectory)
         count += 1
 
     # Set the edges back to their initial values :
@@ -642,8 +647,10 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
 
     return trajectories
 
+
 def return_drone_from_flight_number(model, flight_number):
     return model.total_drone_dict[flight_number]
+
 
 def check_traj_is_possible(graph, traj):
     for index in range(len(traj) - 1):

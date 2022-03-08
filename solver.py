@@ -12,17 +12,17 @@ import Drone
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
-drone_list_file_path = 'graph_files/Intentions/100_drones.csv'
+drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
 output_scenario = "PLNE OUTPUT/scenario.scn"
 output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
 
-T_MAX_OPTIM = 300
+T_MAX_OPTIM = 600
 MIP_GAP = 0.3
 ms_to_knots = 1.94384
 m_to_feet = 3.28084
-drone_delete_dist = 0.0026997840172786176 * 2
+drone_delete_dist = 0.0026997840172786176 * 3
 
-TIME_MARGIN = 0
+TIME_MARGIN = 3
 
 
 def solve_with_time_segmentation():
@@ -325,7 +325,7 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 first_node_x, first_node_y = graph.nodes[drone.path_object.path[0]]["x"], graph.nodes[drone.path_object.path[0]]["y"]
                 qdr = BlueskySCNTools.qdrdist(drone.departure_vertiport[1], drone.departure_vertiport[0], first_node_y, first_node_x, 'qdr')
                 # Write SCN
-                print("Drone FN : ", drone.flight_number, " dep :", departure_time)
+                # print("Drone FN : ", drone.flight_number, " dep :", departure_time)
                 h, m, s = departure_time // 3600, (departure_time % 3600) // 60, departure_time % 60
                 time_str = str(int(h // 10)) + str(int(h % 10)) + ":" + str(int(m // 10)) + str(int(m % 10)) + ":" + str(int(s // 10)) + str(int(s % 10))
                 to_write = time_str + ">CRE " + drone.flight_number + " " + drone.drone_type + " " + dep_vertiport + " " + str(qdr) + " 25 " + str(0) + "\n"
@@ -406,8 +406,8 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
             to_sort.append(drone)
         sorted_drone_list = sorted(to_sort, key=return_drone_dep)
         # print("to write : ", to_write_dict)
-        print("SORTED : " ,sorted_drone_list)
-        print([return_drone_dep(drone) for drone in sorted_drone_list])
+        # print("SORTED : " ,sorted_drone_list)
+        # print([return_drone_dep(drone) for drone in sorted_drone_list])
         for drone in sorted_drone_list:
             for to_write in to_write_dict[drone]:
                 file.write(to_write)
