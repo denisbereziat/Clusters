@@ -89,7 +89,7 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
 
         sep21_first = max(trajectories_to_path[k2].separation_dict[t_k2_first][1], trajectories_to_path[k1].separation_dict[t_k1_first][0])
         sep21_last = max(trajectories_to_path[k2].separation_dict[t_k2_last][1], trajectories_to_path[k1].separation_dict[t_k1_last][0])
-
+            
         if multiPointsStatus == 2:
             #they are consecutive, take fist and last and create single intersection condition
             cut_k2 = (t_k1_last - t_k1_first) - (t_k2_last - t_k2_first)
@@ -101,12 +101,13 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
             delta_sep21 = sep21_last - sep21_first
 
             new_sep21_first = sep21_first + max(0, min(cut_k1, cut_k1 + delta_sep21)) + max(0, min(delta_sep21, delta_sep21 + cut_k1))
+            
         elif multiPointsStatus == 3:
             #they are opposite
             new_sep12_first = (t_k1_last - t_k1_first) + (t_k2_first - t_k2_last) + sep12_last
             new_sep21_first = sep21_first
         conflict = (k1, k2, t_k1_first, t_k2_first, new_sep12_first, new_sep21_first)
-    
+                
     horizontal_shared_nodes_list.append(conflict)
     if verbose:
         print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
@@ -176,7 +177,6 @@ def generate_vertiport_intersections(vert_intersection_grid, delta_time, interse
 def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
     """Generate intersection points between given trajectories"""
 
-    # protection_area, nb_FL, delay_max, FL_sep, FL_min, temps_sep_vertiport = model.generation_params
     max_delta_fl = model.nb_FL - 1
     horizontal_shared_nodes_list = []
     climb_horiz_list = []
@@ -399,7 +399,7 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
                     if trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])] == (
                             points[point_index][1], points[point_index][0]):
                         # Potentially there is multiplication
-                        if (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].next_node_dict:
+                        if (multiPointsStatus == 1 or multiPointsStatus == 2) and (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].next_node_dict:
                             if trajectories_to_path[k2].next_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (
                                     points[point_index][2], points[point_index][0]):
                                 # consecutive multiple points
@@ -407,7 +407,7 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
                                 multiPointsStatus = 2
                                 point_index += 1
                                 continue
-                        if (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].previous_node_dict:
+                        if (multiPointsStatus == 1 or multiPointsStatus == 3) and (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].previous_node_dict:
                             if trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (
                                     points[point_index][2], points[point_index][0]):
                                 # opposite multiple points
