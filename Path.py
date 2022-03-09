@@ -97,8 +97,16 @@ class Path:
             if not(len(edge2[0]) == 6 or len(edge2[1]) == 6): #if edge2 is in constrained
                 #we need to compute the angle and coresponding speed
                 if edge1:
-                    #find angle from the dual
                     angle = graph_dual.edges[(edge1, edge2)]["angle"]
+                    #find angle from the dual
+                    # try:
+                    #     if (edge1, edge2) in graph_dual.edges:
+                    #         angle = graph_dual.edges[(edge1, edge2)]["angle"]
+                    #     else:
+                    #         angle = graph_dual.edges[((edge1[1], edge1[0]), edge2)]["angle"]
+                    # except:
+                    #     print(edge1, edge2)
+                    #     raise Exception
                 else:
                     #compute angle as heading difference of (dep, edge2[0]) and edge2
                     pt1 = model.graph.nodes[edge2[0]]["x"], model.graph.nodes[edge2[0]]["y"]

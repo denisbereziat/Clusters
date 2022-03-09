@@ -23,6 +23,8 @@ def create_dual(graph, turn_cost_function):
     for node1 in dual_graph.nodes():
         for node2 in dual_graph.nodes():
             if node1[1] == node2[0]:
+                if node1[1] == node2[0] and node1[0] == node2[1]:
+                    continue
                 dual_graph.add_edge(node1, node2)
                 # Adding the turn cost if it isn't a starting or ending edge (node starting with S or ending with T)
                 if node2[1][-1] == "T" or node1[0][0] == "S":

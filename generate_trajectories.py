@@ -472,7 +472,9 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
         print(drone_dep_dual_list)
     # print(drone_dep_dual, drone_arr_dual)
     shortest_path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time)
+
     shortest_path.new_set_path(shortest_path.path, model)
+
     # shortest_path.set_path(shortest_path.path, model)
 
     #Check that there are no nodes in the geofenced_nodes list

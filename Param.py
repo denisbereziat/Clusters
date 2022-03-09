@@ -4,7 +4,8 @@ import random as rd
 from decimal import Decimal
 import Drone
 
-delayStep = 10;						#delay step duration in [sec]; total delay = number od delay steps (dec. var) * delay step
+delayStep = 10						#delay step duration in [sec]; total delay = number od delay steps (dec. var) * delay step
+
 
 class Param:
 	def __init__(self, model, A, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
@@ -59,6 +60,14 @@ class Param:
 		if any(i < 0 for i in t1) or any(i < 0 for i in t2):
 			raise ValueError("Arrival time at intersecting point may not be negative!")
 		if any(i < 0 for i in sep12) or any(i < 0 for i in sep21):
+			print("SEP12 : ")
+			for j in sep12:
+				if j < 0:
+					print(j)
+			print("SEP21 : ")
+			for j in sep21:
+				if j < 0:
+					print(j)
 			raise ValueError("Separation at intersecting point may not be negative!")
 		self.k1 = k1 						#first trajectory of intersecting point
 		self.k2 = k2						#second trajectory of intersecting point

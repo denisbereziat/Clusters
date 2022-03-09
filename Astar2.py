@@ -23,10 +23,18 @@ def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, prima
         current_node = nd.Node(dep_node_id)
         current_node.cost = 0
         current_node.time = departure_time
-        # TODO modify heuristic to be towards vertiport instead
-        current_node.heuristic = current_node.dist_to_node(arr_node_list[0], graph_dual)
+        # current_node.heuristic = current_node.dist_to_node(arr_node_list[0], graph_dual)
+        min_heuristic = math.inf
+        for arr_nd in arr_node_list:
+            x1, y1 = graph_dual.nodes[current_node.id]["x"], graph_dual.nodes[current_node.id]["y"]
+            x2, y2 = graph_dual.nodes[arr_nd]["x"], graph_dual.nodes[arr_nd]["y"]
+            # heuri1 = neighbor.dist_to_node(arr_nd, graph_dual)
+            heuri = tools.distance(x1, y1, x2, y2)
+            # print(heuri1, heuri)
+            if heuri < min_heuristic:
+                min_heuristic = heuri
+        current_node.heuristic = min_heuristic
         priority_queue.append(current_node)
-    # TODO priority_queue = [current_node, inverse_current_node]
 
     # print("current node :", current_node.id)
     while len(priority_queue) > 0:
@@ -34,40 +42,14 @@ def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, prima
         closed_nodes_list.append(current_node.id)
         # TERMINATION CONDITION : Having reached the arrival node
         if current_node.id in arr_node_list:
-            # TODO current_node = arr_node_id ou inverse_arr_node_id
             solution_dual_path = current_node.path()
-            # Turning the path back in the normal graph path
-            # last_iter = False
-            # for arrnd in arr_node_list:
-            #     if arrnd[0] in drone.arr_edge:
-            #         last_iter = True
-            # if last_iter:
-            #     if drone.arr_edge in [n.id for n in solution_dual_path[-3:]] or (drone.arr_edge[1], drone.arr_edge[0]) in [n.id for n in solution_dual_path[-3:]]:
-            #         print("drone FN", drone.flight_number)
-            #         print("last nodes : ", [n.id for n in solution_dual_path[-3:]])
-            #         print("heuri :", [n.heuristic for n in solution_dual_path[-3:]])
-            #         print("pos nodes :", [(graph_dual.nodes[n.id]["x"],graph_dual.nodes[n.id]["y"]) for n in solution_dual_path[-3:]])
-            #         print("pos arr :", [(graph_dual.nodes[n]["x"],graph_dual.nodes[n]["y"]) for n in arr_node_list])
-            #         for _nd in solution_dual_path[-3:]:
-            #             print("nd id :", _nd.id)
-            #             for nd_arr in arr_node_list:
-            #                 print(_nd.dist_to_node(nd_arr, graph_dual))
-            #
-            #         # print("costs :", [n.cost for n in solution_dual_path[-3:]])
-            #         print("arr_edge :", drone.arr_edge)
-            #         print("arr nodes :", arr_node_list)
-                # print("arr_node ", arr_node_list)
-                # print((solution_dual_path[-3].id[1], solution_dual_path[-2].id[1]), " ::: ", drone.arr_edge)
-            #
-            # if (solution_dual_path[-3].id[1], solution_dual_path[-2].id[1]) == drone.arr_edge:
-            #     print("TSOINSOINS")
             shortest_path = pt.Path(drone.dep_time, [node.id[1] for node in solution_dual_path[:-1]], drone)
             return shortest_path
         neighbors = get_available_neighbors_dual(current_node, primal_constraint_nodes_dict, drone, model)
         for neighbor in neighbors:
+            # TODO a modifier pour matcher la version de set_path
             edge = (current_node.id, neighbor)
             speed_on_neighbor = drone.speeds_dict["cruise"]
-            # TODO Mettre les bonnes v de virage
             if graph_dual.edges[current_node.id, neighbor]["is_turn"]:
                 speed_on_neighbor = drone.speeds_dict["turn1"]
             if current_node.parent is not None:
@@ -89,7 +71,11 @@ def astar_dual(model, dep_node_list, arr_node_list, drone, departure_time, prima
                 # RQ on peut ajouter le cout du neighbor avec le virage a l'heuristic
                 min_heuristic = math.inf
                 for arr_nd in arr_node_list:
-                    heuri = neighbor.dist_to_node(arr_nd, graph_dual)
+                    x1, y1 = graph_dual.nodes[neighbor.id]["x"], graph_dual.nodes[neighbor.id]["y"]
+                    x2, y2 = graph_dual.nodes[arr_nd]["x"], graph_dual.nodes[arr_nd]["y"]
+                    # heuri1 = neighbor.dist_to_node(arr_nd, graph_dual)
+                    heuri = tools.distance(x1, y1, x2, y2)
+                    # print(heuri1, heuri)
                     if heuri < min_heuristic:
                         min_heuristic = heuri
                 neighbor.heuristic = min_heuristic
