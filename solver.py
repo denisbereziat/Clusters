@@ -79,7 +79,7 @@ def solve_with_time_segmentation():
         geofence_time_intervals = dict()
         for drone_fn, fixed_flight in fixed_flights_dict.items():
             activation_time = fixed_flight[3] * Param.delayStep
-            activation_time += fixed_flight[2] * 2 / Param.vVert
+            activation_time += fixed_flight[2] * model.FL_sep / Param.vVert
             activation_time += trajectories_to_path[fixed_flight[1]].arr_time
             drone = fn_to_drones_dict[drone_fn]
             for node in find_nodes_in_geofence(drone.loitering_geofence, graph):
@@ -252,8 +252,7 @@ def create_param(model, trajectories,trajectories_to_duration,trajectories_to_fn
     fixed_intentions = []
     for fn in fixed_flights_dict:
         fixed_intentions.append(fixed_flights_dict[fn])
-    param = Param.Param(model, A, K, model.delay_max, nbPt, k1, k2, t1, t2, sep12, sep21,
-                         fixed_intentions)
+    param = Param.Param(model, A, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixed_intentions)
 
     # Print output :
     list_all = [horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list]
@@ -316,8 +315,8 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 drone.path_object = trajectories[drone.flight_number][k][0]
                 for a in problem.param.A:
                     if a == drone.flight_number:
-                        fl_m = problem.y[a].x * model.FL_sep + model.FL_min
-                        fl_feet = problem.y[a].x * model.FL_sep * m_to_feet + model.FL_min
+                        fl_m = problem.y[a].x * model.FL_sep
+                        fl_feet = fl_m * m_to_feet
                         delay = problem.delay[a].x * Param.delayStep
                         drone_delay_dict[drone] = delay
                         departure_time = drone.dep_time + delay

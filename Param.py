@@ -2,32 +2,23 @@
 import re
 import random as rd
 from decimal import Decimal
+import Drone
 
-nbFL = 16;        					#number of flight levels
-aVert = 3.5;						#vertical acceleration in m/s^2
-vVert = 5;							#vertical seed in m/s
-dFL = 9.14;							#vertical separation between two flight levels in m = 30ft
-dSeedUp = vVert*vVert/(2*aVert);	#distance needed to acceleate from 0 to vVert with acceleration aVert and vv
-tSeedUp = vVert/aVert;				#time needed to acceleate from 0 to vVert with acceleration aVert and vv
-
-delayStep = 10;						#delay step duration; total delay = number od delay steps (dec. var) * delay step
-
+delayStep = 10;						#delay step duration in [sec]; total delay = number od delay steps (dec. var) * delay step
 
 class Param:
-	def __init__(self, model, A, K, maxDelay, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
-		self.nbFL = model.nb_FL
-		self.aVert = aVert
-		self.vVert = vVert
-		self.dFL = dFL
-		self.dSeedUp = dSeedUp
-		self.tSeedUp = tSeedUp
+	def __init__(self, model, A, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
+		self.nbFL = model.nb_FL				#number of flight levels
+		self.vVert = Drone.vertical_speed	#vertical seed in m/s
+		self.dFL = model.FL_sep				#vertical separation between two flight levels in m = 30ft
+		self.tSeedUp = Drone.vertical_acceleration_time(0, self.vVert) #time needed to acceleate from 0 to vVert with acceleration aVert and vv
 		self.delayStep = delayStep
 		
 		self.nbflights = len(A)					#number of flight instances
 		self.nbTrajs = len(K)					#total number of alternative trajectories
 		
-		self.maxDelay = maxDelay				#maximum delay
-		self.maxStep = maxDelay // delayStep	#maximum number of steps
+		self.maxDelay = model.delay_max			#maximum delay
+		self.maxStep = self.maxDelay // delayStep	#maximum number of steps
 
 		self.A = A								#set of flight intentions
 		if any(d < 0 for k, d, a in K):
@@ -92,9 +83,9 @@ class Param:
 		self.KInterArr = list(set((k1[p], k2[p]) for p in self.Parr).union(set((k2[p], k1[p]) for p in self.Parr)))
 		
 		#big M parameters
-		self.FLmax = nbFL					#big M is set to max difference between two flight levels
+		self.FLmax = self.nbFL					#big M is set to max difference between two flight levels
 		self.delta = 0.5					#small number that is less than difference between any different flight levels
-		self.deltaFLmax = (nbFL - 1)*dFL	#maximum difference in meters between two flight levels
+		self.deltaFLmax = (self.nbFL - 1)*self.dFL	#maximum difference in meters between two flight levels
 		self.deltaFLmin = -self.deltaFLmax	#minimum difference in meters between two flight levels
 	
 		
@@ -117,13 +108,13 @@ class Param:
 		if fixedLevels:
 			if len(fixedIntentions) + len(fixedLevels) != self.nbflights:
 				raise ValueError("All flights must have fixed levels!")
-			if any(a not in self.A or l <= 0 or l > self.nbFLy for a, l in fixedLevels):
+			if any(a not in self.A or l <= 0 or l > self.nbFL for a, l in fixedLevels):
 				raise ValueError("Either flight or level is out of the range for fixed level flights!")
 			self.FLfix = fixedLevels
 		
 class ParamLevelChoice:
-	def __init__(self, A, interactions):
-		self.nbFL = nbFL
+	def __init__(self, model, A, interactions):
+		self.nbFL = model.nbFL
 		self.nbflights = len(A)				#number of flight instances
 		self.A = A							#set of flight intentions labeled from 1 to nbflights
 		
@@ -132,12 +123,12 @@ class ParamLevelChoice:
 		self.AInter = list(set((i,j) for i,j in interactions).union(set((j,i) for i,j in interactions)))
 											
 		#big M parameters
-		self.FLmax = nbFL					#big M is set to max difference between two flight levels
-		self.delta = 0.5					#small number that is less than difference between any different flight levels
-		self.deltaFLmax = (nbFL - 1)*dFL	#maximum difference in meters between two flight levels
-		self.deltaFLmin = -self.deltaFLmax	#minimum difference in meters between two flight levels
+		self.FLmax = self.nbFL						#big M is set to max difference between two flight levels
+		self.delta = 0.5							#small number that is less than difference between any different flight levels
+		self.deltaFLmax = (self.nbFL - 1)*model.dFL	#maximum difference in meters between two flight levels
+		self.deltaFLmin = -self.deltaFLmax			#minimum difference in meters between two flight levels
 	
-
+'''
 def readDat(filename):
 	print("Loading parameters from ", filename)
 	d = []
@@ -180,7 +171,7 @@ def readDat(filename):
 							p[i-1].append(float(line[i]))
 	
 	return Param(list(range(params["nbflights"])), [(k, dur, mon_vol[k]) for k, dur in enumerate(d)], params["maxDelay"], [params["nbPtHor"], params["nbPtClmb"], params["nbPtDesc"], params["nbPtDep"], params["nbPtArr"]], k1, k2, t1, t2, sep12, sep21)
-
+'''
 def addRandomFixFligth(filename, nbAfix=0):
 	param = readDat(filename)
 	if nbAfix > param.nbflights:

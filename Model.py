@@ -17,7 +17,6 @@ vertical_protection = 7.62  # 25 ft
 nb_FL = 16
 delay_max = 100
 FL_sep = 9.14  # in m
-FL_min = 25
 temps_sep_vertiport = 5
 turn_angle_mini = Drone.angle_intervals[0]
 
@@ -38,7 +37,6 @@ class Model:
         self.nb_FL = nb_FL
         self.delay_max = delay_max
         self.FL_sep = FL_sep
-        self.FL_min = FL_min
         self.temps_sep_vertiport = temps_sep_vertiport
         # Initial constraints contains the constraints caused by the currently
         # flying drones when the model is initialised
