@@ -23,7 +23,8 @@ ms_to_knots = 1.94384
 m_to_feet = 3.28084
 drone_delete_dist = 0.0026997840172786176 * 3
 
-TIME_MARGIN = 3
+# TODO a modifier ensuite
+TIME_MARGIN = 0
 
 
 def solve_with_time_segmentation():
@@ -329,7 +330,7 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 # print("Drone FN : ", drone.flight_number, " dep :", departure_time)
                 h, m, s = departure_time // 3600, (departure_time % 3600) // 60, departure_time % 60
                 time_str = str(int(h // 10)) + str(int(h % 10)) + ":" + str(int(m // 10)) + str(int(m % 10)) + ":" + str(int(s // 10)) + str(int(s % 10))
-                to_write = time_str + ">CRE " + drone.flight_number + " " + drone.drone_type + " " + dep_vertiport + " " + str(qdr) + " 25 " + str(0) + "\n"
+                to_write = time_str + ">CRE " + drone.flight_number + " " + drone.drone_type + " " + dep_vertiport + " " + str(qdr) + " 0 " + str(0) + "\n"
                 to_write_dict[drone].append(to_write)
                 # file.write(to_write)
                 to_write = time_str + ">ADDWAYPOINTS " + drone.flight_number + " " + dep_vertiport + "," + str(fl_feet) + ",,FLYBY,0,"
@@ -350,8 +351,8 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                                 print("listarredge", drone.arr)
 
                                 print(drone.path_object.path[wpt-1],drone.path_object.path[wpt],drone.path_object.path[wpt+1])
-                                for node in [drone.path_object.path[wpt-1],drone.path_object.path[wpt],drone.path_object.path[wpt+1],drone.path_object.path[wpt+2]]:
-                                    print(graph.nodes[node]["y"], graph.nodes[node]["x"])
+                                for _node in [drone.path_object.path[wpt-1],drone.path_object.path[wpt],drone.path_object.path[wpt+1],drone.path_object.path[wpt+2]]:
+                                    print(graph.nodes[_node]["y"], graph.nodes[_node]["x"])
                                 print("ANGLE IN DUAL :", model.graph_dual.edges[((drone.path_object.path[wpt-1],drone.path_object.path[wpt]),(drone.path_object.path[wpt],drone.path_object.path[wpt+1]))]["angle"])
                             except:
                                 pass

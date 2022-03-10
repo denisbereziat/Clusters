@@ -1,12 +1,13 @@
 import math
 
-spd_fctr = 0.8  # Multiplicative factor for sped to allow the drone to follow the RTA times
-accel_factor = 0.7  # Same with acceleration and for a more accurate estimation of turn times
+spd_fctr1 = 1  # Multiplicative factor for speed to allow the drone MP30 to follow the RTA times
+spd_fctr2 = 1  # Multiplicative factor for speed to allow the drone to MP20 follow the RTA times
+accel_factor = 1  # Same with acceleration and for a more accurate estimation of turn times
 
 turn_speed = 5.144
 # speeds_dict = {"cruise": 15.4333, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
-speeds_dict_model1 = {"cruise": 15.4333 * spd_fctr, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
-speeds_dict_model2 = {"cruise": 10.288886666666667 * spd_fctr, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model1 = {"cruise": 15.4333 * spd_fctr1, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
+speeds_dict_model2 = {"cruise": 10.288886666666667 * spd_fctr2, "turn1": 5.144, "turn2": 2.5722, "turn3": 1.02889}
 angle_intervals = [25, 100, 150]
 accel_max = 3 * accel_factor  # m/s**2
 vertical_accel = 3.5
@@ -44,6 +45,15 @@ class Drone:
         self.arrival_vertiport = None
         self.is_unconstrained_arrival = None
 
+    def return_delay_from_angle(self, angle):
+        if angle >= angle_intervals[0]:
+            return 3
+        else:
+            return 0
+
+    def return_sep_margin_from_angle(self, angle):
+        return 3
+
     '''
     def find_current_edge(self, current_t, graph):
         """Finds the edge of the drone at given time t in seconds."""
@@ -57,6 +67,7 @@ class Drone:
         # if conflict time is before take off time or beetween first and second node
         return self.path_object.path[0], self.path_object.path[1]
     '''
+
 
 def return_speed_from_angle(angle, drone):
     if angle <= angle_intervals[0]:
@@ -78,6 +89,7 @@ def return_accel_time(v1, v2):
     accel_time = abs(v1 - v2) / accel_max
     return accel_time
 
+
 def return_vertical_accel_dist(v1, v2):
     avg_speed = (v1 + v2) / 2
     return avg_speed * abs(v1 - v2) / vertical_accel
@@ -87,45 +99,58 @@ def return_vertical_accel_time(v1, v2):
     accel_time = abs(v1 - v2) / vertical_accel
     return accel_time
 
+
 #horizontal kinematics
 def accelerated_speed(v1, distance):
     return math.sqrt(v1**2 + 2*accel_max*distance)
 
+
 def decelerated_speed(v1, distance):
 	#due to float representation inprecission (e.g. 0 that is -0.0000001) we 'round' the calculation
     return math.sqrt(max(0, v1**2 - 2*accel_max*distance))
-    
+
+
 def acceleration_distance(v1, v2):
     return (v2**2 - v1**2)/(2*accel_max)
 
+
 def deceleration_distance(v1, v2):
     return acceleration_distance(v2, v1)
-    
+
+
 def acceleration_time(v1, v2):
     return (v2 - v1)/accel_max
-    
+
+
 def deceleration_time(v1, v2):
     return acceleration_time(v2, v1)
+
 
 #vertical kinematics
 def vertical_accelerated_speed(v1, distance):
     return math.sqrt(v1**2 + 2*vertical_accel*distance)
 
+
 def vertical_decelerated_speed(v1, distance):
     return math.sqrt(v1**2 - 2*vertical_accel*distance)
+
 
 def vertical_acceleration_distance(v1, v2):
     return (v2**2 - v1**2)/(2*vertical_accel)
 
+
 def vertical_deceleration_distance(v1, v2):
     return vertical_acceleration_distance(v2, v1)
-    
+
+
 def vertical_acceleration_time(v1, v2):
     return (v2 - v1)/vertical_accel
-    
+
+
 def vertical_deceleration_time(v1, v2):
     return vertical_acceleration_time(v2, v1)
-    
+
+
 class Integrator:
     '''
     It is an class that describe drone's motion on the given segment 
@@ -158,8 +183,7 @@ class Integrator:
         res += "Cruisse: d=" + str(self.d_cruise) + ", v=" + str(self.v_cruise) + ", t=" + str(self.t_cruise) + "\n"
         res += "Deceleration: d=" + str(self.d_dec) + ", v=" + str(self.v_dec) + ", t=" + str(self.t_dec) + "\n"
         return res
-    
-    
+
     def end_time(self):
         return self.t_dec
     
@@ -237,6 +261,7 @@ class Integrator:
     
         return Integrator(p[0], p[1], d1, v[0], v[1], d_acc, v_acc, t_acc, d_cruise, v_acc, t_cruise, d_dec, v_dec, t_dec)
 
+
 class VerticalIntegrator:
     '''
     It is an class that describe drone's vertical motion on the given segment
@@ -265,8 +290,7 @@ class VerticalIntegrator:
         res += "Cruisse: d=" + str(self.d_cruise) + ", v=" + str(self.v_cruise) + ", t=" + str(self.t_cruise) + "\n"
         res += "Deceleration: d=" + str(self.d_dec) + ", v=" + str(self.v_dec) + ", t=" + str(self.t_dec) + "\n"
         return res
-    
-    
+
     def end_time(self):
         return self.t_dec
         

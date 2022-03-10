@@ -29,22 +29,10 @@ class Path:
         self.separation_dict = dict()
         #edge_middle dict for each edge that is a key contains (t_middle, (sep_before, sep_after)) as value
         self.edge_middle_dict = dict()
-        #self.edge_dict = dict()
         #ordered list of turn angles len(turns) == len(path)
         self.turns = []
         #list of Integrator objects for each segment of horizontal path
         self.segments = []
-        # The discretized version of the path with time as key and position x,y as value
-        #self.path_dict_discretized = {}
-        #self.delay = {}
-        #self.flightTime = 0
-        #self.flightDistance = 0
-        # Previous path is used to store the last path that was taken
-        #self.previous_path = []
-        # Store the fixed speed at this node, None if there's none
-        #self.fixed_speed_wpt = []
-        # Speed ate time stamp after the node
-        #self.speed_time_stamps = dict()
         
     def __str__(self):
         res = "Drone: " + self.drone.drone_type + "\n"
@@ -176,7 +164,7 @@ class Path:
         t += integrator.end_time()
         #set next node and fill next/previous node dicts
         next_node = (t, p[1])
-        self.next_node_dict[current_node]  = next_node
+        self.next_node_dict[current_node] = next_node
         self.previous_node_dict[next_node] = current_node
         
         #add path_dict (no dep/arr)
@@ -445,6 +433,7 @@ class Path:
             v1, v2, v3 = self.drone.speeds_dict["cruise"], self.drone.speeds_dict["cruise"], 0
             sep = return_sep(model, self.drone, v1, v2, v3, len_previous_edge, dist_to_arr)
             return time_to_arr, sep, angle
+
 
 def return_sep(model, drone, v1, v2, v3, l1, l2):
     v_cruise = drone.speeds_dict["cruise"]
