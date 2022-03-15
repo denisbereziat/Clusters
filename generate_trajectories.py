@@ -12,7 +12,7 @@ from Drone import VerticalIntegrator
 verbose = False
 
 
-def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param=None):
+def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param=None, number_of_trajectories=None):
     """Generate alternative trajectories for all drones in the model
     OUTPUT :
     drone_trajectories_dict[drone_fn][traj_id] = [path_object, total_time]
@@ -26,7 +26,10 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
         drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = current_param
     else:
         drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = dict(), dict(), dict(), dict(), []
-    nb_alternative_traj = 5
+    if number_of_trajectories is None:
+        nb_alternative_traj = 5
+    else:
+        nb_alternative_traj = number_of_trajectories
 
     generated_trajectories = dict()
     # Generate alternate trajectories for all drones.
@@ -531,8 +534,6 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
             remove_first = True
         if [shortest_path.path[_i - 1], shortest_path.path[_i]] == [drone.dep_edge[1], drone.dep_edge[0]]:
             remove_first = True
-    # TODO ENCORE DES A/R DANS LE DEBUT JE SAIS PAS POURQUOI DONC J'ENLEVE ICI
-    # TODO encore demi_tour en milieu d'arrete rare
     if remove_first:
         if len(set(shortest_path.path[1:])) != len(shortest_path.path[1:]):
             print("ATTENTION1")
