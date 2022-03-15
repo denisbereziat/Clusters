@@ -185,7 +185,8 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     descent_descent_list = []
     
     #we take into account middle hor turning speed
-    worse_hor_time_sep = model.protection_area / Drone.speeds_dict_model1["turn2"]
+    #worse_hor_time_sep = model.protection_area / Drone.speeds_dict_model1["turn2"]
+    worse_hor_time_sep = Path.worse_hor_time_sep
     #we take into account acceleration (or deceleration) and climb at max speed for the rest
     #use when drone that is climbing/descending is leveling up at next flight level
     worse_vert_time_sep = VerticalIntegrator.integrate(model.FL_sep, 0, Drone.vertical_speed).time_at_distance_before_end(model.vertical_protection)

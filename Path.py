@@ -4,6 +4,7 @@ import tools
 from Drone import Integrator
 
 over_estimate_turn_factor = 1
+worse_hor_time_sep = 0 #initial max value
 
 
 class Path:
@@ -86,15 +87,6 @@ class Path:
                 #we need to compute the angle and coresponding speed
                 if edge1:
                     angle = graph_dual.edges[(edge1, edge2)]["angle"]
-                    #find angle from the dual
-                    # try:
-                    #     if (edge1, edge2) in graph_dual.edges:
-                    #         angle = graph_dual.edges[(edge1, edge2)]["angle"]
-                    #     else:
-                    #         angle = graph_dual.edges[((edge1[1], edge1[0]), edge2)]["angle"]
-                    # except:
-                    #     print(edge1, edge2)
-                    #     raise Exception
                 else:
                     #compute angle as heading difference of (dep, edge2[0]) and edge2
                     pt1 = model.graph.nodes[edge2[0]]["x"], model.graph.nodes[edge2[0]]["y"]
@@ -107,7 +99,9 @@ class Path:
         self.separation_dict[t] = [0, 0]  #initialize next sep_dict key
         current_node = (t, p[1])
         index = 1
+        angle0 = 0
         while index < len(node_list):
+            angle1 = self.turns[-1]
             #take out the first node and cooresponding speed
             p.pop(0); v.pop(0)
             #append the next node and cooresponding speed
@@ -125,41 +119,47 @@ class Path:
                     self.turns[-1] = angle
             
             #integrate segment and save path fields
-            t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, model.protection_area, dep, arr)
+            t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, angle0, angle1, model.protection_area, dep, arr)
                 
             #set next node
             index += 1
             d1 = d2
             d2 = d2_next
             current_node = next_node
+            angle0 = angle1
         
+        angle1 = self.turns[-1]
         #take out the first node and cooresponding speed
         p.pop(0); v.pop(0)
         #add the arrival node and cooresponding speed
         p.append(arr)
         v.append(0)
         #integrate segment and save path fields
-        t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, model.protection_area, dep, arr)
+        t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, angle0, angle1, model.protection_area, dep, arr)
         
         #treate last segment
+        angle0 = angle1
+        angle1 = 0
         d1 = d2
         d2 = None
         current_node = next_node
         #take out the first node and cooresponding speed, and don't add anything
         p.pop(0); v.pop(0)
         #integrate last segment and save path fields except path_dict
-        t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, model.protection_area, dep, arr, False)
+        t, next_node = self.integrate_segment(t, current_node, p, v, d1, d2, angle0, angle1, model.protection_area, dep, arr, False)
         
         #set Path object arrival time
         self.arr_time = t
 
-    def integrate_segment(self, t, current_node, p, v, d1, d2, sep_norm, dep, arr, save_path_dict=True):
+    def integrate_segment(self, t, current_node, p, v, d1, d2, angle0, angle1, sep_norm, dep, arr, save_path_dict=True):
+        global worse_hor_time_sep #we'll calculate acctual worse horizontal time separation
         #integrate segment between p[0] and p[1]
-        integrator = Integrator.integrate(p, v, d1, d2, self.drone)
+        integrator = Integrator.integrate(p, v, d1, d2, angle0, angle1, self.drone)
         self.segments.append(integrator)
         
         #set after_sep for current node
         self.separation_dict[t][1] = integrator.time_at_distance_after_begin(sep_norm)
+        worse_hor_time_sep = max(worse_hor_time_sep, self.separation_dict[t][1])
         
         t += integrator.end_time()
         #set next node and fill next/previous node dicts
@@ -172,11 +172,13 @@ class Path:
         
         #initialize and set before_sep for next node
         self.separation_dict[t] = [integrator.time_at_distance_before_end(sep_norm), 0]
+        worse_hor_time_sep = max(worse_hor_time_sep, self.separation_dict[t][0])
         
         #initialize and set middle_edge_dict
         #Attention: don't save dep_vert-xxx and xxx-arr_vert, since may cause error later
         if p[0] != dep and p[1] != arr:
             self.edge_middle_dict[p[0], p[1]] = (integrator.middle_time(), (integrator.time_at_distance_before_middle(sep_norm), integrator.time_at_distance_after_middle(sep_norm)))
+            worse_hor_time_sep = max(worse_hor_time_sep, self.edge_middle_dict[p[0], p[1]][1][0], self.edge_middle_dict[p[0], p[1]][1][1])
         
         return t, next_node
 

@@ -110,7 +110,7 @@ def accelerated_speed(v1, distance):
 
 
 def decelerated_speed(v1, distance):
-	#due to float representation inprecission (e.g. 0 that is -0.0000001) we 'round' the calculation
+    #due to float representation inprecission (e.g. 0 that is -0.0000001) we 'round' the calculation
     return math.sqrt(max(0, v1**2 - 2*accel_max*distance))
 
 
@@ -163,12 +163,15 @@ class Integrator:
     Maximum possible end speed is generally determined based on the turning angle 
     speed restriction at the end point but also at the next point in the traj. 
     '''
-    def __init__(self, p0, p1, d, v0, v1, d_acc, v_acc, t_acc, d_cruise, v_cruise, t_cruise, d_dec, v_dec, t_dec):
+    def __init__(self, drone, p0, p1, d, v0, v1, angle0, angle1, d_acc, v_acc, t_acc, d_cruise, v_cruise, t_cruise, d_dec, v_dec, t_dec):
+        self.drone =  drone
         self.p0 = p0
         self.p1 = p1
         self.d = d
         self.v0 = v0
         self.v1 = v1
+        self.angle0 = angle0
+        self.angle1 = angle1
         self.d_acc = d_acc
         self.v_acc = v_acc
         self.t_acc = t_acc
@@ -189,7 +192,7 @@ class Integrator:
         return res
 
     def end_time(self):
-        return self.t_dec
+        return self.t_dec + self.drone.return_delay_from_angle(self.angle1)
     
     def middle_time(self):
         return self.t_middle
@@ -197,30 +200,34 @@ class Integrator:
     def time_at_distance_after_begin(self, distance):
         if distance >= self.d:
             #distance is longer than segment, hence we approximate with average speed over segment
-            return distance*self.t_dec/self.d
+            rez = distance*self.t_dec/self.d
         else:
-            return self.time_at_distance(distance)
+            rez = self.time_at_distance(distance)
+        return rez + self.drone.return_sep_margin_from_angle(self.angle0)
     
     def time_at_distance_before_end(self, distance):
         if distance >= self.d:
             #distance is longer than segment, hence we approximate with average speed over segment
-            return distance*self.t_dec/self.d
+            rez = distance*self.t_dec/self.d
         else:
-            return self.t_dec - self.time_at_distance(self.d - distance)
+            rez = self.t_dec - self.time_at_distance(self.d - distance)
+        return rez + self.drone.return_sep_margin_from_angle(self.angle1)
         
     def time_at_distance_after_middle(self, distance):
         if distance >= self.d/2:
             #distance is longer than half-segment, hence we approximate with average speed over second half of segment
-            return distance*2*(self.t_dec - self.t_middle)/self.d
+            rez = distance*2*(self.t_dec - self.t_middle)/self.d
         else:
-            return self.time_at_distance(self.d/2 + distance) - self.t_middle
+            rez = self.time_at_distance(self.d/2 + distance) - self.t_middle
+        return rez + self.drone.return_sep_margin_from_angle(0)
     
     def time_at_distance_before_middle(self, distance):
         if distance >= self.d/2:
             #distance is longer than half-segment, hence we approximate with average speed over first half of segment
-            return distance*2*self.t_middle/self.d
+            rez = distance*2*self.t_middle/self.d
         else:
-            return self.t_middle - self.time_at_distance(self.d/2 - distance)
+            rez = self.t_middle - self.time_at_distance(self.d/2 - distance)
+        return rez + self.drone.return_sep_margin_from_angle(0)
         
     def time_at_distance(self, distance): #returns relative time from begining of the segment till required distnce
         if distance < self.d_acc:
@@ -237,7 +244,7 @@ class Integrator:
     The drone motion is coverned by the kinematic law with constant acceleration/deceleration,
     maximum cruising speed that are all defined in Drone class. 
     '''
-    def integrate(p, v, d1, d2, drone):
+    def integrate(p, v, d1, d2, angle0, angle1, drone):
         if len(p) == 3:
             if not(v[2] >= v[1] or d2 >= deceleration_distance(v[1], v[2])):
                 #second segment is restrictive for v[1] that need be reduced
@@ -263,7 +270,7 @@ class Integrator:
         v_dec = decelerated_speed(v_acc, d_dec)
         t_dec = t_cruise + deceleration_time(v_acc, v_dec)
     
-        return Integrator(p[0], p[1], d1, v[0], v[1], d_acc, v_acc, t_acc, d_cruise, v_acc, t_cruise, d_dec, v_dec, t_dec)
+        return Integrator(drone, p[0], p[1], d1, v[0], v[1], angle0, angle1, d_acc, v_acc, t_acc, d_cruise, v_acc, t_cruise, d_dec, v_dec, t_dec)
 
 
 class VerticalIntegrator:
