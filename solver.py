@@ -25,6 +25,7 @@ drone_delete_dist = 0.0026997840172786176 * 3
 
 # TODO a modifier ensuite
 TIME_MARGIN = 0
+rta_time_deviation = 0
 
 
 def solve_with_time_segmentation():
@@ -118,12 +119,10 @@ def solve_with_time_segmentation():
                     a = drone_fn
                     fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
         generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_" + str(sim_time) + ".scn")
-        # generate_time_stamps(model, graph)
         sim_time += sim_step
 
     # Generate SCN
     generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_Final.scn")
-    # generate_time_stamps(model, graph)
 
 
 def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixed_flights_dict, geofence_time_intervals):
@@ -339,24 +338,6 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 for wpt_time, node in drone.path_object.path_dict.items():
                     x, y = graph.nodes[node]["x"], graph.nodes[node]["y"]
                     if Drone.return_speed_from_angle(drone.path_object.turns[wpt], drone) != drone.speeds_dict["cruise"]:
-                        if drone.path_object.turns[wpt] > 175:
-                            try:
-                                print("---")
-                                print(drone.flight_number)
-                                print("ANGLE :", drone.path_object.turns[wpt])
-                                print(wpt)
-                                print("depedge", drone.dep_edge)
-                                print(drone.path_object.path)
-                                print("arredge ",drone.arr_edge)
-                                print("listarredge", drone.arr)
-
-                                print(drone.path_object.path[wpt-1],drone.path_object.path[wpt],drone.path_object.path[wpt+1])
-                                for _node in [drone.path_object.path[wpt-1],drone.path_object.path[wpt],drone.path_object.path[wpt+1],drone.path_object.path[wpt+2]]:
-                                    print(graph.nodes[_node]["y"], graph.nodes[_node]["x"])
-                                print("ANGLE IN DUAL :", model.graph_dual.edges[((drone.path_object.path[wpt-1],drone.path_object.path[wpt]),(drone.path_object.path[wpt],drone.path_object.path[wpt+1]))]["angle"])
-                            except:
-                                pass
-
                         to_write += str(y) + "," + str(x) + "," + str(fl_feet) + ",,TURNSPD," + str(Drone.return_speed_from_angle(drone.path_object.turns[wpt], drone) * ms_to_knots)
                     else:
                         to_write += str(y) + "," + str(x) + "," + str(fl_feet) + ",,FLYBY,0"
@@ -377,11 +358,6 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 to_write = time_str + ">ATALT " + drone.flight_number + " " + str(fl_feet) + " VNAV " + drone.flight_number + " ON\n"
                 to_write_dict[drone].append(to_write)
 
-                # file.write(to_write)
-                # to_write_dict[drone].append(time_str + ">LNAV " + drone.flight_number + " ON\n")
-                # to_write_dict[drone].append(time_str + ">VNAV " + drone.flight_number + " ON\n")
-                # file.write(time_str + ">LNAV " + drone.flight_number + " ON\n")
-                # file.write(time_str + ">VNAV " + drone.flight_number + " ON\n")
                 wpt = 2
                 for wpt_time, node in drone.path_object.path_dict.items():
                     to_write = time_str + ">RTA " + drone.flight_number + " " + drone.flight_number
@@ -393,7 +369,7 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                     #
                     # print(rta_deviation)
                     if drone.path_object.turns[wpt - 2] > Drone.angle_intervals[0]:
-                        rta_deviation -= -3
+                        rta_deviation -= rta_time_deviation
                     h, m, s = (wpt_time + delay + rta_deviation) // 3600, ((wpt_time + delay + rta_deviation) % 3600) // 60, (wpt_time + delay + rta_deviation) % 60
                     rta_time_str = str(int(h // 10)) + str(int(h % 10)) + ":" + str(int(m // 10)) + str(int(m % 10)) + ":" + str(int(s // 10)) + str(int(s % 10))
                     to_write += rta_time_str + "\n"
@@ -401,15 +377,13 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                     # file.write(to_write)
                     wpt += 1
 
+        # Sort the drones by actual dep time (wt delay) and write the SCN
         def return_drone_dep(_drone):
             return _drone.dep_time + drone_delay_dict[_drone]
         to_sort = []
         for drone in to_write_dict:
             to_sort.append(drone)
         sorted_drone_list = sorted(to_sort, key=return_drone_dep)
-        # print("to write : ", to_write_dict)
-        # print("SORTED : " ,sorted_drone_list)
-        # print([return_drone_dep(drone) for drone in sorted_drone_list])
         for drone in sorted_drone_list:
             for to_write in to_write_dict[drone]:
                 file.write(to_write)
