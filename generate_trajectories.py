@@ -461,6 +461,88 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
 
 
+def generate_interaction(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
+    """Determine whether there is interaction between given trajectories"""
+
+    #we take into account middle hor turning speed
+    #worse_hor_time_sep = model.protection_area / Drone.speeds_dict_model1["turn2"]
+    worse_hor_time_sep = Path.worse_hor_time_sep
+    
+    '''Intersection dicts has key=interescting_point_id and value that is another dict 
+    whose key is time_id and value is list of trajectories 
+    * time_id is calculated as int(time_over_node/delta_time)
+    * delta_time is used to filter the trajectories and it is calculated such that  
+    if trajs time separation is greater than this value then they cann't be in interaction
+    * delta_time is calculated as worse time shift that may yield lost of separation in distance
+    * Hence, it is given by a sum of max_delay and max sep in time, plus any addition time shift,
+    such as level distances, etc. (this depends on the type of intersection)
+    Atention!!! always use the same norm to filter and to indentify intersection'''
+    # horizontal-horizontal
+    delta_time_horizontal = math.ceil(model.delay_max + worse_hor_time_sep)
+    horizontal_intersection_grid = {}
+    '''Loop over all drones, trajectories and their nodes and fill the grids 
+    by adding concerned trajectories and respective passage time over intersecting point (and any other required data)
+    * horizontal_intersection_grid indexed by nodes and normalized time'''
+    for drone in model.droneList:
+        # initialize horizontal_intersection_grid with dep and arr
+        if not dep in horizontal_intersection_grid:
+            horizontal_intersection_grid[dep] = {}
+        if not arr in horizontal_intersection_grid:
+            horizontal_intersection_grid[arr] = {}
+
+        drone_fn = drone.flight_number
+        for traj_id in drone_trajectories_dict[drone_fn]:
+            traj_path = drone_trajectories_dict[drone_fn][traj_id][0]
+            # fill horizontal_intersection_grid with dep and arr
+            time_id = traj_path.dep_time // delta_time_horizontal  # integer division
+            if not time_id in horizontal_intersection_grid[dep]:
+                horizontal_intersection_grid[dep][time_id] = []
+            horizontal_intersection_grid[dep][time_id].append((drone_fn, traj_path.dep_time))
+            time_id = traj_path.arr_time // delta_time_horizontal  # integer division
+            if not time_id in horizontal_intersection_grid[arr]:
+                horizontal_intersection_grid[arr][time_id] = []
+            horizontal_intersection_grid[arr][time_id].append((drone_fn, traj_path.arr_time))
+            
+
+            for t, node_id in traj_path.path_dict.items():
+                # initialize horizontal_intersection_grid
+                time_id = t // delta_time_horizontal  # integer division
+                if not node_id in horizontal_intersection_grid:
+                    horizontal_intersection_grid[node_id] = {}
+                if not time_id in horizontal_intersection_grid[node_id]:
+                    horizontal_intersection_grid[node_id][time_id] = []
+                # fill horizontal_intersection_grid
+                horizontal_intersection_grid[node_id][time_id].append((drone_fn, t))
+
+
+    '''DETECTION OF INTERACTIONS
+    Now it is simply necessary to loop over the grid and for every node_id and every time_id 
+    then verify all trajectory pairs in this cell and neighbouring ones
+    i.e. one time_id before and after are potential interactions
+    * If we want to avoid to conservative consideration of intersections, we need to filter further 
+    all pairs by the actual time separation whether it is less than delta_time_horizontal
+    To avoid duplicates, for every time_id we check all combinations of:
+    * trajs in time_id
+    * trajs in time_id vs time_id+1
+    
+    Create interaction for any filtered pair of drones'''
+    interactions = set()
+    for node_id in horizontal_intersection_grid:
+        for time_id in horizontal_intersection_grid[node_id]:
+
+            potential_intersections = list(itertools.combinations(horizontal_intersection_grid[node_id][time_id], 2))
+            if time_id + 1 in horizontal_intersection_grid[node_id]:
+                potential_intersections.extend(itertools.product(horizontal_intersection_grid[node_id][time_id],
+                                                                 horizontal_intersection_grid[node_id][time_id + 1]))
+
+            for pair in potential_intersections:
+                if pair[0][0] != pair[1][0]:  # not the same flight intention i.e. drone
+                    if abs(pair[0][1] - pair[1][1]) <= delta_time_horizontal:  # further fillterig per actual separation
+                        interactions.add((pair[0][0], pair[1][0]))
+
+    return interactions
+
+
 def generate_parallel_trajectories(drone, model, step, dist, number_to_generate, geofence_time_intervals):
     trajectories = []
     drone_dep_dual_list = []
