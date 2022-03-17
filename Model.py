@@ -108,6 +108,7 @@ class Model:
                 if deposit_time > time:
                     continue
                 drone_model = line[2]
+                priority = line[6]
                 dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
                 arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
                 hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
@@ -157,6 +158,7 @@ class Model:
                 drone.is_unconstrained_arrival = is_unconstrained_arrival
                 drone.dep_edge = dep_edge
                 drone.arr_edge = arr_edge
+                drone.priority = priority
 
                 if len(line) > 9:
                     if line[9] != '':

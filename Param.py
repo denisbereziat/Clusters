@@ -8,7 +8,8 @@ delayStep = 10						#delay step duration in [sec]; total delay = number od delay
 
 
 class Param:
-	def __init__(self, model, A, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
+	def __init__(self, model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
+		self.priorities = priorities
 		self.nbFL = model.nb_FL				#number of flight levels
 		self.vVert = Drone.vertical_speed	#vertical seed in m/s
 		self.dFL = model.FL_sep				#vertical separation between two flight levels in m = 30ft

@@ -32,6 +32,7 @@ class Drone:
         self.arr_edge = None
         self.dep_time = hDep
 
+        self.priority = None
         self.drone_type = drone_type
         if self.drone_type == 'MP30':
             self.speeds_dict = speeds_dict_model1

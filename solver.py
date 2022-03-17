@@ -9,14 +9,15 @@ import BlueskySCNTools
 import networkx
 import csv
 import Drone
+import os
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour.graphml"
 # dual_graph_path = None
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
-drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
-output_scenario = "PLNE OUTPUT/scenario.scn"
-output_scenario_with_RTA = "PLNE OUTPUT/scenario_with_RTA.scn"
+_drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
+output_directory = "PLNE OUTPUT"
+input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
 
 T_MAX_OPTIM = 50
 MIP_GAP = 0.3
@@ -29,9 +30,23 @@ TIME_MARGIN = 0
 rta_time_deviation = 0
 
 
-def solve_with_time_segmentation():
+def main():
+    input_files_list = os.listdir(input_directory)
+    for input_file in input_files_list:
+        solve_with_time_segmentation(input_file, output_directory)
+
+
+def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
     """"SOLVE the problem by using time segmentation.
     Dynamic geofence flights are sorted to be computed first and are always included in resolution"""
+    # Create output file
+    try:
+        path = os.path.join(_output_dir, _drone_list_file_path)
+        os.mkdir(path)
+    except FileExistsError:
+        path = os.path.join(_output_dir, _drone_list_file_path)
+    drone_list_file_path = input_directory+"/"+_drone_list_file_path
+    output_dir = path
     print("-- INIT")
     print("Initialising graph")
     graph, graph_dual = md.init_graphs(graph_file_path, dual_path=dual_graph_path)
@@ -82,7 +97,7 @@ def solve_with_time_segmentation():
                 drone_fn = trajectories_to_fn[k]
                 a = drone_fn
                 fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
-        generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_" + "geofence" + ".scn")
+        # generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + "geofence" + ".scn")
         generate_time_stamps(model, graph)
         # Create the geofenced nodes list
         geofence_time_intervals = dict()
@@ -125,11 +140,11 @@ def solve_with_time_segmentation():
                 if drone.dep_time < sim_time + sim_step and drone_fn not in fixed_flights_dict:
                     a = drone_fn
                     fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
-        generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_" + str(sim_time) + ".scn")
+        # generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + str(sim_time) + ".scn")
         sim_time += sim_step
 
     # Generate SCN
-    generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/scenarioV2_Final.scn")
+    generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, path + "/scenarioV2_Final.scn")
 
 
 def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels):
@@ -288,13 +303,17 @@ def create_param(model, trajectories,trajectories_to_duration,horizontal_shared_
     sep21 = [pt[5] + TIME_MARGIN for pt in all_pt]
     A = trajectories.keys()
     K = []
+    priorities = dict()
     for a in trajectories:
         for k in trajectories[a]:
             K.append([k, trajectories_to_duration[k], a])
+    for a in A:
+        priorities[a] = model.total_drone_dict[a].priority
     fixed_intentions = []
     for fn in fixed_flights_dict:
         fixed_intentions.append(fixed_flights_dict[fn])
-    param = Param.Param(model, A, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixed_intentions, fixedLevels=fixed_flight_levels)
+
+    param = Param.Param(model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixed_intentions, fixedLevels=fixed_flight_levels)
 
     # Print output :
     list_all = [horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list]
@@ -369,7 +388,16 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 # print("Drone FN : ", drone.flight_number, " dep :", departure_time)
                 h, m, s = departure_time // 3600, (departure_time % 3600) // 60, departure_time % 60
                 time_str = str(int(h // 10)) + str(int(h % 10)) + ":" + str(int(m // 10)) + str(int(m % 10)) + ":" + str(int(s // 10)) + str(int(s % 10))
-                to_write = time_str + ">CRE " + drone.flight_number + " " + drone.drone_type + " " + dep_vertiport + " " + str(qdr) + " 0 " + str(0) + "\n"
+                if drone.is_loitering_mission:
+                    to_write = time_str + ">CRELOITER " + drone.flight_number + " " + drone.drone_type + " " + dep_vertiport + " " + str(
+                        qdr) + " 0 " + str(0)
+                    fence = drone.loitering_geofence
+                    to_write += " " + str(fence[0])
+                    to_write += " " + str(fence[3]) + " " + str(fence[1]) + " " + str(fence[4]) + " " + str(fence[1])
+                    to_write += " " + str(fence[4]) + " " + str(fence[2]) + " " + str(fence[3]) + " " + str(fence[2])
+                    to_write += "\n"
+                else:
+                    to_write = time_str + ">CRE " + drone.flight_number + " " + drone.drone_type + " " + dep_vertiport + " " + str(qdr) + " 0 " + str(0) + "\n"
                 to_write_dict[drone].append(to_write)
                 # file.write(to_write)
                 to_write = time_str + ">ADDWAYPOINTS " + drone.flight_number + " " + dep_vertiport + "," + str(fl_feet) + ",,FLYBY,0,"
@@ -387,8 +415,7 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 to_write += "\n"
                 to_write_dict[drone].append(to_write)
                 # file.write(to_write)
-                to_write = time_str + ">" + drone.flight_number + " ATDIST " + str(y) + " " + str(x) + " " + str(drone_delete_dist)+ " DEL " + drone.flight_number + "\n"
-                to_write_dict[drone].append(to_write)
+                # Have the drone stop, descend and delete itself when it reaches the vertiport
                 to_write = time_str + ">ALT " + drone.flight_number + " " + str(fl_feet) + "\n"
                 to_write_dict[drone].append(to_write)
                 to_write = time_str + ">ATALT " + drone.flight_number + " " + str(fl_feet) + " SPD " + drone.flight_number + " " + str(drone.speeds_dict["cruise"] * ms_to_knots) + "\n"
@@ -397,6 +424,16 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 to_write_dict[drone].append(to_write)
                 to_write = time_str + ">ATALT " + drone.flight_number + " " + str(fl_feet) + " VNAV " + drone.flight_number + " ON\n"
                 to_write_dict[drone].append(to_write)
+                if drone.is_loitering_mission:
+                    to_write = time_str + ">" + drone.flight_number + " ATDIST " + str(y) + " " + str(x) + " " + str(drone_delete_dist) + " DELLOITER " + drone.flight_number + "\n"
+                    to_write_dict[drone].append(to_write)
+                else:
+                    to_write = time_str + ">" + drone.flight_number + " ATDIST " + str(y) + " " + str(x) + " " + str(drone_delete_dist) + " SPD " + drone.flight_number + "  0\n"
+                    to_write_dict[drone].append(to_write)
+                    to_write = time_str + ">" + drone.flight_number + " ATDIST " + str(y) + " " + str(x) + " " + str(drone_delete_dist) + " ALT " + drone.flight_number + "  0\n"
+                    to_write_dict[drone].append(to_write)
+                    to_write = time_str + ">" + drone.flight_number + " ATDIST " + str(y) + " " + str(x) + " " + str(drone_delete_dist) + " ATALT " + drone.flight_number + " 0.2 DEL " + drone.flight_number + " \n"
+                    to_write_dict[drone].append(to_write)
 
                 wpt = 2
                 for wpt_time, node in drone.path_object.path_dict.items():
@@ -406,7 +443,6 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                     # rta_deviation = Drone.return_vertical_accel_time(0, Drone.vertical_speed) + (fl - Drone.return_vertical_accel_dist(0, Drone.vertical_speed)) / Drone.vertical_speed
                     # rta_deviation = fl / Drone.vertical_speed
                     rta_deviation = Drone.VerticalIntegrator.integrate(fl_m).end_time()
-                    #
                     # print(rta_deviation)
                     if drone.path_object.turns[wpt - 2] > Drone.angle_intervals[0]:
                         rta_deviation -= drone.return_delay_from_angle(drone.path_object.turns[wpt - 2])
@@ -429,5 +465,5 @@ def generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, output_fil
                 file.write(to_write)
 
 
-solve_with_time_segmentation()
-
+# solve_with_time_segmentation(_drone_list_file_path, output_directory)
+main()
