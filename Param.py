@@ -115,15 +115,13 @@ class Param:
 		
 		self.FLfix = []
 		if fixedLevels:
-			if len(fixedIntentions) + len(fixedLevels) != self.nbflights:
-				raise ValueError("All flights must have fixed levels!")
 			if any(a not in self.A or l <= 0 or l > self.nbFL for a, l in fixedLevels):
 				raise ValueError("Either flight or level is out of the range for fixed level flights!")
 			self.FLfix = fixedLevels
 		
 class ParamLevelChoice:
 	def __init__(self, model, A, interactions):
-		self.nbFL = model.nbFL
+		self.nbFL = model.nb_FL
 		self.nbflights = len(A)				#number of flight instances
 		self.A = A							#set of flight intentions labeled from 1 to nbflights
 		
@@ -134,7 +132,7 @@ class ParamLevelChoice:
 		#big M parameters
 		self.FLmax = self.nbFL						#big M is set to max difference between two flight levels
 		self.delta = 0.5							#small number that is less than difference between any different flight levels
-		self.deltaFLmax = (self.nbFL - 1)*model.dFL	#maximum difference in meters between two flight levels
+		self.deltaFLmax = (self.nbFL - 1)*model.FL_sep	#maximum difference in meters between two flight levels
 		self.deltaFLmin = -self.deltaFLmax			#minimum difference in meters between two flight levels
 	
 '''

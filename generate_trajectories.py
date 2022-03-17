@@ -485,6 +485,10 @@ def generate_interaction(drone_trajectories_dict, trajectories_to_fn_dict, traje
     * horizontal_intersection_grid indexed by nodes and normalized time'''
     for drone in model.droneList:
         # initialize horizontal_intersection_grid with dep and arr
+        # TODO a verifier que c'est ça
+        dep = drone.departure_vertiport
+        arr = drone.arrival_vertiport
+
         if not dep in horizontal_intersection_grid:
             horizontal_intersection_grid[dep] = {}
         if not arr in horizontal_intersection_grid:
@@ -556,6 +560,7 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
     if len(drone_dep_dual_list) < 2:
         print("TOOSHORT1")
         print(drone_dep_dual_list)
+        raise Exception
     # print(drone_dep_dual, drone_arr_dual)
     shortest_path = a2.astar_dual(model, drone_dep_dual_list, drone_arr_dual_list, drone, drone.dep_time)
 
@@ -619,18 +624,38 @@ def generate_parallel_trajectories(drone, model, step, dist, number_to_generate,
     if remove_first:
         if len(set(shortest_path.path[1:])) != len(shortest_path.path[1:]):
             print("ATTENTION1")
+            print(shortest_path.path)
+            tools.scatter_graph(model.graph)
+            tools.plot_traj(shortest_path.path, model.graph)
+            plt.show()
             if at_least_one_edge_modified:
                 print("AND ONE EDGE MODIFIED")
             else:
                 print("NO EDGES MODIFIED")
+        print("REMOVING FIRST")
+        raise Exception
         trajectories.append(shortest_path.path[1:])
     else:
         if len(set(shortest_path.path)) != len(shortest_path.path):
             print("ATTENTION2")
-            if at_least_one_edge_modified:
-                print("AND ONE EDGE MODIFIED")
-            else:
-                print("NO EDGES MODIFIED")
+            # tools.scatter_graph(model.graph)
+            # tools.plot_traj(shortest_path.path, model.graph)
+            # plt.show()
+            while len(set(shortest_path.path)) != len(shortest_path.path):
+                # find duplicate
+                duplicate = None
+                idx2 = None
+                for index, node in enumerate(shortest_path.path):
+                    if node in shortest_path.path[index+1:]:
+                        duplicate = node
+                        idx2 = shortest_path.path[index+1:].index(node)
+                        print("MODIFYING :")
+                        print(shortest_path.path)
+                        shortest_path.path = shortest_path.path[:index+1] + shortest_path.path[index+idx2+2:]
+                        print(shortest_path.path)
+                        print("DONE")
+                        break
+                # remove everything in beetween
         trajectories.append(shortest_path.path)
     # GENERATE ALL THE OTHER TRAJS
     geodesic = pyproj.Geod(ellps='WGS84')
