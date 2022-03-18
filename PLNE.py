@@ -2,6 +2,8 @@ import gurobipy as gb
 import Param
 import sys
 
+W = {1: 1, 2: 1.5, 3: 2, 4: 3} #weights defining importance of the flight instancies based on their priority
+
 class ProblemGlobal:
 	def __init__(self, param, name = "MyProblem"):
 		self.param = param
@@ -34,7 +36,7 @@ class ProblemGlobal:
 
 
 	def createObjectiveFunction(self):
-		self.model.setObjective(sum(self.param.d[k]*self.x[k] for k in self.param.K) + sum(self.param.delayStep*self.delay[a] + 2*(self.param.tSeedUp + self.y[a]*self.param.dFL/self.param.vVert) for a in self.param.A), gb.GRB.MINIMIZE) 
+		self.model.setObjective(sum(W[self.param.priorities[self.param.mon_vol[k]]]*self.param.d[k]*self.x[k] for k in self.param.K) + sum(W[self.param.priorities[a]]*(self.param.delayStep*self.delay[a] + 2*(self.param.tSeedUp + self.y[a]*self.param.dFL/self.param.vVert)) for a in self.param.A), gb.GRB.MINIMIZE) 
 
 	
 	def createConstraints(self):
@@ -131,7 +133,7 @@ class ProblemLevelChoice:
 
 	def createObjectiveFunction(self, withcost):
 		if withcost:
-			self.model.setObjective(sum(self.same_fl[i,j] for i,j in self.param.AInter if i<j) + 0.1*sum(self.y[i] for i in self.param.A), gb.GRB.MINIMIZE)
+			self.model.setObjective(sum(self.same_fl[i,j] for i,j in self.param.AInter if i<j) + 0.1*sum(W[self.param.priorities[i]]*self.y[i] for i in self.param.A), gb.GRB.MINIMIZE)
 		else:
 			self.model.setObjective(sum(self.same_fl[i,j] for i,j in self.param.AInter if i<j), gb.GRB.MINIMIZE)
 

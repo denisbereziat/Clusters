@@ -9,7 +9,6 @@ delayStep = 10						#delay step duration in [sec]; total delay = number od delay
 
 class Param:
 	def __init__(self, model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
-		self.priorities = priorities
 		self.nbFL = model.nb_FL				#number of flight levels
 		self.vVert = Drone.vertical_speed	#vertical seed in m/s
 		self.dFL = model.FL_sep				#vertical separation between two flight levels in m = 30ft
@@ -23,12 +22,15 @@ class Param:
 		self.maxStep = self.maxDelay // delayStep	#maximum number of steps
 
 		self.A = A								#set of flight intentions
+		if any(a not in priorities for a in self.A):
+			raise ValueError("Priority must be defined for every flight intention!")
+		self.priorities = priorities			#flight intention priorities
 		if any(d < 0 for k, d, a in K):
 			raise ValueError("Trajectory duration may not be negative!")
 		if any(a not in self.A for k, d, a in K):
 			raise ValueError("Flight of a trajectory must be in the list of flights!")
 		self.K = []								#set of all horizontal trajectories
-		self.d = {}								#duration of horizontal trajectory i
+		self.d = {}								#duration of horizontal trajectory
 		self.mon_vol = {}						#flight intention to which belongs given horizontal trajectory 
 		for k, d, a in K:
 			self.K.append(k)
@@ -121,10 +123,14 @@ class Param:
 			self.FLfix = fixedLevels
 		
 class ParamLevelChoice:
-	def __init__(self, model, A, interactions):
+	def __init__(self, model, A, priorities, interactions):
 		self.nbFL = model.nb_FL
 		self.nbflights = len(A)				#number of flight instances
 		self.A = A							#set of flight intentions labeled from 1 to nbflights
+		
+		if any(a not in priorities for a in self.A):
+			raise ValueError("Priority must be defined for every flight intention!")
+		self.priorities = priorities			#flight intention priorities
 		
 		if any(i not in self.A or j not in self.A for i,j in interactions):
 			raise ValueError("Non existing fights in interaction list!")
@@ -179,7 +185,7 @@ def readDat(filename):
 							p[i-1].append(float(line[i]))
 	
 	return Param(list(range(params["nbflights"])), [(k, dur, mon_vol[k]) for k, dur in enumerate(d)], params["maxDelay"], [params["nbPtHor"], params["nbPtClmb"], params["nbPtDesc"], params["nbPtDep"], params["nbPtArr"]], k1, k2, t1, t2, sep12, sep21)
-'''
+
 def addRandomFixFligth(filename, nbAfix=0):
 	param = readDat(filename)
 	if nbAfix > param.nbflights:
@@ -203,20 +209,6 @@ def addRandomFixFligth(filename, nbAfix=0):
 	print("param.Kfix = ", param.Kfix)
 	
 	return param
-	
-def fixLevelParam():
-	param = readDat("output.dat")
-	
-	param.Kfix = [10, 56, 72, 83, 126, 148, 151, 155, 164, 210, 220, 230, 235, 270, 309, 342, 346, 350, 387, 390, 397, 420, 486, 405]
-	Afix = [2, 11, 14, 16, 25, 29, 30, 31, 32, 42, 44, 46, 47, 54, 61, 68, 69, 70, 77, 78, 79, 84, 97, 81]
-	yfix = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3]
-	delayfix = [0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-	for i, a in enumerate(Afix):
-		param.Afix[a] = (yfix[i], delayfix[i])
-	
-	param.FLfix = [(0, 1), (1, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1), (12, 1), (13, 1), (15, 1), (17, 1), (18, 1), (19, 1), (20, 1), (21, 1), (22, 1), (23, 1), (24, 1), (26, 1), (27, 1), (28, 1), (33, 1), (34, 1), (35, 1), (36, 1), (37, 1), (38, 1), (39, 1), (40, 1), (41, 1), (43, 1), (45, 1), (48, 1), (49, 1), (50, 1), (51, 1), (52, 1), (53, 1), (55, 1), (56, 1), (57, 1), (58, 1), (59, 1), (60, 1), (62, 1), (63, 1), (64, 1), (65, 1), (66, 1), (67, 1), (71, 1), (72, 1), (73, 1), (74, 1), (75, 1), (76, 1), (80, 1), (82, 1), (83, 1), (85, 1), (86, 1), (87, 1), (88, 1), (89, 1), (90, 1), (91, 1), (92, 1), (93, 1), (94, 1), (95, 1), (96, 1), (98, 1), (99, 1)]
-
-	return param
 
 def createRandomParamLevelChoice(nbflights):
 	A = list(range(nbflights))
@@ -226,8 +218,8 @@ def createRandomParamLevelChoice(nbflights):
 		a2 = rd.choice(A)
 		if a1 != a2 and (a1,a2) not in interactions and (a2,a1) not in interactions:
 			interactions.append((a1,a2))
-	print(interactions)
-	return ParamLevelChoice(A, interactions)
+	priorities = {a: rd.randint(1, 4) for a in A}
+	return ParamLevelChoice(A, priorities, interactions)
 
 
 def levelChoiceParamGenerator(filename):
@@ -253,3 +245,4 @@ def levelChoiceParamGenerator(filename):
 			interactions.add((a1, a2))
 		
 	return param, ParamLevelChoice(param.A, interactions)
+'''

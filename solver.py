@@ -17,7 +17,8 @@ dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 _drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
 output_directory = "PLNE OUTPUT"
-input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
+#input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
+input_directory = "graph_files/Intentions"
 
 T_MAX_OPTIM = 50
 MIP_GAP = 0.3
@@ -187,7 +188,10 @@ def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
     print("Computing interactions")
     interactions = generate_trajectories.generate_interaction(trajectories, trajectories_to_fn, trajectories_to_path, model, graph, graph_dual, raw_graph)
     A = trajectories.keys()
-    param_level = Param.ParamLevelChoice(model, A, interactions)
+    priorities = dict()
+    for a in A:
+        priorities[a] = model.total_drone_dict[a].priority
+    param_level = Param.ParamLevelChoice(model, A, priorities, interactions)
     problem = PLNE.ProblemLevelChoice(param_level)
     problem.model.setParam("TimeLimit", T_MAX_OPTIM)
     problem.solve()
@@ -303,10 +307,10 @@ def create_param(model, trajectories,trajectories_to_duration,horizontal_shared_
     sep21 = [pt[5] + TIME_MARGIN for pt in all_pt]
     A = trajectories.keys()
     K = []
-    priorities = dict()
     for a in trajectories:
         for k in trajectories[a]:
             K.append([k, trajectories_to_duration[k], a])
+    priorities = dict()
     for a in A:
         priorities[a] = model.total_drone_dict[a].priority
     fixed_intentions = []

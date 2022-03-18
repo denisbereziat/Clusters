@@ -102,13 +102,14 @@ class Model:
         with open(filename, newline='') as csv_file:
             reader = csv.reader(csv_file, delimiter=',', quotechar='|')
             for line in reader:
-                # print(line)
+                #print(line)
                 deposit_time = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
                 # print(time, deposit_time)
                 if deposit_time > time:
                     continue
                 drone_model = line[2]
-                priority = line[6]
+                priority = line[8]
+                #print(priority)
                 dep_vertiport_coordinates = (float(line[4].strip("\"(")), float(line[5].strip("\")")))
                 arr_vertiport_coordinates = (float(line[6].strip("\"(")), float(line[7].strip("\")")))
                 hash_nodes, hash_edges, min_x, min_y, x_step, y_step, resolution = self.hash_map
@@ -158,7 +159,7 @@ class Model:
                 drone.is_unconstrained_arrival = is_unconstrained_arrival
                 drone.dep_edge = dep_edge
                 drone.arr_edge = arr_edge
-                drone.priority = priority
+                drone.priority = int(priority)
 
                 if len(line) > 9:
                     if line[9] != '':
