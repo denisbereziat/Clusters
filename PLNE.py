@@ -172,7 +172,7 @@ class ProblemLevelChoice:
 			x = model.cbGetSolution(model._y)
 			level_use = {i+1: 0 for i in range(model._param.nbFL)}
 			for a in model._param.A:
-				level_use[int(x[a])] += 1
+				level_use[round(x[a])] += 1
 			
 			er = any(level_use[i+1]<level_use[i+2] for i in range(model._param.nbFL-1))
 			if er:
@@ -180,7 +180,7 @@ class ProblemLevelChoice:
 				level_use = {level: index+1 for index, level in enumerate(level_use)}
 				model._y_vals = {}
 				for a in model._param.A:
-					model._y_vals[a] = level_use[x[a]]
+					model._y_vals[a] = level_use[round(x[a])]
 					
 				model._same_fl_vals = model.cbGetSolution(model._same_fl)
 				
