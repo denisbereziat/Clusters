@@ -31,6 +31,7 @@ class Drone:
         self.dep_edge = None
         self.arr_edge = None
         self.dep_time = hDep
+        self.arr_time = 1e+10 #it will get value once solution is found for this drone
 
         self.priority = None
         self.drone_type = drone_type

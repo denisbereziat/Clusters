@@ -119,9 +119,13 @@ class ProblemLevelChoice:
 		# Objects to use inside callbacks
 		self.model._param = param
 		self.model._y = self.y
+		self.model._same_fl = self.same_fl
+		self.model._y_vals = None
+		self.model._same_fl_vals = None
 		
 	def solve(self):
-		self.model.optimize()
+		self.model.optimize(ProblemLevelChoice.mycallback)
+		#self.model.optimize()
 	
 	def createVars(self):
 		self.y = self.model.addVars(self.param.A, vtype=gb.GRB.INTEGER, lb=1, ub=self.param.nbFL, name="y") 				#flight level choice for flight intention i
@@ -148,26 +152,45 @@ class ProblemLevelChoice:
 
 	def printSolution(self):
 		print("Obj: ", self.model.objVal)
+		print("Remaining interactions: ", sum(self.same_fl[i,j].x for i,j in self.param.AInter if i<j))
 		#for every flight print chosen flight level
 		for a in self.param.A:
 			print("Flight ", a, "\t", int(self.y[a].x))
 
-
-	#def mycallback(model, where):
-		#if where == gb.GRB.Callback.MIPSOL:
-			## computed number of flight instances per level
-			#level_use = {i+1: 0 for i in range(model._param.nbFL)}
-			#for a in model._param.A:
-				#l = int(model._y[a].x)
-				#level_use[l] += 1
-			#print(level_use)
+	def mycallback(model, where):
+		'''if where == gb.GRB.Callback.PRESOLVE:
+			interactions = {a: 0 for a in model._param.A}
+			for pair in model._param.AInter:
+				interactions[pair[0]] += 1
+			interactions = sorted(interactions.items(), key=lambda item: -item[1])
+			print(interactions)
+			sys.exit(0)'''
 		
-		#if where == gb.GRB.Callback.MIPNODE:
+		if where == gb.GRB.Callback.MIPSOL:
+			#print("improving ", model.cbGet(gb.GRB.Callback.MIPSOL_OBJ))
+			# computed number of flight instances per level
+			x = model.cbGetSolution(model._y)
+			level_use = {i+1: 0 for i in range(model._param.nbFL)}
+			for a in model._param.A:
+				level_use[int(x[a])] += 1
+			
+			er = any(level_use[i+1]<level_use[i+2] for i in range(model._param.nbFL-1))
+			if er:
+				level_use = sorted(level_use.keys(), key=lambda k: -level_use[k])
+				level_use = {level: index+1 for index, level in enumerate(level_use)}
+				model._y_vals = {}
+				for a in model._param.A:
+					model._y_vals[a] = level_use[x[a]]
+					
+				model._same_fl_vals = model.cbGetSolution(model._same_fl)
+				
+		if where == gb.GRB.Callback.MIPNODE and model._y_vals is not None:
 			## inject heuristic solution
-			#print('**** New node ****')
-			#if model.cbGet(gb.GRB.Callback.MIPNODE_STATUS) == gb.GRB.OPTIMAL:
-				#x = model.cbGetNodeRel(model._vars)
-				#model.cbSetSolution(model.getVars(), x)
+			model.cbSetSolution(model._same_fl, model._same_fl_vals)
+			model.cbSetSolution(model._y, model._y_vals)
+			model._y_vals = None
+			
+			model.cbUseSolution()
 			
 			
 if __name__ == "__main__":

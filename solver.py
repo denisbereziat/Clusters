@@ -15,12 +15,14 @@ graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour.graphml"
 # dual_graph_path = None
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
-_drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
+#_drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
 output_directory = "PLNE OUTPUT"
-#input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
-input_directory = "graph_files/Intentions"
+input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
+#input_directory = "graph_files/Intentions"
 
-T_MAX_OPTIM = 50
+HEURISTICS = 0.3
+T_MAX_OPTIM_FL = 1200
+T_MAX_OPTIM = 600
 MIP_GAP = 0.3
 ms_to_knots = 1.94384
 m_to_feet = 3.28084
@@ -32,12 +34,15 @@ rta_time_deviation = 0
 
 
 def main():
-    input_files_list = os.listdir(input_directory)
+    input_files_list = [i for i in os.listdir(input_directory) if os.path.isfile(input_directory +"/"+ i)]
     for input_file in input_files_list:
         solve_with_time_segmentation(input_file, output_directory)
 
 
 def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
+    print("\n************************")
+    print("SOLVING ", _drone_list_file_path)
+    print("************************")
     """"SOLVE the problem by using time segmentation.
     Dynamic geofence flights are sorted to be computed first and are always included in resolution"""
     # Create output file
@@ -98,8 +103,12 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
                 drone_fn = trajectories_to_fn[k]
                 a = drone_fn
                 fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
+                #calculate/set actual arr_time of this drone based on the chosen solution
+                #hor travel time + ground delay + vertical movement time
+                model.total_drone_dict[drone_fn].arr_time = trajectories_to_path[k].arr_time + problem.delay[a].x*Param.delayStep + 2*VerticalIntegrator.integrate(model.FL_sep*problem.y[a].x).end_time()
+                
         # generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + "geofence" + ".scn")
-        generate_time_stamps(model, graph)
+        #generate_time_stamps(model, graph)
         # Create the geofenced nodes list
         geofence_time_intervals = dict()
         for drone_fn, fixed_flight in fixed_flights_dict.items():
@@ -141,11 +150,14 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
                 if drone.dep_time < sim_time + sim_step and drone_fn not in fixed_flights_dict:
                     a = drone_fn
                     fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
-        # generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + str(sim_time) + ".scn")
+                    #calculate/set actual arr_time of this drone based on the chosen solution
+                    #hor travel time + ground delay + vertical movement time
+                    drone.arr_time = trajectories_to_path[k].arr_time + problem.delay[a].x*Param.delayStep + 2*VerticalIntegrator.integrate(model.FL_sep*problem.y[a].x).end_time()
+        # generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + str(sim_time) + ".scn")
         sim_time += sim_step
 
     # Generate SCN
-    generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, path + "/scenarioV2_Final.scn")
+    generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, path + "/scenarioV2_Final.scn")
 
 
 def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels):
@@ -193,9 +205,10 @@ def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
         priorities[a] = model.total_drone_dict[a].priority
     param_level = Param.ParamLevelChoice(model, A, priorities, interactions)
     problem = PLNE.ProblemLevelChoice(param_level)
-    problem.model.setParam("TimeLimit", T_MAX_OPTIM)
+    problem.model.setParam("Heuristics", HEURISTICS)
+    problem.model.setParam("TimeLimit", T_MAX_OPTIM_FL)
     problem.solve()
-    # problem.printSolution()
+    #problem.printSolution()
     # Generate fixed_flight_levels_dict
     fixed_flight_levels = []
     for a in problem.param.A:
@@ -215,13 +228,13 @@ def return_current_flight_level_fixed_flights(fixed_flight_levels, model, fixed_
 
 def set_model_drone_list(model, sim_time, sim_size):
     """Add the drones from the total_list in the droneList depending on specified time
-    Drones which are dynamic geofences drones (and should be the first of the list are added too"""
+    Drones which are dynamic geofences drones (and should be the first of the list are added too
+    Fixed drones are removed once they couldn't influence solution anymore """
     model.droneList = []
-    for drone_fn in model.total_drone_dict:
-        drone = model.total_drone_dict[drone_fn]
-        if drone.is_loitering_mission:
+    for drone in model.total_drone_dict.values():
+        if drone.is_loitering_mission: #we let them always since they are not nombreux
             model.droneList.append(drone)
-        elif drone.dep_time <= sim_time + sim_size and not drone.deposit_time > sim_time:
+        elif drone.dep_time <= sim_time + sim_size and not drone.arr_time < sim_time and not drone.deposit_time > sim_time:
             model.droneList.append(drone)
 
 
@@ -249,9 +262,9 @@ def sort_flight_intention(flight_intention_file):
 
 
 def get_drones_with_dynamic_geofences_flight_number(drone_file):
+    drones_with_dynamic_fences = []
     with open(drone_file, newline='') as csv_file:
         reader = csv.reader(csv_file, delimiter=',', quotechar='|')
-        drones_with_dynamic_fences = []
         for line in reader:
             if len(line) < 10:
                 return []
