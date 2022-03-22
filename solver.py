@@ -21,8 +21,8 @@ input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_inte
 #input_directory = "graph_files/Intentions"
 
 HEURISTICS = 0.3
-T_MAX_OPTIM_FL = 1800
-T_MAX_OPTIM = 900
+T_MAX_OPTIM_FL = 200
+T_MAX_OPTIM = 500
 MIP_GAP = 1e-3
 ms_to_knots = 1.94384
 m_to_feet = 3.28084
@@ -118,8 +118,8 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
     # FULL RESOLUTION
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
-    sim_step = 300
-    sim_size = 600
+    sim_step = 50
+    sim_size = 100
     sim_time = 0
     last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
     print("Last departure : ", last_departure)
@@ -139,7 +139,7 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
                     #calculate/set actual arr_time of this drone based on the chosen solution
                     #hor travel time + ground delay + vertical movement time
                     drone.arr_time = trajectories_to_path[k].arr_time + problem.delay[a].x*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*problem.y[a].x).end_time()
-        # generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + str(sim_time) + ".scn")
+        generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, path + "/scenarioV2_Final.scn")
         sim_time += sim_step
 
     # Generate SCN
@@ -337,7 +337,7 @@ def generate_SCN_v2(model, fixed_flights, trajectories, trajectories_to_fn, outp
         for index, content in fixed_flights.items():
             a, k, _fl, _delay = content
             delay = _delay * Param.delayStep
-            fl_m  =_fl
+            fl_m  =_fl * model.FL_sep
         # for k in problem.param.K:
             # Set the corresponding path to the drone
             drone = generate_trajectories.return_drone_from_flight_number(model, trajectories_to_fn[k])
