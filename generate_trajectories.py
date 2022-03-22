@@ -13,7 +13,8 @@ verbose = False
 
 
 def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param=None, number_of_trajectories=None):
-    """Generate alternative trajectories for all drones in the model
+    """Generate alternative trajectories for drones in the model drone_dict
+    and add it in the dictionaries that will keep them for the further use
     OUTPUT :
     drone_trajectories_dict[drone_fn][traj_id] = [path_object, total_time]
     trajectories_to_path[traj_id] = path
@@ -24,47 +25,38 @@ def generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_int
 
     if current_param is not None:
         drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = current_param
+        traj_id = max(trajectories_to_fn.keys()) + 1
     else:
         drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = dict(), dict(), dict(), dict(), []
+        traj_id = 0  # used to fill the traj_id to traj dict
+    
     if number_of_trajectories is None:
         nb_alternative_traj = 5
     else:
         nb_alternative_traj = number_of_trajectories
 
-    generated_trajectories = dict()
-    # Generate alternate trajectories for all drones.
-    # If the drone doesn't already have trajectories generated we generate some
-    for drone in model.droneList:
-        if drone.flight_number not in drone_trajectories_dict:
-            generated_trajectories[drone.flight_number] = generate_parallel_trajectories(drone, model, 6, 500, nb_alternative_traj, geofence_time_intervals)
-
-    # Compute total time for each trajectory
+    # Generate alternate trajectories for drones that haven't already
     fn_order = []
-    for drone in model.droneList:
-        fn_order.append(drone.flight_number)
-    if current_param is None:
-        traj_id = 0  # used to fill the traj_id to traj dict
-    else:
-        traj_id = max(trajectories_to_fn.keys()) + 1
-    # print("Time and path_object")
-    for drone_fn in generated_trajectories:
-        for traj in generated_trajectories[drone_fn]:
-            drone = return_drone_from_flight_number(model, drone_fn)
-            path = Path.Path(drone.dep_time, [], drone)
-            path.new_set_path(traj, model) #!!!we may directly call it from constructor
-            # print("PATH :", path.path_dict)
-            # path.set_path(traj, model)
-            # print("OLDPATH :", path.path_dict)
-            total_time = path.arr_time - path.dep_time
-            trajectories_to_path[traj_id] = path
-            trajectories_to_fn[traj_id] = drone_fn
-            trajectories_to_duration[traj_id] = total_time
-            if drone_fn in drone_trajectories_dict:
-                drone_trajectories_dict[drone_fn][traj_id] = [path, total_time]
-            else:
-                drone_trajectories_dict[drone_fn] = dict()
-                drone_trajectories_dict[drone_fn][traj_id] = [path, total_time]
-            traj_id += 1
+    for drone_fn, drone in model.drone_dict.items():
+        fn_order.append(drone_fn)
+        if drone_fn not in drone_trajectories_dict:
+            for traj in generate_parallel_trajectories(drone, model, 6, 500, nb_alternative_traj, geofence_time_intervals):
+                path = Path.Path(drone.dep_time, [], drone)
+                path.new_set_path(traj, model) #!!!we may directly call it from constructor
+                # print("PATH :", path.path_dict)
+                # path.set_path(traj, model)
+                # print("OLDPATH :", path.path_dict)
+                total_time = path.arr_time - path.dep_time
+                trajectories_to_path[traj_id] = path
+                trajectories_to_fn[traj_id] = drone_fn
+                trajectories_to_duration[traj_id] = total_time
+                if drone_fn in drone_trajectories_dict:
+                    drone_trajectories_dict[drone_fn][traj_id] = [path, total_time]
+                else:
+                    drone_trajectories_dict[drone_fn] = dict()
+                    drone_trajectories_dict[drone_fn][traj_id] = [path, total_time]
+                traj_id += 1
+
     return drone_trajectories_dict, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order
 
 
@@ -177,7 +169,7 @@ def generate_vertiport_intersections(vert_intersection_grid, delta_time, interse
                         intersection_list.append(conflict)
 
 
-def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
+def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model):
     """Generate intersection points between given trajectories"""
 
     max_delta_fl = model.nb_FL - 1
@@ -229,7 +221,7 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     * clmb_hor_intersection_grid and desc_hor_intersection_grid indexed by edge_id and normalized time
     (edge_id is the one in which middle the vertiport is located)
     * dep_intersection_grid and arr_intersection_grid indexed by vertiport_id and normalized time'''
-    for drone in model.droneList:
+    for drone_fn, drone in model.drone_dict.items():
         # initialize clmb_intersection_grid and clmb_hor_intersection_grid
         dep_edge = drone.dep_edge
         if not(drone.is_unconstrained_departure) and dep_edge[0] > dep_edge[1]:
@@ -262,7 +254,6 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
         if not arr in horizontal_intersection_grid:
             horizontal_intersection_grid[arr] = {}
 
-        drone_fn = drone.flight_number
         for traj_id in drone_trajectories_dict[drone_fn]:
             traj_path = drone_trajectories_dict[drone_fn][traj_id][0]
             # fill clmb_intersection_grid and clmb_hor_intersection_grid
@@ -461,7 +452,7 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
 
 
-def generate_interaction(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, graph, graph_dual, raw_graph):
+def generate_interaction(drone_trajectories_dict, model):
     """Determine whether there is interaction between given trajectories"""
 
     #we take into account middle hor turning speed
@@ -483,7 +474,7 @@ def generate_interaction(drone_trajectories_dict, trajectories_to_fn_dict, traje
     '''Loop over all drones, trajectories and their nodes and fill the grids 
     by adding concerned trajectories and respective passage time over intersecting point (and any other required data)
     * horizontal_intersection_grid indexed by nodes and normalized time'''
-    for drone in model.droneList:
+    for drone_fn, drone in model.drone_dict.items():
         # initialize horizontal_intersection_grid with dep and arr
         # TODO a verifier que c'est ça
         dep = drone.departure_vertiport
@@ -494,7 +485,6 @@ def generate_interaction(drone_trajectories_dict, trajectories_to_fn_dict, traje
         if not arr in horizontal_intersection_grid:
             horizontal_intersection_grid[arr] = {}
 
-        drone_fn = drone.flight_number
         for traj_id in drone_trajectories_dict[drone_fn]:
             traj_path = drone_trajectories_dict[drone_fn][traj_id][0]
             # fill horizontal_intersection_grid with dep and arr

@@ -90,6 +90,15 @@ class ProblemGlobal:
 			self.y[a].lb = l
 			self.y[a].ub = l
 			
+	def setPartialSolution(self, x_val, y_val, delay_val):
+		for k, val in x_val:
+			self.x[k].Start = val
+		for a, val in y_val:
+			self.y[a].Start = val
+		for a, val in delay_val:
+			self.delay[a].Start = val
+		
+	
 	def printSolution(self):
 		print("Obj: ", self.model.objVal)
 		#for every flight print trajectory selected, flight level and delay

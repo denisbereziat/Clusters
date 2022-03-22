@@ -28,10 +28,14 @@ class Model:
         self.graph = init_graph(graph)
         self.graph_dual = None
         self.timeInterval = dt
-        self.droneList = drones
-        self.total_drone_list = []
+        self.drone_dict = {}                #it is dict of drone in the current window
+        self.total_drone_list = drones
         self.total_drone_dict = dict()
-        self.drone_order = []
+        for drone in drones:
+            self.total_drone_dict[drone.flight_number] = drone
+        self.drones_with_dynamic_fences = {}
+        #self.drone_order = []
+        
         self.protection_area = protection_area
         self.vertical_protection = vertical_protection
         self.nb_FL = nb_FL
@@ -49,64 +53,45 @@ class Model:
         self.generation_params = None
 
     def add_drone(self, drone):
-        self.droneList.append(drone)
+        self.total_drone_list.append(drone)
+        self.total_drone_dict[drone.flight_number] = drone
+        if drone.is_loitering_mission:
+            self.drones_with_dynamic_fences[drone.flight_number] = drone
 
     def set_graph_dual(self, graph_dual):
         self.graph_dual = graph_dual
 
-    def add_drones_from_file(self, filename, time):
+    def add_drones_from_file(self, filename):
         if filename[-4:] == ".csv":
-            self.add_drones_from_csv_file(filename, time)
+            self.add_drones_from_csv_file(filename)
         else:
-            self.add_drones_from_file_old(filename, time)
+            self.add_drones_from_file_old(filename)
 
     def add_drones_from_file_old(self, filename, time):
         """Extract the information of drones from the given file and add them to the model"""
         print("Loading from old format")
-        if time is not None:
-            time_in_seconds = float(time[0:2])*3600 + float(time[3:5])*60 + float(time[6:8])
-            with open(filename, 'r') as f:
-                for line in f:
-                    line = line.strip().split('\t')
-                    dep_coordinates = line[4].strip('()').split(',')
-                    arr_coordinates = line[5].strip('()').split(',')
-                    dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
-                    arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
-                    deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
-                    # print("Deposit time :", line)
-                    # print("Deposit time :", deposit_time_in_seconds)
-                    dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
-                    drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
-                    if deposit_time_in_seconds <= time_in_seconds:
-                        self.add_drone(drone)
-        else:
-            with open(filename, 'r') as f:
-                for line in f:
-                    line = line.strip().split('\t')
-                    dep_coordinates = line[4].strip('()').split(',')
-                    arr_coordinates = line[5].strip('()').split(',')
-                    dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
-                    arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
-                    deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
-                    # print("Deposit time :", line)
-                    # print("Deposit time :", deposit_time_in_seconds)
-                    dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
-                    drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
-                    self.add_drone(drone)
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip().split('\t')
+                dep_coordinates = line[4].strip('()').split(',')
+                arr_coordinates = line[5].strip('()').split(',')
+                dep = get_closest_node(float(dep_coordinates[1]), float(dep_coordinates[0]), self.graph)
+                arr = get_closest_node(float(arr_coordinates[1]), float(arr_coordinates[0]), self.graph)
+                deposit_time_in_seconds = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
+                # print("Deposit time :", line)
+                # print("Deposit time :", deposit_time_in_seconds)
+                dep_time = float(line[3][0:2])*3600 + float(line[3][3:5])*60 + float(line[3][6:8])
+                drone = dr.Drone(line[1], dep, arr, dep_time, line[2])
+                self.add_drone(drone)
 
-    def add_drones_from_csv_file(self, filename, time):
+    def add_drones_from_csv_file(self, filename):
         """Extract the information of drones from the given file and add them to the model"""
         print("Loading from CSV file")
-        if time is None:
-            time = math.inf
         with open(filename, newline='') as csv_file:
             reader = csv.reader(csv_file, delimiter=',', quotechar='|')
             for line in reader:
                 #print(line)
                 deposit_time = float(line[0][0:2])*3600 + float(line[0][3:5])*60 + float(line[0][6:8])
-                # print(time, deposit_time)
-                if deposit_time > time:
-                    continue
                 drone_model = line[2]
                 priority = line[8]
                 #print(priority)
@@ -124,7 +109,6 @@ class Model:
                 arr_edge, dist_arr_edge = tools.find_closest_edge_in_list(x_arr, y_arr, list_of_possible_closest_edges, self.graph)
 
                 dep = list(dep_edge)
-                # print("before :", dep)
                 arr = list(arr_edge)
 
                 # If the departure is too far from the edge we store the dep or arr edge as departure/arrival_vertiport and
@@ -165,23 +149,22 @@ class Model:
                     if line[9] != '':
                         drone.is_loitering_mission = True
                         drone.loitering_geofence = [float(_i) for _i in line[9:14]]
-
+                
                 # Check that the drone isn't already in the list
-                drone_in_list = False
-                for _d in self.droneList:
-                    if _d.flight_number == drone.flight_number:
-                        drone_in_list = True
-                if not drone_in_list:
+                #and add it if not
+                if not flight_number in self.total_drone_dict:
                     self.add_drone(drone)
+                else:
+                    print("Drone already existing or having same flight number: ", drone.flight_number)
 
     def find_conflicts(self):
         """Detect conflicts on the graph"""
         conflict_list = []
-        for i, drone in enumerate(self.droneList):
-            if i != len(self.droneList)-1:
-                for j in range(i+1, len(self.droneList)):
-                    t_edge = find_conflict_on_edges(drone, self.droneList[j])
-                    t_node = find_conflict_on_nodes(drone, self.droneList[j], self.protection_area, self.graph_dual,
+        for i, drone in enumerate(self.total_drone_list):
+            if i != len(self.total_drone_list)-1:
+                for j in range(i+1, len(self.total_drone_list)):
+                    t_edge = find_conflict_on_edges(drone, self.total_drone_list[j])
+                    t_node = find_conflict_on_nodes(drone, self.total_drone_list[j], self.protection_area, self.graph_dual,
                                                     self.graph)
                     if t_edge is not None:
                         if t_node is not None:
@@ -198,7 +181,7 @@ class Model:
         conflict_list = []
         # drones_to_check = []
         # # Chaque drone n'est ajouté qu'une fois comme ça
-        # for drone in self.droneList:
+        # for drone in self.total_drone_list:
         #     if drone.flight_number in drones_to_check_flight_numbers:
         #         drones_to_check.append(drone)
         for i, drone in enumerate(drones_to_check):
@@ -267,7 +250,7 @@ def generate_scenarios(model, alts=None, turn_speeds = None):
 
     def get_dep_time(d):
         return d.dep_time
-    sorted_drone_list = sorted(model.droneList, key=get_dep_time)
+    sorted_drone_list = sorted(model.total_drone_list, key=get_dep_time)
     for drone in sorted_drone_list:
         if drone.path_object is None:
             print("SKIPPED A DRONE : ", drone.flight_number)
@@ -526,14 +509,13 @@ def get_closest_node(x, y, graph):
     
     return closest_node
 
-
-def init_model(graph, graph_dual, drone_list_path, graph_hash, current_sim_time=None):
-    """ initialise a model instance with a primal graph and a dual one and load drones from the specified time taking
-    into account the current_time so the drones announced after this time aren't loaded."""
+def init_model(graph, graph_dual, drone_list_path, graph_hash):
+    """ initialise a model instance with a primal graph and a dual one 
+    and load all drones from the specified file and store them for further use"""
     model = Model(graph)
     model.hash_map = graph_hash
-    model.droneList = []
-    model.add_drones_from_file(drone_list_path, current_sim_time)
+    model.droneList = {}
+    model.add_drones_from_file(drone_list_path)
     model.set_graph_dual(graph_dual)
     return model
 
