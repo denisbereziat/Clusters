@@ -6,7 +6,7 @@ import Drone
 
 delayStep = 10						#delay step duration in [sec]; total delay = number od delay steps (dec. var) * delay step
 
-
+#!!!!Attention verifications are currently desactivated to save computation time
 class Param:
 	def __init__(self, model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
 		self.nbFL = model.nb_FL				#number of flight levels
@@ -22,13 +22,13 @@ class Param:
 		self.maxStep = self.maxDelay // delayStep	#maximum number of steps
 
 		self.A = A								#set of flight intentions
-		if any(a not in priorities for a in self.A):
-			raise ValueError("Priority must be defined for every flight intention!")
+		#if any(a not in priorities for a in self.A):
+		#	raise ValueError("Priority must be defined for every flight intention!")
 		self.priorities = priorities			#flight intention priorities
-		if any(d < 0 for k, d, a in K):
-			raise ValueError("Trajectory duration may not be negative!")
-		if any(a not in self.A for k, d, a in K):
-			raise ValueError("Flight of a trajectory must be in the list of flights!")
+		#if any(d < 0 for k, d, a in K):
+		#	raise ValueError("Trajectory duration may not be negative!")
+		#if any(a not in self.A for k, d, a in K):
+		#	raise ValueError("Flight of a trajectory must be in the list of flights!")
 		self.K = []								#set of all horizontal trajectories
 		self.d = {}								#duration of horizontal trajectory
 		self.mon_vol = {}						#flight intention to which belongs given horizontal trajectory 
@@ -37,8 +37,8 @@ class Param:
 			self.d[k] = d
 			self.mon_vol[k] = a
 
-		if any(n < 0 for n in nbPt):
-			raise ValueError("Number of intersecting points may not be negative!")
+		#if any(n < 0 for n in nbPt):
+		#	raise ValueError("Number of intersecting points may not be negative!")
 		self.nbPtHor = nbPt[0]					#number of horizontal intersecting points
 		self.nbPtClmb = nbPt[1]					#number of climbing-horizontal intersecting points
 		self.nbPtDesc = nbPt[2]					#number of descending-horizontal intersecting points
@@ -54,24 +54,24 @@ class Param:
 		self.Parr = list(range(self.nbPtHor+self.nbPtClmb+self.nbPtDesc+self.nbPtDep, self.nbPtInter)) if self.nbPtArr > 0 else []
 		
 		
-		if len(k1) != self.nbPtInter or len(k2) != self.nbPtInter or \
-		   len(t1) != self.nbPtInter or len(t2) != self.nbPtInter or \
-		   len(sep12) != self.nbPtInter or len(sep21) != self.nbPtInter:
-			raise ValueError("Parameters k1, k2, t1, t2, sep12 and sep21 must be defined exactly for every interesecting point !")
-		if any(i not in self.K for i in k1) or any(i not in self.K for i in k2):
-			raise ValueError("Trajectory of an intersecting point must be in the list of trajectories!")
-		if any(i < 0 for i in t1) or any(i < 0 for i in t2):
-			raise ValueError("Arrival time at intersecting point may not be negative!")
-		if any(i < 0 for i in sep12) or any(i < 0 for i in sep21):
-			print("SEP12 : ")
-			for j in sep12:
-				if j < 0:
-					print(j)
-			print("SEP21 : ")
-			for j in sep21:
-				if j < 0:
-					print(j)
-			raise ValueError("Separation at intersecting point may not be negative!")
+		#if len(k1) != self.nbPtInter or len(k2) != self.nbPtInter or \
+		#   len(t1) != self.nbPtInter or len(t2) != self.nbPtInter or \
+		#   len(sep12) != self.nbPtInter or len(sep21) != self.nbPtInter:
+		#	raise ValueError("Parameters k1, k2, t1, t2, sep12 and sep21 must be defined exactly for every interesecting point !")
+		#if any(i not in self.K for i in k1) or any(i not in self.K for i in k2):
+		#	raise ValueError("Trajectory of an intersecting point must be in the list of trajectories!")
+		#if any(i < 0 for i in t1) or any(i < 0 for i in t2):
+		#	raise ValueError("Arrival time at intersecting point may not be negative!")
+		#if any(i < 0 for i in sep12) or any(i < 0 for i in sep21):
+		#	print("SEP12 : ")
+		#	for j in sep12:
+		#		if j < 0:
+		#			print(j)
+		#	print("SEP21 : ")
+		#	for j in sep21:
+		#		if j < 0:
+		#			print(j)
+		#	raise ValueError("Separation at intersecting point may not be negative!")
 		self.k1 = k1 						#first trajectory of intersecting point
 		self.k2 = k2						#second trajectory of intersecting point
 		self.t1 = t1						#first trajectory planned time over intersecting point
@@ -80,19 +80,17 @@ class Param:
 		self.sep21 = sep21					#required time separation at intersecting point if second then first passes
 											
 											#set of pairs of "intersecting"" flight intnetions
-		#self.AhorsDiag = [(i,j) for i in self.A for j in self.A if i != j]
 		self.AInter = list(set((self.mon_vol[k1[p]], self.mon_vol[k2[p]]) for p in self.P).union(set((self.mon_vol[k2[p]], self.mon_vol[k1[p]]) for p in self.P)))
 											
 											#set of pairs of "intersecting"" trajectories
-		#self.KhorsDiag = [(i,j) for i in self.K for j in self.K if mon_vol[i] != mon_vol[j]]
 		self.KInterHor = list(set((k1[p], k2[p]) for p in self.Phor).union(set((k2[p], k1[p]) for p in self.Phor)))
 		KInterClmb = set((k1[p], k2[p]) for p in self.Pclmb).union(set((k2[p], k1[p]) for p in self.Pclmb))
-		self.KInterClmb = list(KInterClmb)
+		#self.KInterClmb = list(KInterClmb)
 		KInterDesc = set((k1[p], k2[p]) for p in self.Pdesc).union(set((k2[p], k1[p]) for p in self.Pdesc))
-		self.KInterDesc = list(KInterDesc)
+		#self.KInterDesc = list(KInterDesc)
 		self.KInterEvol = list(KInterClmb.union(KInterDesc))
-		self.KInterDep = list(set((k1[p], k2[p]) for p in self.Pdep).union(set((k2[p], k1[p]) for p in self.Pdep)))
-		self.KInterArr = list(set((k1[p], k2[p]) for p in self.Parr).union(set((k2[p], k1[p]) for p in self.Parr)))
+		#self.KInterDep = list(set((k1[p], k2[p]) for p in self.Pdep).union(set((k2[p], k1[p]) for p in self.Pdep)))
+		#self.KInterArr = list(set((k1[p], k2[p]) for p in self.Parr).union(set((k2[p], k1[p]) for p in self.Parr)))
 		
 		#big M parameters
 		self.FLmax = self.nbFL					#big M is set to max difference between two flight levels
@@ -102,14 +100,14 @@ class Param:
 	
 		
 		#fixed flight intentions parameters
-		if any(a not in self.A for a, k, y, delay in fixedIntentions):
-			raise ValueError("Fixed flight is not presented in the list of flights!")
-		if any(k not in self.K for a, k, y, delay in fixedIntentions):
-			raise ValueError("Fixed ftrajector doesn't exist!")
-		if any(y <= 0 or y > self.nbFL for a, k, y, delay in fixedIntentions):
-			raise ValueError("Inexisting fixed flight level!")
-		if any(delay < 0 or delay > self.maxStep for a, k, y, delay in fixedIntentions):
-			raise ValueError("Wrong fixed delay!")
+		#if any(a not in self.A for a, k, y, delay in fixedIntentions):
+		#	raise ValueError("Fixed flight is not presented in the list of flights!")
+		#if any(k not in self.K for a, k, y, delay in fixedIntentions):
+		#	raise ValueError("Fixed ftrajector doesn't exist!")
+		#if any(y <= 0 or y > self.nbFL for a, k, y, delay in fixedIntentions):
+		#	raise ValueError("Inexisting fixed flight level!")
+		#if any(delay < 0 or delay > self.maxStep for a, k, y, delay in fixedIntentions):
+		#	raise ValueError("Wrong fixed delay!")
 		self.Kfix = []
 		self.Afix = {}
 		for a, k, y, delay in fixedIntentions:
@@ -118,8 +116,8 @@ class Param:
 		
 		self.FLfix = []
 		if fixedLevels:
-			if any(a not in self.A or l <= 0 or l > self.nbFL for a, l in fixedLevels):
-				raise ValueError("Either flight or level is out of the range for fixed level flights!")
+			#if any(a not in self.A or l <= 0 or l > self.nbFL for a, l in fixedLevels):
+			#	raise ValueError("Either flight or level is out of the range for fixed level flights!")
 			self.FLfix = fixedLevels
 		
 class ParamLevelChoice:
@@ -128,12 +126,12 @@ class ParamLevelChoice:
 		self.nbflights = len(A)				#number of flight instances
 		self.A = A							#set of flight intentions labeled from 1 to nbflights
 		
-		if any(a not in priorities for a in self.A):
-			raise ValueError("Priority must be defined for every flight intention!")
+		#if any(a not in priorities for a in self.A):
+		#	raise ValueError("Priority must be defined for every flight intention!")
 		self.priorities = priorities			#flight intention priorities
 		
-		if any(i not in self.A or j not in self.A for i,j in interactions):
-			raise ValueError("Non existing fights in interaction list!")
+		#if any(i not in self.A or j not in self.A for i,j in interactions):
+		#	raise ValueError("Non existing fights in interaction list!")
 		self.AInter = list(set((i,j) for i,j in interactions).union(set((j,i) for i,j in interactions)))
 											
 		#big M parameters

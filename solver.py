@@ -15,14 +15,12 @@ graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour.graphml"
 # dual_graph_path = None
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
-#_drone_list_file_path = 'graph_files/Intentions/M2_final_flight_intentions/flight_intentions/Flight_intention_very_low_50_1.csv'
 output_directory = "PLNE OUTPUT"
 input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
-#input_directory = "graph_files/Intentions"
 
 HEURISTICS = 0.3
-T_MAX_OPTIM_FL = 200
-T_MAX_OPTIM = 500
+T_MAX_OPTIM_FL = 1800
+T_MAX_OPTIM = 600 #not recommended as it may prevent finding a solution 
 MIP_GAP = 1e-3
 ms_to_knots = 1.94384
 m_to_feet = 3.28084
@@ -37,23 +35,18 @@ rta_time_deviation = 0
 def main():
     input_files_list = [i for i in os.listdir(input_directory) if os.path.isfile(input_directory +"/"+ i)]
     for input_file in input_files_list:
-        solve_with_time_segmentation(input_file, output_directory)
+        solve_with_time_segmentation(input_directory, output_directory, input_file)
 
 
-def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
+def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
     print("\n************************")
-    print("SOLVING ", _drone_list_file_path)
+    print("SOLVING ", input_file_name)
     print("************************")
     """"SOLVE the problem by using time segmentation.
     Dynamic geofence flights are sorted to be computed first and are always included in resolution"""
-    # Create output file
-    try:
-        path = os.path.join(_output_dir, _drone_list_file_path)
-        os.mkdir(path)
-    except FileExistsError:
-        path = os.path.join(_output_dir, _drone_list_file_path)
-    drone_list_file_path = input_directory+"/"+_drone_list_file_path
-    output_dir = path
+    # Define input/output file paths
+    input_file_path = input_dir + "/" + input_file_name
+    output_file_path = output_dir + "/" + input_file_name[:-4] + ".scn"
     print("-- INIT")
     print("Initialising graph")
     graph, graph_dual = md.init_graphs(graph_file_path, dual_path=dual_graph_path)
@@ -66,7 +59,7 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
     print("Graphs initialised")
     print("Loading flight intention file")
     # Load all drones at first
-    model = md.init_model(graph, graph_dual, drone_list_file_path, graph_hash)
+    model = md.init_model(graph, graph_dual, input_file_path, graph_hash)
     print("TOTAL NB DRONES :", len(model.total_drone_list))
     print("-- INITIALISED")
 
@@ -85,19 +78,17 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
         model.drone_dict = dict(model.drones_with_dynamic_fences)
         # SOLVE
         print("\n-------------------------\n--NB DRONES :", len(model.drone_dict))
-        traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual, None, {}, {}, fixed_flight_levels_dict)
+        traj_output, intersection_outputs, previous_solution = solve_current_model(model, graph, raw_graph, graph_dual, None, {}, {}, fixed_flight_levels_dict, {})
         trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
         # Add the dynamic geofence drones to the fixed flights list
-        for k in problem.param.K:
+        for k in (k for (k, val) in previous_solution['x_val'].items() if val == 1):
             # For each of the drone find the chosen traj, fl, delay
-            if round(problem.x[k].x) == 1:
-                a = trajectories_to_fn[k]
-                fixed_flights_dict[a] = [a, k, round(problem.y[a].x), round(problem.delay[a].x)]
-                #calculate/set actual arr_time of this drone based on the chosen solution
-                #hor travel time + ground delay + vertical movement time
-                model.total_drone_dict[a].arr_time = trajectories_to_path[k].arr_time + problem.delay[a].x*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*problem.y[a].x).end_time()
+            a = trajectories_to_fn[k]
+            fixed_flights_dict[a] = [a, k, previous_solution['y_val'][a], previous_solution['delay_val'][a]]
+            #calculate/set actual arr_time of this drone based on the chosen solution
+            #hor travel time + ground delay + vertical movement time
+            model.total_drone_dict[a].arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a]*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
                 
-        # generate_SCN_v2(model, problem, trajectories, trajectories_to_fn, "PLNE OUTPUT/"+ output_dir +"/scenarioV2_" + "geofence" + ".scn")
         # Create the geofenced nodes list
         geofence_time_intervals = dict()
         for drone_fn, drone  in model.drones_with_dynamic_fences.items():
@@ -112,40 +103,40 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
         print("\n-------------------------\n--No geofence drones")
         traj_output = None
         geofence_time_intervals = dict()
-
+    
     #####
     # FULL RESOLUTION
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
-    sim_step = 50
-    sim_size = 100
+    sim_step = 300
+    sim_size = 600
     sim_time = 0
     last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
     print("Last departure : ", last_departure)
+    previous_solution = {} #neglecting geofences that are anyway fixed
     while sim_time <= last_departure + sim_step:
         set_model_drone_list(model, sim_time,  sim_size)
-        print("\n-------------------------\n--NB DRONES :", len(model.drone_dict))
-        print("-- ", len(fixed_flights_dict), " Total number of fixed flights till now (not all are considered)")
-        traj_output, intersection_outputs, problem, param = solve_current_model(model, graph, raw_graph, graph_dual, traj_output, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels_dict)
+        print("\n-------------------------\n--", len(fixed_flights_dict), " Total number of fixed flights till now (not all are considered)")
+        print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min")
+        print("-- NB DRONES :", len(model.drone_dict))
+        traj_output, intersection_outputs, previous_solution = solve_current_model(model, graph, raw_graph, graph_dual, traj_output, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels_dict, previous_solution)
         trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
-        for k in problem.param.K:
+        for k in (k for (k, val) in previous_solution['x_val'].items() if val == 1):
             # For each of the drone find the chosen traj, fl, delay
-            if round(problem.x[k].x) == 1:
-                a = trajectories_to_fn[k]
-                drone = model.total_drone_dict[a]
-                if drone.dep_time < sim_time + sim_step and a not in fixed_flights_dict:
-                    fixed_flights_dict[a] = [a, k, round(problem.y[a].x), round(problem.delay[a].x)]
-                    #calculate/set actual arr_time of this drone based on the chosen solution
-                    #hor travel time + ground delay + vertical movement time
-                    drone.arr_time = trajectories_to_path[k].arr_time + problem.delay[a].x*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*problem.y[a].x).end_time()
-        generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, path + "/scenarioV2_Final.scn")
+            a = trajectories_to_fn[k]
+            drone = model.total_drone_dict[a]
+            if drone.dep_time < sim_time + sim_step and a not in fixed_flights_dict:
+                fixed_flights_dict[a] = [a, k, previous_solution['y_val'][a], previous_solution['delay_val'][a]]
+                #calculate/set actual arr_time of this drone based on the chosen solution
+                #hor travel time + ground delay + vertical movement time
+                drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a]*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
         sim_time += sim_step
-
+    
     # Generate SCN
-    generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, path + "/scenarioV2_Final.scn")
+    generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, output_file_path)
 
 
-def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels_dict):
+def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels_dict, previous_solution):
     ####
     # Solve current state of the model :
     # - Generate trajectories
@@ -160,13 +151,19 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     param = create_param(model, trajectories, trajectories_to_duration, h_h_list, climb_h_list, descent_h_list, c_c_list, d_d_list, fixed_flights_dict, fixed_flight_levels_dict)
     # - Create Problem
     problem = PLNE.ProblemGlobal(param)
+    if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'])
     problem.model.setParam("Heuristics", HEURISTICS)
     #problem.model.setParam("TimeLimit", T_MAX_OPTIM)
     problem.model.setParam("MIPGap", MIP_GAP)
     # Solve
     problem.solve()
     # problem.printSolution()
-    return trajectories_output, intersection_outputs, problem, param
+    #Set solution to initialise next problem
+    x_val = {k: round(problem.x[k].x) for k in param.K}
+    y_val = {a: round(problem.y[a].x) for a in param.A}
+    delay_val = {a: round(problem.delay[a].x) for a in param.A}
+    
+    return trajectories_output, intersection_outputs, {'x_val': x_val, 'y_val': y_val, 'delay_val': delay_val}
 
 
 def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
@@ -301,10 +298,11 @@ def create_param(model, trajectories,trajectories_to_duration,horizontal_shared_
         elif a in fixed_flight_levels_dict:
             fixed_flight_levels_intentions.append(fixed_flight_levels_dict[a])
             
-    print("-- ", len(fixed_intentions), " Number of fixed flights at this time")
+    print("--", len(fixed_intentions), "are fixed at this time.")
 
     param = Param.Param(model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixed_intentions, fixed_flight_levels_intentions)
 
+    '''
     # Print output :
     list_all = [horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list]
     tag_dict = {0:"hh", 1:"ch", 2:"dh", 3:"cc", 4:"dd"}
@@ -318,14 +316,11 @@ def create_param(model, trajectories,trajectories_to_duration,horizontal_shared_
                 to_write += "\n"
                 file.write(to_write)
             tag_count += 1
-
+    '''
     return param
 
 
 def generate_SCN_v2(model, fixed_flights, trajectories, trajectories_to_fn, output_file):
-
-    # Drone.VerticalIntegrator.integrate(problem.y[a].x * model.FL_sep).end_time()
-    # fixed_flights_dict[drone_fn] = [a, k, problem.y[a].x, problem.delay[a].x]
     print(" GENERATING TRAJS :")
     graph = model.graph
     drone_delay_dict = dict()
@@ -337,7 +332,7 @@ def generate_SCN_v2(model, fixed_flights, trajectories, trajectories_to_fn, outp
         for index, content in fixed_flights.items():
             a, k, _fl, _delay = content
             delay = _delay * Param.delayStep
-            fl_m  =_fl * model.FL_sep
+            fl_m  = _fl * model.FL_sep
         # for k in problem.param.K:
             # Set the corresponding path to the drone
             drone = generate_trajectories.return_drone_from_flight_number(model, trajectories_to_fn[k])
@@ -430,5 +425,4 @@ def generate_SCN_v2(model, fixed_flights, trajectories, trajectories_to_fn, outp
                 file.write(to_write)
 
 
-# solve_with_time_segmentation(_drone_list_file_path, output_directory)
 main()
