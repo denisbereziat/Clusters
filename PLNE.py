@@ -91,11 +91,11 @@ class ProblemGlobal:
 			self.y[a].ub = l
 			
 	def setPartialSolution(self, x_val, y_val, delay_val):
-		for k, val in x_val:
+		for k, val in (item for item in x_val.items() if item[0] in self.param.K):
 			self.x[k].Start = val
-		for a, val in y_val:
+		for a, val in (item for item in y_val.items() if item[0] in self.param.A):
 			self.y[a].Start = val
-		for a, val in delay_val:
+		for a, val in (item for item in delay_val.items() if item[0] in self.param.A):
 			self.delay[a].Start = val
 		
 	
