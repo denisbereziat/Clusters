@@ -75,7 +75,6 @@ def solve_with_time_segmentation(_drone_list_file_path, _output_dir):
     set_model_drone_list(model, 0, math.inf)
     fixed_flight_levels_dict = solve_flight_levels_current_model(model, graph,raw_graph,graph_dual)
 
-
     fixed_flights_dict = {}
     model.drone_dict = {}
     #####
@@ -193,6 +192,7 @@ def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
     for a in problem.param.A:
         fixed_flight_levels[a] = (a, round(problem.y[a].x))
     return fixed_flight_levels
+
 
 def set_model_drone_list(model, sim_time, sim_size):
     """Add the drones from the total_drone_list in the drone_dict depending on specified time

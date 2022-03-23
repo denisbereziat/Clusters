@@ -24,15 +24,16 @@ turn_angle_mini = Drone.angle_intervals[0]
 class Model:
     """Class used to store the drones objects, the primal graph, the dual graph, safety parameters
      and find conflicts."""
-    def __init__(self, graph, dt=5, drones=[], initial_constraints=None):
+    def __init__(self, graph, dt=5, drones=None, initial_constraints=None):
         self.graph = init_graph(graph)
         self.graph_dual = None
         self.timeInterval = dt
         self.drone_dict = {}                #it is dict of drone in the current window
-        self.total_drone_list = drones
+        self.total_drone_list = []
         self.total_drone_dict = dict()
-        for drone in drones:
-            self.total_drone_dict[drone.flight_number] = drone
+        if drones is not None:
+            for drone in drones:
+                self.total_drone_dict[drone.flight_number] = drone
         self.drones_with_dynamic_fences = {}
         #self.drone_order = []
         
@@ -151,8 +152,8 @@ class Model:
                         drone.loitering_geofence = [float(_i) for _i in line[9:14]]
                 
                 # Check that the drone isn't already in the list
-                #and add it if not
-                if not flight_number in self.total_drone_dict:
+                # and add it if not
+                if flight_number not in self.total_drone_dict:
                     self.add_drone(drone)
                 else:
                     print("Drone already existing or having same flight number: ", drone.flight_number)
@@ -509,6 +510,7 @@ def get_closest_node(x, y, graph):
     
     return closest_node
 
+
 def init_model(graph, graph_dual, drone_list_path, graph_hash):
     """ initialise a model instance with a primal graph and a dual one 
     and load all drones from the specified file and store them for further use"""
@@ -520,7 +522,7 @@ def init_model(graph, graph_dual, drone_list_path, graph_hash):
     return model
 
 
-def init_graphs(graph_path, dual_path = None):
+def init_graphs(graph_path, dual_path=None):
     raw_graph = nx.read_graphml(graph_path)
     graph = nx.Graph()
     # Creating a new graph without what's not needed
