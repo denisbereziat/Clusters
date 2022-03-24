@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 protection_area = 32
 vertical_protection = 7.62  # 25 ft
 nb_FL = 16
-delay_max = 100
+delay_max = 300
 FL_sep = 9.14  # in m
 temps_sep_vertiport = 5
 turn_angle_mini = Drone.angle_intervals[0]
@@ -32,6 +32,7 @@ class Model:
         self.total_drone_list = []
         self.total_drone_dict = dict()
         if drones is not None:
+            self.total_drone_list = drones
             for drone in drones:
                 self.total_drone_dict[drone.flight_number] = drone
         self.drones_with_dynamic_fences = {}

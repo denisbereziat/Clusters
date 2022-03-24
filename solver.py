@@ -10,6 +10,7 @@ import networkx
 import csv
 import Drone
 import os
+import sys
 
 graph_file_path = "graph_files/total_graph_200m.graphml"
 dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour.graphml"
@@ -41,6 +42,7 @@ def main():
 def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
     print("\n************************")
     print("SOLVING ", input_file_name)
+    print("SOLVING ", input_file_name, file=sys.stderr)
     print("************************")
     """"SOLVE the problem by using time segmentation.
     Dynamic geofence flights are sorted to be computed first and are always included in resolution"""
@@ -108,7 +110,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
     # FULL RESOLUTION
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
-    sim_step = 300
+    sim_step = 150
     sim_size = 600
     sim_time = 0
     last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
@@ -118,6 +120,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
         set_model_drone_list(model, sim_time,  sim_size)
         print("\n-------------------------\n--", len(fixed_flights_dict), " Total number of fixed flights till now (not all are considered)")
         print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min")
+        print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min", file=sys.stderr)
         print("-- NB DRONES :", len(model.drone_dict))
         traj_output, intersection_outputs, previous_solution = solve_current_model(model, graph, raw_graph, graph_dual, traj_output, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels_dict, previous_solution)
         trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
@@ -151,19 +154,30 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     param = create_param(model, trajectories, trajectories_to_duration, h_h_list, climb_h_list, descent_h_list, c_c_list, d_d_list, fixed_flights_dict, fixed_flight_levels_dict)
     # - Create Problem
     problem = PLNE.ProblemGlobal(param)
-    if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'])
+    if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'], previous_solution['same_fl_val'], previous_solution['lower_fl_val'], previous_solution['higher_fl_val'], previous_solution['x_same_fl_val'], previous_solution['x_higher_fl_val'])
     problem.model.setParam("Heuristics", HEURISTICS)
     #problem.model.setParam("TimeLimit", T_MAX_OPTIM)
     problem.model.setParam("MIPGap", MIP_GAP)
     # Solve
     problem.solve()
     # problem.printSolution()
-    #Set solution to initialise next problem
+    #Set initial solution to for next problem
     x_val = {k: round(problem.x[k].x) for k in param.K}
-    y_val = {a: round(problem.y[a].x) for a in param.A}
-    delay_val = {a: round(problem.delay[a].x) for a in param.A}
-    
-    return trajectories_output, intersection_outputs, {'x_val': x_val, 'y_val': y_val, 'delay_val': delay_val}
+    y_val = {}
+    delay_val = {}
+    for a in param.A:
+        y_val[a] = round(problem.y[a].x)
+        delay_val[a] = round(problem.delay[a].x)
+    same_fl_val = {}
+    lower_fl_val = {}
+    higher_fl_val = {}
+    for a_pair in param.AInter:
+        same_fl_val[a_pair] = round(problem.same_fl[a_pair].x)
+        lower_fl_val[a_pair] = round(problem.lower_fl[a_pair].x)
+        higher_fl_val[a_pair] = round(problem.higher_fl[a_pair].x)
+    x_same_fl_val = {k_pair: round(problem.x_same_fl[k_pair].x) for k_pair in param.KInterHor}
+    x_higher_fl_val = {k_pair: round(problem.x_higher_fl[k_pair].x) for k_pair in param.KInterEvol}
+    return trajectories_output, intersection_outputs, {'x_val': x_val, 'y_val': y_val, 'delay_val': delay_val, 'same_fl_val': same_fl_val, 'lower_fl_val': lower_fl_val, 'higher_fl_val': higher_fl_val, 'x_same_fl_val': x_same_fl_val, 'x_higher_fl_val': x_higher_fl_val}
 
 
 def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):

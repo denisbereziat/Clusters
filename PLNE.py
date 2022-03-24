@@ -89,14 +89,26 @@ class ProblemGlobal:
 		for a, l in self.param.FLfix:
 			self.y[a].lb = l
 			self.y[a].ub = l
-			
-	def setPartialSolution(self, x_val, y_val, delay_val):
-		for k, val in (item for item in x_val.items() if item[0] in self.param.K):
-			self.x[k].Start = val
-		for a, val in (item for item in y_val.items() if item[0] in self.param.A):
-			self.y[a].Start = val
-		for a, val in (item for item in delay_val.items() if item[0] in self.param.A):
-			self.delay[a].Start = val
+
+	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, lower_fl_val, higher_fl_val, x_same_fl_val, x_higher_fl_val):
+		for k in self.param.K:
+			if k in x_val:
+				self.x[k].Start = x_val[k]
+		for a in self.param.A:
+			if a in y_val: # and a in delay_val that is always the case
+				self.y[a].Start = y_val[a]
+				self.delay[a].Start = delay_val[a]
+		for a_pair in self.param.AInter:
+			if a_pair in same_fl_val: # other should have it then
+				self.same_fl[a_pair].Start = same_fl_val[a_pair]
+				self.lower_fl[a_pair].Start = lower_fl_val[a_pair]
+				self.higher_fl[a_pair].Start = higher_fl_val[a_pair]
+		for k_pair in self.param.KInterHor:
+			if k_pair in x_same_fl_val:
+				self.x_same_fl[k_pair].Start = x_same_fl_val[k_pair]
+		for k_pair in self.param.KInterEvol:
+			if k_pair in x_higher_fl_val:
+				self.x_higher_fl[k_pair].Start = x_higher_fl_val[k_pair]
 		
 	
 	def printSolution(self):

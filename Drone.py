@@ -60,6 +60,8 @@ class Drone:
     def return_sep_margin_from_angle(self, angle):
         return 3
 
+    def return_vertical_sep_margin():
+        return 0
     '''
     def find_current_edge(self, current_t, graph):
         """Finds the edge of the drone at given time t in seconds."""
@@ -310,16 +312,18 @@ class VerticalIntegrator:
     def time_at_distance_after_begin(self, distance):
         if distance >= self.d:
             #distance is longer than segment, hence we approximate with average speed over segment
-            return distance*self.t_dec/self.d
+            rez = distance*self.t_dec/self.d
         else:
-            return self.time_at_distance(distance)
+            rez = self.time_at_distance(distance)
+        return rez + Drone.return_vertical_sep_margin()
     
     def time_at_distance_before_end(self, distance):
         if distance >= self.d:
             #distance is longer than segment, hence we approximate with average speed over segment
-            return distance*self.t_dec/self.d
+            rez = distance*self.t_dec/self.d
         else:
-            return self.t_dec - self.time_at_distance(self.d - distance)
+            rez = self.t_dec - self.time_at_distance(self.d - distance)
+        return rez + Drone.return_vertical_sep_margin()
         
     def time_at_distance(self, distance): #returns relative time from begining of the segment till required distnce
         if distance < self.d_acc:
