@@ -17,7 +17,8 @@ dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour
 # dual_graph_path = None
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 output_directory = "PLNE OUTPUT"
-input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
+#input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
+input_directory = "graph_files/Intentions/"
 
 HEURISTICS = 0.3
 T_MAX_OPTIM_FL = 1800
@@ -36,7 +37,11 @@ rta_time_deviation = 0
 def main():
     input_files_list = [i for i in os.listdir(input_directory) if os.path.isfile(input_directory +"/"+ i)]
     for input_file in input_files_list:
-        solve_with_time_segmentation(input_directory, output_directory, input_file)
+        try:
+            solve_with_time_segmentation(input_directory, output_directory, input_file)
+        except:
+            print("Error occured with ", input_file)
+            pass
 
 
 def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
@@ -110,8 +115,8 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
     # FULL RESOLUTION
     print("Starting resolution")
     # Load a ever increasing list of drone in the model, and don't forget the dynamic geofences ones
-    sim_step = 150
-    sim_size = 600
+    sim_step = 300
+    sim_size = 1200
     sim_time = 0
     last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
     print("Last departure : ", last_departure)
@@ -146,20 +151,26 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     print("-- Generating trajectories")
     trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = generate_trajectories.generate_trajectories(model, graph, raw_graph, graph_dual, geofence_time_intervals, current_param)
     trajectories_output = trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order
-    # - Generate intersection points
-    print("-- Intersection points")
-    h_h_list,climb_h_list,descent_h_list,c_c_list,d_d_list = generate_trajectories.generate_intersection_points(trajectories, trajectories_to_fn, trajectories_to_path, model)
-    intersection_outputs = h_h_list,climb_h_list,descent_h_list,c_c_list,d_d_list
-    # - Create param
-    param = create_param(model, trajectories, trajectories_to_duration, h_h_list, climb_h_list, descent_h_list, c_c_list, d_d_list, fixed_flights_dict, fixed_flight_levels_dict)
-    # - Create Problem
-    problem = PLNE.ProblemGlobal(param)
-    if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'], previous_solution['same_fl_val'], previous_solution['lower_fl_val'], previous_solution['higher_fl_val'], previous_solution['x_same_fl_val'], previous_solution['x_higher_fl_val'])
-    problem.model.setParam("Heuristics", HEURISTICS)
-    #problem.model.setParam("TimeLimit", T_MAX_OPTIM)
-    problem.model.setParam("MIPGap", MIP_GAP)
-    # Solve
-    problem.solve()
+    solution_not_found = True
+    while  solution_not_found:
+        # - Generate intersection points
+        print("-- Intersection points")
+        h_h_list,climb_h_list,descent_h_list,c_c_list,d_d_list = generate_trajectories.generate_intersection_points(trajectories, trajectories_to_fn, trajectories_to_path, model)
+        intersection_outputs = h_h_list,climb_h_list,descent_h_list,c_c_list,d_d_list
+        # - Create param
+        param = create_param(model, trajectories, trajectories_to_duration, h_h_list, climb_h_list, descent_h_list, c_c_list, d_d_list, fixed_flights_dict, fixed_flight_levels_dict)
+        # - Create Problem
+        problem = PLNE.ProblemGlobal(param)
+        if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'], previous_solution['same_fl_val'], previous_solution['lower_fl_val'], previous_solution['higher_fl_val'], previous_solution['x_same_fl_val'], previous_solution['x_higher_fl_val'])
+        problem.model.setParam("Heuristics", HEURISTICS)
+        #problem.model.setParam("TimeLimit", T_MAX_OPTIM)
+        problem.model.setParam("MIPGap", MIP_GAP)
+        # Solve
+        solution_not_found = not problem.solve()
+        if solution_not_found:
+            #increase delay_max
+            model.increase_delay_max()
+            print("-- Solution not found increasing max delay ", model.delay_max)
     # problem.printSolution()
     #Set initial solution to for next problem
     x_val = {k: round(problem.x[k].x) for k in param.K}

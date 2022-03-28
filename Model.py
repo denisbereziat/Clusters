@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 protection_area = 32
 vertical_protection = 7.62  # 25 ft
 nb_FL = 16
-delay_max = 300
+delay_increase_step = 50
+delay_max = 30
 FL_sep = 9.14  # in m
 temps_sep_vertiport = 5
 turn_angle_mini = Drone.angle_intervals[0]
@@ -54,6 +55,9 @@ class Model:
         self.hash_map = None
         self.generation_params = None
 
+    def increase_delay_max(self):
+        self.delay_max += delay_increase_step
+    
     def add_drone(self, drone):
         self.total_drone_list.append(drone)
         self.total_drone_dict[drone.flight_number] = drone

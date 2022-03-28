@@ -18,6 +18,7 @@ class ProblemGlobal:
 		
 	def solve(self):
 		self.model.optimize()
+		return self.model.Status == gb.GRB.OPTIMAL
 	
 	def createVars(self):
 		self.x = self.model.addVars(self.param.K, vtype=gb.GRB.BINARY, name="x")					#assignment variables =1 whether horizontal trajectory i is used
