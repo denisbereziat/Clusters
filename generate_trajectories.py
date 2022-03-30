@@ -108,6 +108,77 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
         print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
 
 
+def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm):
+    '''
+    Check what is situation and calculate magnitude of interaction
+    Magnitude is calculated as the overlaping of the period when two crossing drones blocks intersection
+    Intersection could be one point or segment (in the case of multipoints)
+    So first we calculate for each situation blocking period as tuple of
+    begin end time when intersection is not available due to that drone.
+    begin time = represent moment when drone enters in the zone sep norm before intersection point
+    end time = represent moment when drone leaves the zone sep norm from intersection point
+    '''
+    if verbose:
+        print("Connected :", multiPoints)
+    if multiPointsStatus == 1: #this could be verified with len of multiPoints
+        #save independent intersecting point
+        t1 = multiPoints[0][1]
+        t2 = multiPoints[0][2]
+        block1 = (t1 - trajectories_to_path[k1].separation_dict[t1][0], t1 + trajectories_to_path[k1].separation_dict[t1][1] + model.delay_max)
+        block2 = (t2 - trajectories_to_path[k2].separation_dict[t2][0], t2 + trajectories_to_path[k2].separation_dict[t2][1] + model.delay_max)
+    else:
+        first_node = multiPoints[0]
+        last_node = multiPoints[-1]
+
+        t_k1_first = first_node[1]
+        t_k1_last = last_node[1]
+        
+        t_k2_first = first_node[2]
+        t_k2_last = last_node[2]
+        
+        if multiPointsStatus == 2:
+            #they are consecutive
+            cut_k2 = (t_k1_last - t_k1_first) - (t_k2_last - t_k2_first)
+            delta_sep12 = trajectories_to_path[k1].separation_dict[t_k1_last][1] - trajectories_to_path[k1].separation_dict[t_k1_first][1]
+
+            block1 = (
+                      t_k1_first - trajectories_to_path[k1].separation_dict[t_k1_first][0],
+                      t_k1_first + model.delay_max + trajectories_to_path[k1].separation_dict[t_k1_first][1] + max(0, min(cut_k2, cut_k2 + delta_sep12)) + max(0, min(delta_sep12, delta_sep12 + cut_k2))
+                     )
+            
+            cut_k1 = (t_k2_last - t_k2_first) - (t_k1_last - t_k1_first)
+            delta_sep21 = trajectories_to_path[k2].separation_dict[t_k2_last][1] - trajectories_to_path[k2].separation_dict[t_k2_first][1]
+
+            block2 = (
+                      t_k2_first - trajectories_to_path[k2].separation_dict[t_k2_first][0],
+                      t_k2_first + model.delay_max + trajectories_to_path[k2].separation_dict[t_k2_first][1] + max(0, min(cut_k1, cut_k1 + delta_sep21)) + max(0, min(delta_sep21, delta_sep21 + cut_k1))
+                     )
+            
+        elif multiPointsStatus == 3:
+            #they are opposite
+            block1 = (
+                      t_k1_first - trajectories_to_path[k1].separation_dict[t_k1_first][0],
+                      t_k1_last + trajectories_to_path[k1].separation_dict[t_k1_last][1] + model.delay_max
+                     )
+            block2 = (
+                      t_k2_last - trajectories_to_path[k2].separation_dict[t_k2_last][0],
+                      t_k2_first + trajectories_to_path[k2].separation_dict[t_k2_first][1] + model.delay_max
+                     )
+    overlap = max(0, min(block1[1], block2[1]) - max(block1[0], block2[0]))
+    if verbose:
+        print("conflict MultipointStatus", multiPointsStatus, " : \nblock1: ", block1, "\nblock2: ", block2)
+                
+    pair = (trajectories_to_fn_dict[k1], trajectories_to_fn_dict[k2])
+    if not pair in interactions:
+        interactions[pair] = 0
+    if verbose:
+        print("previous interaction: ", interactions[pair])
+    interactions[pair] = (interactions[pair]*interaction_norm + overlap)/interaction_norm
+    interactions[(pair[1], pair[0])] = interactions[pair]
+    if verbose:
+        print("new interaction: ", interactions[pair])
+
+
 def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersection_grid, delta_time, intersection_list, trajectories_to_fn_dict, model):
     #final object in vert_intersection_grid and vert_hor_intersection_grid are
     #triplets (traj_id, time_at_intersection, (hor_time_separation_before, hor_time_separation_before))
@@ -520,7 +591,7 @@ def generate_interaction(drone_trajectories_dict, model):
     * trajs in time_id vs time_id+1
     
     Create interaction for any filtered pair of drones'''
-    interactions = set()
+    interactions = {}
     for node_id in horizontal_intersection_grid:
         for time_id in horizontal_intersection_grid[node_id]:
 
@@ -532,8 +603,167 @@ def generate_interaction(drone_trajectories_dict, model):
             for pair in potential_intersections:
                 if pair[0][0] != pair[1][0]:  # not the same flight intention i.e. drone
                     if abs(pair[0][1] - pair[1][1]) <= delta_time_horizontal:  # further fillterig per actual separation
-                        interactions.add((pair[0][0], pair[1][0]))
+                        interactions[(pair[0][0], pair[1][0])] = 1
+                        interactions[(pair[1][0], pair[0][0])] = 1
 
+    return interactions
+
+
+def generate_interaction_multi_weights(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model):
+    """Determine whether there is interaction between given trajectories
+       and determines which type of interaction it is, given different weights"""
+
+    #we take into account middle hor turning speed
+    #worse_hor_time_sep = model.protection_area / Drone.speeds_dict_model1["turn2"]
+    worse_hor_time_sep = Path.worse_hor_time_sep
+    interaction_norm = worse_hor_time_sep + model.delay_max #max value for crossing interaction is 2*sep_max + delay_max
+    
+    '''Intersection dicts has key=interescting_point_id and value that is another dict 
+    whose key is time_id and value is list of trajectories 
+    * time_id is calculated as int(time_over_node/delta_time)
+    * delta_time is used to filter the trajectories and it is calculated such that  
+    if trajs time separation is greater than this value then they cann't be in interaction
+    * delta_time is calculated as worse time shift that may yield lost of separation in distance
+    * Hence, it is given by a sum of max_delay and max sep in time, plus any addition time shift,
+    such as level distances, etc. (this depends on the type of intersection)
+    Atention!!! always use the same norm to filter and to indentify intersection'''
+    # horizontal-horizontal
+    delta_time_horizontal = math.ceil(model.delay_max + worse_hor_time_sep)
+    horizontal_intersection_grid = {}
+    '''Loop over all drones, trajectories and their nodes and fill the grids 
+    by adding concerned trajectories and respective passage time over intersecting point (and any other required data)
+    * horizontal_intersection_grid indexed by nodes and normalized time'''
+    for drone_fn, drone in model.drone_dict.items():
+        # initialize horizontal_intersection_grid with dep and arr
+        # TODO a verifier que c'est ça
+        dep = drone.departure_vertiport
+        arr = drone.arrival_vertiport
+
+        if not dep in horizontal_intersection_grid:
+            horizontal_intersection_grid[dep] = {}
+        if not arr in horizontal_intersection_grid:
+            horizontal_intersection_grid[arr] = {}
+
+        for traj_id in drone_trajectories_dict[drone_fn]:
+            traj_path = drone_trajectories_dict[drone_fn][traj_id][0]
+            # fill horizontal_intersection_grid with dep and arr
+            time_id = traj_path.dep_time // delta_time_horizontal  # integer division
+            if not time_id in horizontal_intersection_grid[dep]:
+                horizontal_intersection_grid[dep][time_id] = []
+            horizontal_intersection_grid[dep][time_id].append((traj_id, traj_path.dep_time))
+            time_id = traj_path.arr_time // delta_time_horizontal  # integer division
+            if not time_id in horizontal_intersection_grid[arr]:
+                horizontal_intersection_grid[arr][time_id] = []
+            horizontal_intersection_grid[arr][time_id].append((traj_id, traj_path.arr_time))
+            
+
+            for t, node_id in traj_path.path_dict.items():
+                # initialize horizontal_intersection_grid
+                time_id = t // delta_time_horizontal  # integer division
+                if not node_id in horizontal_intersection_grid:
+                    horizontal_intersection_grid[node_id] = {}
+                if not time_id in horizontal_intersection_grid[node_id]:
+                    horizontal_intersection_grid[node_id][time_id] = []
+                # fill horizontal_intersection_grid
+                horizontal_intersection_grid[node_id][time_id].append((traj_id, t))
+
+
+    '''DETECTION OF INTERACTIONS
+    Now it is simply necessary to loop over the grid and for every node_id and every time_id 
+    then verify all trajectory pairs in this cell and neighbouring ones
+    i.e. one time_id before and after are potential interactions
+    * If we want to avoid to conservative consideration of intersections, we need to filter further 
+    all pairs by the actual time separation whether it is less than delta_time_horizontal
+    To avoid duplicates, for every time_id we check all combinations of:
+    * trajs in time_id
+    * trajs in time_id vs time_id+1
+    
+    Create interaction for any filtered pair of drones'''
+    horizontal_intersections = {}
+    for node_id in horizontal_intersection_grid:
+        for time_id in horizontal_intersection_grid[node_id]:
+
+            potential_intersections = list(itertools.combinations(horizontal_intersection_grid[node_id][time_id], 2))
+            if time_id + 1 in horizontal_intersection_grid[node_id]:
+                potential_intersections.extend(itertools.product(horizontal_intersection_grid[node_id][time_id],
+                                                                 horizontal_intersection_grid[node_id][time_id + 1]))
+
+            for pair in potential_intersections:
+                if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:  # not the same flight intention i.e. drone
+                    if abs(pair[0][1] - pair[1][1]) <= delta_time_horizontal:  # further fillterig per actual separation
+                        key = (pair[0][0], pair[1][0])
+                        val = (node_id, pair[0][1], pair[1][1])
+                        if pair[0][0] > pair[1][0]:
+                            key = (pair[1][0], pair[0][0])
+                            val = (node_id, pair[1][1], pair[0][1])
+
+                        if not key in horizontal_intersections:
+                            horizontal_intersections[key] = []
+                        horizontal_intersections[key].append(val)
+
+    '''now for every pair of drones detect type of interaction
+    and save the interaction with coresponding weight'''
+    interactions = {}
+    for (k1, k2), points in horizontal_intersections.items():
+        if verbose:
+            print("k1 k2")
+            print(k1, k2)
+
+        if len(points) == 1:
+            #this is just simple intersection
+            #save intersecting point and continue
+            if verbose:
+                print("points initial")
+                print(points)
+            save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, points, 1, interactions, interaction_norm)
+        else:
+            # there are multiple points, but they could be still: independent or
+            # part of the consecutive or opossite portion of traj
+            # detect the case, reduce points if needed and save results
+
+            # sort the points by passage time of first traj
+            points.sort(key=lambda x: x[1])
+            if verbose:
+                print("points initial")
+                print(points)
+
+            multiPoints = [points[0]]
+            multiPointsStatus = 1  # 1 if independant, 2 if consecutive, 3 if opposite
+            point_index = 1
+            while point_index < len(points):
+                if (multiPoints[-1][1], multiPoints[-1][0]) in trajectories_to_path[k1].next_node_dict:
+                    if trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])] == (
+                            points[point_index][1], points[point_index][0]):
+                        # Potentially there is multiplication
+                        if (multiPointsStatus == 1 or multiPointsStatus == 2) and (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].next_node_dict:
+                            if trajectories_to_path[k2].next_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (
+                                    points[point_index][2], points[point_index][0]):
+                                # consecutive multiple points
+                                multiPoints.append(points[point_index])
+                                multiPointsStatus = 2
+                                point_index += 1
+                                continue
+                        if (multiPointsStatus == 1 or multiPointsStatus == 3) and (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].previous_node_dict:
+                            if trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])] == (
+                                    points[point_index][2], points[point_index][0]):
+                                # opposite multiple points
+                                multiPoints.append(points[point_index])
+                                multiPointsStatus = 3
+                                point_index += 1
+                                continue
+
+                #multi point chain is broken
+                #save intersection(s)
+                save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm)
+
+                #reinitialise multiPoints and multiPointsStatus
+                multiPoints = [points[point_index]]
+                multiPointsStatus = 1
+                point_index += 1
+            
+            #make last saving
+            save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm)
+    
     return interactions
 
 

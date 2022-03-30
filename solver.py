@@ -17,8 +17,7 @@ dual_graph_path = "graph_files/dual_total_graph_200m_with_geofences_no_demi_tour
 # dual_graph_path = None
 save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 output_directory = "PLNE OUTPUT"
-#input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
-input_directory = "graph_files/Intentions/"
+input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
 
 HEURISTICS = 0.3
 T_MAX_OPTIM_FL = 1800
@@ -74,7 +73,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
     # SET ALL FLIGHT LEVELS FOR AVAILABLE FLIGHTS AT T = 0
     set_model_drone_list(model, 0, math.inf)
     fixed_flight_levels_dict = solve_flight_levels_current_model(model, graph,raw_graph,graph_dual)
-
+    
     fixed_flights_dict = {}
     model.drone_dict = {}
     #####
@@ -198,7 +197,8 @@ def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
     trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = generate_trajectories.generate_trajectories(model, graph, raw_graph, graph_dual, [], None, number_of_trajectories=1)
     # Generate conflict matrix
     print("Computing interactions")
-    interactions = generate_trajectories.generate_interaction(trajectories, model)
+    #interactions = generate_trajectories.generate_interaction(trajectories, model)
+    interactions = generate_trajectories.generate_interaction_multi_weights(trajectories, trajectories_to_fn, trajectories_to_path, model)
     A = model.drone_dict.keys() #although at this instance it is the same as total
     priorities = dict()
     for a, drone in model.drone_dict.items():

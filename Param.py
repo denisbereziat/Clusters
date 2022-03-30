@@ -132,7 +132,8 @@ class ParamLevelChoice:
 		
 		#if any(i not in self.A or j not in self.A for i,j in interactions):
 		#	raise ValueError("Non existing fights in interaction list!")
-		self.AInter = list(set((i,j) for i,j in interactions).union(set((j,i) for i,j in interactions)))
+		self.AInter = interactions.keys() #interactions must be simetric if (i,j) in interactions => (j,i) is too
+		self.interactions = interactions
 											
 		#big M parameters
 		self.FLmax = self.nbFL						#big M is set to max difference between two flight levels

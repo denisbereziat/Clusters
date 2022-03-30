@@ -147,7 +147,6 @@ class ProblemLevelChoice:
 		
 	def solve(self):
 		self.model.optimize(ProblemLevelChoice.mycallback)
-		#self.model.optimize()
 	
 	def createVars(self):
 		self.y = self.model.addVars(self.param.A, vtype=gb.GRB.INTEGER, lb=1, ub=self.param.nbFL, name="y") 				#flight level choice for flight intention i
@@ -159,9 +158,9 @@ class ProblemLevelChoice:
 
 	def createObjectiveFunction(self, withcost):
 		if withcost:
-			self.model.setObjective(sum(self.same_fl[i,j] for i,j in self.param.AInter if i<j) + 0.1*sum(W[self.param.priorities[i]]*self.y[i] for i in self.param.A), gb.GRB.MINIMIZE)
+			self.model.setObjective(sum(self.param.interactions[(i,j)]*self.same_fl[i,j] for i,j in self.param.AInter if i<j) + 0.05*sum(W[self.param.priorities[i]]*self.y[i] for i in self.param.A), gb.GRB.MINIMIZE)
 		else:
-			self.model.setObjective(sum(self.same_fl[i,j] for i,j in self.param.AInter if i<j), gb.GRB.MINIMIZE)
+			self.model.setObjective(sum(self.param.interactions[(i,j)]*self.same_fl[i,j] for i,j in self.param.AInter if i<j), gb.GRB.MINIMIZE)
 
 	
 	def createConstraints(self):
@@ -174,7 +173,8 @@ class ProblemLevelChoice:
 
 	def printSolution(self):
 		print("Obj: ", self.model.objVal)
-		print("Remaining interactions: ", sum(self.same_fl[i,j].x for i,j in self.param.AInter if i<j))
+		print("Remaining interactions number: ", sum(self.same_fl[i,j].x for i,j in self.param.AInter if i<j))
+		print("Remaining interactions magnitude: ", sum(self.param.interactions[(i,j)]*self.same_fl[i,j].x for i,j in self.param.AInter if i<j))
 		#for every flight print chosen flight level
 		for a in self.param.A:
 			print("Flight ", a, "\t", int(self.y[a].x))

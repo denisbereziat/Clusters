@@ -17,6 +17,7 @@ vertical_protection = 7.62  # 25 ft
 nb_FL = 16
 delay_increase_step = 50
 delay_max = 30
+MAX_delay_max = 500
 FL_sep = 9.14  # in m
 temps_sep_vertiport = 5
 turn_angle_mini = Drone.angle_intervals[0]
@@ -57,6 +58,8 @@ class Model:
 
     def increase_delay_max(self):
         self.delay_max += delay_increase_step
+        if self.delay_max > MAX_delay_max:
+            raise ValueError
     
     def add_drone(self, drone):
         self.total_drone_list.append(drone)
