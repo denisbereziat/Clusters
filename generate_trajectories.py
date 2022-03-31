@@ -70,6 +70,29 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
         t2 = multiPoints[0][2]
         conflict = (k1, k2, t1, t2, max(trajectories_to_path[k1].separation_dict[t1][1], trajectories_to_path[k2].separation_dict[t2][0]), max(trajectories_to_path[k2].separation_dict[t2][1], trajectories_to_path[k1].separation_dict[t1][0]))
     else:
+        if multiPointsStatus == 3:
+            #try to enlarge multipoint segment by adding additional shared point before the first one
+            #and after the last one
+            new_node_found = True
+            while new_node_found:
+                if (multiPoints[0][1], multiPoints[0][0]) in trajectories_to_path[k1].previous_node_dict and (multiPoints[0][2], multiPoints[0][0]) in trajectories_to_path[k2].next_node_dict:
+                    if (trajectories_to_path[k1].previous_node_dict[(multiPoints[0][1], multiPoints[0][0])][1] == 
+                       trajectories_to_path[k2].next_node_dict[(multiPoints[0][2], multiPoints[0][0])][1]):
+                           multiPoints.insert(0, (trajectories_to_path[k1].previous_node_dict[(multiPoints[0][1], multiPoints[0][0])][1], trajectories_to_path[k1].previous_node_dict[(multiPoints[0][1], multiPoints[0][0])][0], trajectories_to_path[k2].next_node_dict[(multiPoints[0][2], multiPoints[0][0])][0]))
+                           continue
+                new_node_found = False
+            
+            new_node_found = True
+            while new_node_found:
+                if (multiPoints[-1][1], multiPoints[-1][0]) in trajectories_to_path[k1].next_node_dict and (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].previous_node_dict:
+                    if (trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])][1] == 
+                       trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])][1]):
+                           multiPoints.append((trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])][1], trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])][0], trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])][0]))
+                           continue
+                new_node_found = False
+            if verbose:
+                print("New enlarged Connected :", multiPoints)
+        
         first_node = multiPoints[0]
         last_node = multiPoints[-1]
 
@@ -127,6 +150,29 @@ def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k
         block1 = (t1 - trajectories_to_path[k1].separation_dict[t1][0], t1 + trajectories_to_path[k1].separation_dict[t1][1] + model.delay_max)
         block2 = (t2 - trajectories_to_path[k2].separation_dict[t2][0], t2 + trajectories_to_path[k2].separation_dict[t2][1] + model.delay_max)
     else:
+        if multiPointsStatus == 3:
+            #try to enlarge multipoint segment by adding additional shared point before the first one
+            #and after the last one
+            new_node_found = True
+            while new_node_found:
+                if (multiPoints[0][1], multiPoints[0][0]) in trajectories_to_path[k1].previous_node_dict and (multiPoints[0][2], multiPoints[0][0]) in trajectories_to_path[k2].next_node_dict:
+                    if (trajectories_to_path[k1].previous_node_dict[(multiPoints[0][1], multiPoints[0][0])][1] == 
+                       trajectories_to_path[k2].next_node_dict[(multiPoints[0][2], multiPoints[0][0])][1]):
+                           multiPoints.insert(0, (trajectories_to_path[k1].previous_node_dict[(multiPoints[0][1], multiPoints[0][0])][1], trajectories_to_path[k1].previous_node_dict[(multiPoints[0][1], multiPoints[0][0])][0], trajectories_to_path[k2].next_node_dict[(multiPoints[0][2], multiPoints[0][0])][0]))
+                           continue
+                new_node_found = False
+            
+            new_node_found = True
+            while new_node_found:
+                if (multiPoints[-1][1], multiPoints[-1][0]) in trajectories_to_path[k1].next_node_dict and (multiPoints[-1][2], multiPoints[-1][0]) in trajectories_to_path[k2].previous_node_dict:
+                    if (trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])][1] == 
+                       trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])][1]):
+                           multiPoints.append((trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])][1], trajectories_to_path[k1].next_node_dict[(multiPoints[-1][1], multiPoints[-1][0])][0], trajectories_to_path[k2].previous_node_dict[(multiPoints[-1][2], multiPoints[-1][0])][0]))
+                           continue
+                new_node_found = False
+            if verbose:
+                print("New enlarged Connected :", multiPoints)
+                                
         first_node = multiPoints[0]
         last_node = multiPoints[-1]
 
