@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import itertools
 import Drone
 from Drone import VerticalIntegrator
+from Model import MAX_delay_max
 
 verbose = False
 
@@ -131,7 +132,7 @@ def save_hor_intersection(trajectories_to_path, k1, k2, multiPoints, multiPoints
         print("conflict MultipointStatus", multiPointsStatus, " : ", conflict)
 
 
-def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm):
+def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm, conflicts):
     '''
     Check what is situation and calculate magnitude of interaction
     Magnitude is calculated as the overlaping of the period when two crossing drones blocks intersection
@@ -140,9 +141,13 @@ def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k
     begin end time when intersection is not available due to that drone.
     begin time = represent moment when drone enters in the zone sep norm before intersection point
     end time = represent moment when drone leaves the zone sep norm from intersection point
+    Also it calculates incompatible (conflicting) flights as the one that has opposite trajectory
+    and that can't be resolve by delaying one or other. Those flight should be assigne at diff levels (constraint)
     '''
     if verbose:
-        print("Connected :", multiPoints)
+        print("MultipointStatus: ", multiPointsStatus, " Connected:", multiPoints)
+    
+    pair = (trajectories_to_fn_dict[k1], trajectories_to_fn_dict[k2])
     if multiPointsStatus == 1: #this could be verified with len of multiPoints
         #save independent intersecting point
         t1 = multiPoints[0][1]
@@ -210,11 +215,19 @@ def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k
                       t_k2_last - trajectories_to_path[k2].separation_dict[t_k2_last][0],
                       t_k2_first + trajectories_to_path[k2].separation_dict[t_k2_first][1] + model.delay_max
                      )
+            #Find if flights are incompatible
+            sep12_last = max(trajectories_to_path[k1].separation_dict[t_k1_last][1], trajectories_to_path[k2].separation_dict[t_k2_last][0])
+            sep21_first = max(trajectories_to_path[k2].separation_dict[t_k2_first][1], trajectories_to_path[k1].separation_dict[t_k1_first][0])
+            margin_delay = MAX_delay_max/2 #smaller it is more incompatibles flights there will be
+            if t_k1_first - t_k2_first + margin_delay <= sep21_first and t_k2_last - t_k1_last + margin_delay <= sep12_last:
+                conflicts.add(pair)
+                conflicts.add((pair[1], pair[0]))
+                if verbose:
+                    print("new incompatible flight ", pair)
+    
     overlap = max(0, min(block1[1], block2[1]) - max(block1[0], block2[0]))
     if verbose:
-        print("conflict MultipointStatus", multiPointsStatus, " : \nblock1: ", block1, "\nblock2: ", block2)
-                
-    pair = (trajectories_to_fn_dict[k1], trajectories_to_fn_dict[k2])
+        print("block1: ", block1, "\nblock2: ", block2)
     if not pair in interactions:
         interactions[pair] = 0
     if verbose:
@@ -652,7 +665,7 @@ def generate_interaction(drone_trajectories_dict, model):
                         interactions[(pair[0][0], pair[1][0])] = 1
                         interactions[(pair[1][0], pair[0][0])] = 1
 
-    return interactions
+    return set(), interactions
 
 
 def generate_interaction_multi_weights(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model):
@@ -750,6 +763,7 @@ def generate_interaction_multi_weights(drone_trajectories_dict, trajectories_to_
     '''now for every pair of drones detect type of interaction
     and save the interaction with coresponding weight'''
     interactions = {}
+    conflicts = set()
     for (k1, k2), points in horizontal_intersections.items():
         if verbose:
             print("k1 k2")
@@ -761,7 +775,7 @@ def generate_interaction_multi_weights(drone_trajectories_dict, trajectories_to_
             if verbose:
                 print("points initial")
                 print(points)
-            save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, points, 1, interactions, interaction_norm)
+            save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, points, 1, interactions, interaction_norm, conflicts)
         else:
             # there are multiple points, but they could be still: independent or
             # part of the consecutive or opossite portion of traj
@@ -800,7 +814,7 @@ def generate_interaction_multi_weights(drone_trajectories_dict, trajectories_to_
 
                 #multi point chain is broken
                 #save intersection(s)
-                save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm)
+                save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm, conflicts)
 
                 #reinitialise multiPoints and multiPointsStatus
                 multiPoints = [points[point_index]]
@@ -808,9 +822,9 @@ def generate_interaction_multi_weights(drone_trajectories_dict, trajectories_to_
                 point_index += 1
             
             #make last saving
-            save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm)
+            save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k1, k2, multiPoints, multiPointsStatus, interactions, interaction_norm, conflicts)
     
-    return interactions
+    return conflicts, interactions
 
 
 def generate_parallel_trajectories(drone, model, step, dist, number_to_generate, geofence_time_intervals):

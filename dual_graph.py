@@ -38,7 +38,7 @@ def create_dual(graph, turn_cost_function):
                     # v1 = (x2 - x1, y2 - y1)
                     # v2 = (x3 - x2, y3 - y2)
                     # angle = tools.angle_btw_vectors(v1, v2)
-                    if len(node1[0]) == 6 and len(node1[1]) == 6 and len(node2[1]) == 6:
+                    if tools.is_in_unconstrained(node1[0]) and tools.is_in_unconstrained(node1[1]) and tools.is_in_unconstrained(node2[1]):
                         angle = 0
                         is_turn = False
                     else:

@@ -19,6 +19,7 @@ save_path = "graph_files/dual_total_graph_200m_with_geofences.graphml"
 output_directory = "PLNE OUTPUT"
 input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_intentions"
 
+HEURISTICS_FL = 0.5
 HEURISTICS = 0.3
 T_MAX_OPTIM_FL = 1800
 T_MAX_OPTIM = 600 #not recommended as it may prevent finding a solution 
@@ -197,22 +198,24 @@ def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
     trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = generate_trajectories.generate_trajectories(model, graph, raw_graph, graph_dual, [], None, number_of_trajectories=1)
     # Generate conflict matrix
     print("Computing interactions")
-    #interactions = generate_trajectories.generate_interaction(trajectories, model)
-    interactions = generate_trajectories.generate_interaction_multi_weights(trajectories, trajectories_to_fn, trajectories_to_path, model)
+    #conflicts, interactions = generate_trajectories.generate_interaction(trajectories, model)
+    conflicts, interactions = generate_trajectories.generate_interaction_multi_weights(trajectories, trajectories_to_fn, trajectories_to_path, model)
     A = model.drone_dict.keys() #although at this instance it is the same as total
     priorities = dict()
     for a, drone in model.drone_dict.items():
         priorities[a] = drone.priority
-    param_level = Param.ParamLevelChoice(model, A, priorities, interactions)
+    param_level = Param.ParamLevelChoice(model, A, priorities, conflicts, interactions)
     problem = PLNE.ProblemLevelChoice(param_level)
-    problem.model.setParam("Heuristics", HEURISTICS)
+    problem.model.setParam("Heuristics", HEURISTICS_FL)
     problem.model.setParam("TimeLimit", T_MAX_OPTIM_FL)
     problem.solve()
     #problem.printSolution()
     # Generate fixed_flight_levels_dict
     fixed_flight_levels = {}
     for a in problem.param.A:
-        fixed_flight_levels[a] = (a, round(problem.y[a].x))
+        for fl in problem.param.FL:
+            if round(problem.x[a,fl].x) == 1:
+                fixed_flight_levels[a] = (a, fl)
     return fixed_flight_levels
 
 

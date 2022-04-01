@@ -309,8 +309,8 @@ def extract_lat_lon_turn_bool_from_path(drone, model):
     for i in range(1, len(turn_bool)-1):
         turn_bool[i] = turn_bool_function([lon[i-1], lats[i-1]], [lon[i], lats[i]], [lon[i+1], lats[i+1]])
     for i in range(0, len(turn_bool) - 2):
-        # if len(drone.path_object.path[i-1]) == 6 and len(drone.path_object.path[i]) == 6 and len(drone.path_object.path[i+1]) == 6:
-        if len(drone.path_object.path[i]) == 6:
+        # if tools.is_in_unconstrained(drone.path_object.path[i-1]) and tools.is_in_unconstrained(drone.path_object.path[i]) and tools.is_in_unconstrained(drone.path_object.path[i+1]):
+        if tools.is_in_unconstrained(drone.path_object.path[i]):
             turn_bool[i] = False
     return lats, lon, turn_bool
 

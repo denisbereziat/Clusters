@@ -1,8 +1,10 @@
 import gurobipy as gb
 import Param
 import sys
+import itertools as it
 
 W = {1: 1, 2: 1.5, 3: 2, 4: 3} #weights defining importance of the flight instancies based on their priority
+C = 0.01 #coeficient (scalling factor) of the flight level importance in objective function
 
 class ProblemGlobal:
 	def __init__(self, param, name = "MyProblem"):
@@ -128,9 +130,9 @@ class ProblemGlobal:
 class ProblemLevelChoice:
 	def __init__(self, param, withcost = True, name = "MyProblem"):
 		self.param = param
-		self.nbFL = param.nbFL
 		
-		print("Creating model for ", name)	
+		print("Creating model for ", name)
+		#print(param)	
 		self.model = gb.Model(name)
 		self.createVars()
 		self.model.update 					# Integrate new variables
@@ -140,44 +142,53 @@ class ProblemLevelChoice:
 		
 		# Objects to use inside callbacks
 		self.model._param = param
-		self.model._y = self.y
-		self.model._same_fl = self.same_fl
-		self.model._y_vals = None
-		self.model._same_fl_vals = None
+		self.model._x = self.x
+		self.model._z = self.z
+		self.model._x_vals = None
+		self.model._z_vals = None
 		
 	def solve(self):
-		self.model.optimize(ProblemLevelChoice.mycallback)
+		#self.model.optimize(ProblemLevelChoice.mycallback)
+		self.model.optimize()
 	
 	def createVars(self):
-		self.y = self.model.addVars(self.param.A, vtype=gb.GRB.INTEGER, lb=1, ub=self.param.nbFL, name="y") 				#flight level choice for flight intention i
-
-		self.same_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="same_fl")	#auxiliary =1 if two flight intentions i and j are assigned to same flight level
-		self.lower_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="lower_fl")	#auxiliary =1 if flight level of j flight intention is lower than flihgt level of flight intention i
-		self.higher_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="higher_fl")#auxiliary =1 if flight level of j flight intention is higher than flihgt level of flight intention i
-
+		self.x = self.model.addVars(self.param.A, self.param.FL, vtype=gb.GRB.BINARY, name="x")	#assignment variables =1 when flight is assignet to fl
+		self.z = self.model.addVars(self.param.P, vtype=gb.GRB.BINARY, name="z")				#auxiliary =1 if two flight intentions i and j are assigned to same flight level (assured only when penalized)
 
 	def createObjectiveFunction(self, withcost):
 		if withcost:
-			self.model.setObjective(sum(self.param.interactions[(i,j)]*self.same_fl[i,j] for i,j in self.param.AInter if i<j) + 0.05*sum(W[self.param.priorities[i]]*self.y[i] for i in self.param.A), gb.GRB.MINIMIZE)
+			self.model.setObjective(sum(self.param.interactions[(i,j)]*self.z[i,j] for i,j in self.param.P) + C*sum(fl*sum(W[self.param.priorities[a]]*self.x[a,fl] for a in self.param.A) for fl in self.param.FL), gb.GRB.MINIMIZE)
 		else:
-			self.model.setObjective(sum(self.param.interactions[(i,j)]*self.same_fl[i,j] for i,j in self.param.AInter if i<j), gb.GRB.MINIMIZE)
+			self.model.setObjective(sum(self.param.interactions[(i,j)]*self.z[i,j] for i,j in self.param.P), gb.GRB.MINIMIZE)
 
 	
 	def createConstraints(self):
-		self.model.addConstrs((-self.param.FLmax*self.lower_fl[i,j] + self.param.delta*self.higher_fl[i,j] <= self.y[i] - self.y[j] for i, j in self.param.AInter if i < j), "assuring_lower_fl")
-		self.model.addConstrs((self.y[i] - self.y[j] <= -self.param.delta*self.lower_fl[i,j] + self.param.FLmax*self.higher_fl[i,j] for i, j in self.param.AInter if i < j), "assuring_higher_fl")
-		self.model.addConstrs((self.lower_fl[i,j] + self.higher_fl[i,j] + self.same_fl[i,j] == 1 for i, j in self.param.AInter if i < j), "assuring_same_fl")
-		self.model.addConstrs((self.lower_fl[i,j] == self.higher_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_lower_fl_appendix")
-		self.model.addConstrs((self.higher_fl[i,j] == self.lower_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_higher_fl_appendix")
-		self.model.addConstrs((self.same_fl[i,j] == self.same_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_same_fl_appendix")
+		self.model.addConstrs((sum(self.x[a,fl] for fl in self.param.FL) == 1 for a in self.param.A), "assignement_constraint")
+		self.model.addConstrs((self.x[a1,fl] <= 1 - self.x[a2,fl] for ((a1, a2), fl) in it.product(self.param.I, self.param.FL)), "incompatible_flight")
+		self.model.addConstrs((self.x[a1,fl] + self.x[a2,fl] - 1 <= self.z[a1,a2] for ((a1, a2), fl) in it.product(self.param.P, self.param.FL)), "linking_constraint")
 
 	def printSolution(self):
 		print("Obj: ", self.model.objVal)
-		print("Remaining interactions number: ", sum(self.same_fl[i,j].x for i,j in self.param.AInter if i<j))
-		print("Remaining interactions magnitude: ", sum(self.param.interactions[(i,j)]*self.same_fl[i,j].x for i,j in self.param.AInter if i<j))
+		print("Remaining interactions number: ", sum(self.z[i,j].x for i,j in self.param.P))
+		print("Remaining interactions magnitude: ", sum(self.param.interactions[(i,j)]*self.z[i,j].x for i,j in self.param.P))
 		#for every flight print chosen flight level
+		FLs = {}
+		level_use = {fl: 0 for fl in self.param.FL}
 		for a in self.param.A:
-			print("Flight ", a, "\t", int(self.y[a].x))
+			for fl in self.param.FL:
+				if round(self.x[a,fl].x) == 1:
+					level_use[fl] += 1
+					FLs[a] = fl
+					print("Flight ", a, "\t", fl)
+		print("Level usage: ", level_use)
+		for (a1, a2) in self.param.I:
+			if FLs[a1] == FLs[a2]:
+				print("Incompatible flights ", a1, a2," assigned at same level")
+		for (a1, a2) in self.param.P:
+			if round(self.z[a1, a2].x) == 1:
+				print("z=1 for Interacting flights ", a1, a2, " with ", self.param.interactions[a1, a2], "overlap")
+			if FLs[a1] == FLs[a2]:
+				print("Interacting flights ", a1, a2, " with ", self.param.interactions[a1, a2], "overlap assigned at same level ", self.z[a1, a2].x)
 
 	def mycallback(model, where):
 		'''if where == gb.GRB.Callback.PRESOLVE:
@@ -191,26 +202,35 @@ class ProblemLevelChoice:
 		if where == gb.GRB.Callback.MIPSOL:
 			#print("improving ", model.cbGet(gb.GRB.Callback.MIPSOL_OBJ))
 			# computed number of flight instances per level
-			x = model.cbGetSolution(model._y)
-			level_use = {i+1: 0 for i in range(model._param.nbFL)}
-			for a in model._param.A:
-				level_use[round(x[a])] += 1
+			x = model.cbGetSolution(model._x)
+			#print("Old assignement: ", x)
+			level_use = {}
+			for fl in model._param.FL:
+				level_use[fl] = sum(round(x[a,fl]) for a in model._param.A)
+			#print("current level usage ", level_use)
 			
-			er = any(level_use[i+1]<level_use[i+2] for i in range(model._param.nbFL-1))
+			er = any(level_use[fl]<level_use[fl+1] for fl in model._param.FL[:-1])
 			if er:
 				level_use = sorted(level_use.keys(), key=lambda k: -level_use[k])
+				#print("Sorted levels per usage ", level_use)
 				level_use = {level: index+1 for index, level in enumerate(level_use)}
-				model._y_vals = {}
+				#print("Old: new level change ", level_use)
+				model._x_vals = {}
 				for a in model._param.A:
-					model._y_vals[a] = level_use[round(x[a])]
-					
-				model._same_fl_vals = model.cbGetSolution(model._same_fl)
+					a_level = False
+					for fl in model._param.FL:
+						model._x_vals[a,fl] = 0 	#default var value
+						if round(x[a,fl]) == 1: 	#it is his ancien level
+							a_level = level_use[fl] #note his new level
+					model._x_vals[a,a_level] = 1	#set his new level
+				#print("New assignement: ", model._x_vals)
+				model._z_vals = model.cbGetSolution(model._z) #level assignment (hence z var) doesn't change
 				
-		if where == gb.GRB.Callback.MIPNODE and model._y_vals is not None:
+		if where == gb.GRB.Callback.MIPNODE and model._x_vals is not None:
 			## inject heuristic solution
-			model.cbSetSolution(model._same_fl, model._same_fl_vals)
-			model.cbSetSolution(model._y, model._y_vals)
-			model._y_vals = None
+			model.cbSetSolution(model._z, model._z_vals)
+			model.cbSetSolution(model._x, model._x_vals)
+			model._x_vals = None
 			
 			model.cbUseSolution()
 			

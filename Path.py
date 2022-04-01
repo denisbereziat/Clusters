@@ -83,7 +83,7 @@ class Path:
         #calculate the real speed at first node in node_list
         #if we are 'entering' in constrained airspace
         if edge2:
-            if not(len(edge2[0]) == 6 or len(edge2[1]) == 6): #if edge2 is in constrained
+            if not(tools.is_in_unconstrained(edge2[0]) or tools.is_in_unconstrained(edge2[1])): #if edge2 is in constrained
                 #we need to compute the angle and coresponding speed
                 if edge1:
                     angle = graph_dual.edges[(edge1, edge2)]["angle"]
@@ -112,7 +112,7 @@ class Path:
             v.append(self.drone.speeds_dict["cruise"])
             self.turns.append(0)
             if edge2:
-                if not(len(edge2[0]) == 6 or len(edge2[1]) == 6): #if edge2 is in constrained
+                if not(tools.is_in_unconstrained(edge2[0]) or tools.is_in_unconstrained(edge2[1])): #if edge2 is in constrained
                     #we need to compute the angle and coresponding speed
                     angle = graph_dual.edges[(edge1, edge2)]["angle"]
                     v[-1] = Drone.return_speed_from_angle(angle, self.drone)
@@ -204,8 +204,8 @@ class Path:
         x_dep, y_dep = float(dep_vertiport[0]), float(dep_vertiport[1])
         speeds_dict = self.drone.speeds_dict
         # We need to know if we are in the constrained or unconstrained airspace, we use the length of the node
-        # to know if it's part of the unconstrained airspace ( == 6)
-        if len(self.path[0]) == 6 or self.drone.is_unconstrained_departure:
+        # to know if it's part of the unconstrained airspace
+        if tools.is_in_unconstrained(self.path[0]) or self.drone.is_unconstrained_departure:
             # Then we are in the unconstrained airspace and don't need to worry about turns
             drone_speed_next_node = speeds_dict["cruise"]
             next_node = self.path[0]

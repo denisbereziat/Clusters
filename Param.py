@@ -121,26 +121,33 @@ class Param:
 			self.FLfix = fixedLevels
 		
 class ParamLevelChoice:
-	def __init__(self, model, A, priorities, interactions):
-		self.nbFL = model.nb_FL
-		self.nbflights = len(A)				#number of flight instances
-		self.A = A							#set of flight intentions labeled from 1 to nbflights
+	def __init__(self, model, A, priorities, conflicts, interactions):
+		self.nbflights = len(A)					#number of flight instances
+		self.FL = list(range(1, model.nb_FL+1))	#set of flight levels
+		self.A = A								#set of flight intentions
 		
 		#if any(a not in priorities for a in self.A):
 		#	raise ValueError("Priority must be defined for every flight intention!")
 		self.priorities = priorities			#flight intention priorities
 		
+		#conflicts is a list of pairs of flight intentions that must not be assigned to the same level
+		#if any(i not in self.A or j not in self.A for i,j in conflicts):
+		#	raise ValueError("Non existing fights in conflict list!")
+		self.I = [(i, j) for (i, j) in conflicts if i < j] #conflicts must be symetric if (i,j) in interactions => (j,i) is too
+		
+		#interactions is dict of pairs of flight intentions with magnitude of their interaction that we penalise
 		#if any(i not in self.A or j not in self.A for i,j in interactions):
 		#	raise ValueError("Non existing fights in interaction list!")
-		self.AInter = interactions.keys() #interactions must be simetric if (i,j) in interactions => (j,i) is too
+		self.P = [(i, j) for (i, j) in interactions if i < j] #interactions must be symetric if (i,j) in interactions => (j,i) is too
 		self.interactions = interactions
-											
-		#big M parameters
-		self.FLmax = self.nbFL						#big M is set to max difference between two flight levels
-		self.delta = 0.5							#small number that is less than difference between any different flight levels
-		self.deltaFLmax = (self.nbFL - 1)*model.FL_sep	#maximum difference in meters between two flight levels
-		self.deltaFLmin = -self.deltaFLmax			#minimum difference in meters between two flight levels
-	
+		
+	def __str__(self):
+		rez = "FL assignement parameter\n"
+		rez += "Number of flights: " + str(self.nbflights) + "\n"
+		rez += "Flights: " + str(self.A) + "\n"
+		rez += "Incompatible pairs: " + str(self.I) + "\n"
+		rez += "Penalised pairs: " + str(self.interactions)
+		return rez
 '''
 def readDat(filename):
 	print("Loading parameters from ", filename)
