@@ -94,7 +94,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
             fixed_flights_dict[a] = [a, k, previous_solution['y_val'][a], previous_solution['delay_val'][a]]
             #calculate/set actual arr_time of this drone based on the chosen solution
             #hor travel time + ground delay + vertical movement time
-            model.total_drone_dict[a].arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a]*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
+            model.total_drone_dict[a].arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
                 
         # Create the geofenced nodes list
         geofence_time_intervals = dict()
@@ -137,7 +137,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
                 fixed_flights_dict[a] = [a, k, previous_solution['y_val'][a], previous_solution['delay_val'][a]]
                 #calculate/set actual arr_time of this drone based on the chosen solution
                 #hor travel time + ground delay + vertical movement time
-                drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a]*Param.delayStep + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
+                drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
         sim_time += sim_step
     
     # Generate SCN
@@ -178,7 +178,7 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     delay_val = {}
     for a in param.A:
         y_val[a] = round(problem.y[a].x)
-        delay_val[a] = round(problem.delay[a].x)
+        delay_val[a] = problem.delay[a].x
     same_fl_val = {}
     lower_fl_val = {}
     higher_fl_val = {}
@@ -359,7 +359,7 @@ def generate_SCN_v2(model, fixed_flights, trajectories, trajectories_to_fn, outp
         to_write_dict = dict()
         for index, content in fixed_flights.items():
             a, k, _fl, _delay = content
-            delay = _delay * Param.delayStep
+            delay = _delay
             fl_m  = _fl * model.FL_sep
         # for k in problem.param.K:
             # Set the corresponding path to the drone

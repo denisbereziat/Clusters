@@ -4,8 +4,6 @@ import random as rd
 from decimal import Decimal
 import Drone
 
-delayStep = 10						#delay step duration in [sec]; total delay = number od delay steps (dec. var) * delay step
-
 #!!!!Attention verifications are currently desactivated to save computation time
 class Param:
 	def __init__(self, model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
@@ -13,13 +11,11 @@ class Param:
 		self.vVert = Drone.vertical_speed	#vertical seed in m/s
 		self.dFL = model.FL_sep				#vertical separation between two flight levels in m = 30ft
 		self.tSeedUp = Drone.vertical_acceleration_time(0, self.vVert) #time needed to acceleate from 0 to vVert with acceleration aVert and vv
-		self.delayStep = delayStep
 		
 		self.nbflights = len(A)					#number of flight instances
 		self.nbTrajs = len(K)					#total number of alternative trajectories
 		
 		self.maxDelay = model.delay_max			#maximum delay
-		self.maxStep = self.maxDelay // delayStep	#maximum number of steps
 
 		self.A = A								#set of flight intentions
 		#if any(a not in priorities for a in self.A):
