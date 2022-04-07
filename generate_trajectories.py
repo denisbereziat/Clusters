@@ -238,36 +238,45 @@ def save_hor_interaction(model, trajectories_to_fn_dict, trajectories_to_path, k
         print("new interaction: ", interactions[pair])
 
 
-def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersection_grid, delta_time, intersection_list, trajectories_to_fn_dict, model):
+def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersection_grid, delta_time, intersection_list, trajectories_to_fn_dict, model, fixed_flights_dict, bounds):
     #final object in vert_intersection_grid and vert_hor_intersection_grid are
     #triplets (traj_id, time_at_intersection, (hor_time_separation_before, hor_time_separation_before))
-    for dep_edge in vert_intersection_grid:
-        for time_id in vert_intersection_grid[dep_edge]:
+    for vert_edge in vert_intersection_grid:
+        for time_id in vert_intersection_grid[vert_edge]:
             if verbose:
-                print('Current vertical ', vert_intersection_grid[dep_edge][time_id])
-            if dep_edge in vert_hor_intersection_grid: #if no hor drones no intersections
+                print('Current vertical ', vert_intersection_grid[vert_edge][time_id])
+            if vert_edge in vert_hor_intersection_grid: #if no hor drones no intersections
                 potential_intersections = []
-                if time_id in vert_hor_intersection_grid[dep_edge]:
+                if time_id in vert_hor_intersection_grid[vert_edge]:
                     if verbose:
-                        print('Current hor ', vert_hor_intersection_grid[dep_edge][time_id])
+                        print('Current hor ', vert_hor_intersection_grid[vert_edge][time_id])
                     #add interaction of current clmb and hor
-                    potential_intersections.extend(itertools.product(vert_intersection_grid[dep_edge][time_id], vert_hor_intersection_grid[dep_edge][time_id]))
+                    potential_intersections.extend(itertools.product(vert_intersection_grid[vert_edge][time_id], vert_hor_intersection_grid[vert_edge][time_id]))
                     #add interaction of next clmb and current hor
-                    if time_id+1 in vert_intersection_grid[dep_edge]:
+                    if time_id+1 in vert_intersection_grid[vert_edge]:
                         if verbose:
-                            print('Next vertical ', vert_intersection_grid[dep_edge][time_id+1])
-                        potential_intersections.extend(itertools.product(vert_intersection_grid[dep_edge][time_id+1], vert_hor_intersection_grid[dep_edge][time_id]))
+                            print('Next vertical ', vert_intersection_grid[vert_edge][time_id+1])
+                        potential_intersections.extend(itertools.product(vert_intersection_grid[vert_edge][time_id+1], vert_hor_intersection_grid[vert_edge][time_id]))
                 
                 #add interaction of current clmb and next hor
-                if time_id+1 in vert_hor_intersection_grid[dep_edge]:
+                if time_id+1 in vert_hor_intersection_grid[vert_edge]:
                     if verbose:
-                        print('Next hor ', vert_hor_intersection_grid[dep_edge][time_id+1])
-                    potential_intersections.extend(itertools.product(vert_intersection_grid[dep_edge][time_id],vert_hor_intersection_grid[dep_edge][time_id+1]))
+                        print('Next hor ', vert_hor_intersection_grid[vert_edge][time_id+1])
+                    potential_intersections.extend(itertools.product(vert_intersection_grid[vert_edge][time_id],vert_hor_intersection_grid[vert_edge][time_id+1]))
                     
                 for pair in potential_intersections:
                     if verbose:
                         print(pair)
-                    if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
+                    if (trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]
+                       and 
+                       not(trajectories_to_fn_dict[pair[0][0]] in fixed_flights_dict and trajectories_to_fn_dict[pair[1][0]] in fixed_flights_dict)
+                       and
+                       not(bounds["ub_fl"][trajectories_to_fn_dict[pair[0][0]]] < bounds["ub_fl"][trajectories_to_fn_dict[pair[1][0]]]
+                           and
+                           bounds["ub_fl"][trajectories_to_fn_dict[pair[0][0]]] != model.nb_FL
+                           and
+                           bounds["ub_fl"][trajectories_to_fn_dict[pair[1][0]]] != model.nb_FL)
+                       ):
                         if abs(pair[0][1] - pair[1][1]) <= delta_time: #further fillter per actual separation
                             #create intersecting point
                             conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], max(pair[0][2][1], pair[1][2][0]), max(pair[1][2][1], pair[0][2][0]))
@@ -276,7 +285,7 @@ def generate_vert_hor_intersections(vert_intersection_grid, vert_hor_intersectio
                             intersection_list.append(conflict)
 
 
-def generate_vertiport_intersections(vert_intersection_grid, delta_time, intersection_list, temps_sep_vertiport, trajectories_to_fn_dict):
+def generate_vertiport_intersections(vert_intersection_grid, delta_time, intersection_list, temps_sep_vertiport, trajectories_to_fn_dict, fixed_flights_dict):
     for vertiport in vert_intersection_grid:
         for time_id in vert_intersection_grid[vertiport]:
             if verbose:
@@ -290,7 +299,9 @@ def generate_vertiport_intersections(vert_intersection_grid, delta_time, interse
             for pair in potential_intersections:
                 if verbose:
                     print(pair)
-                if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:
+                if (trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]
+                   and 
+                   not(trajectories_to_fn_dict[pair[0][0]] in fixed_flights_dict and trajectories_to_fn_dict[pair[1][0]] in fixed_flights_dict)):
                     if abs(pair[0][1] - pair[1][1]) <= delta_time: #further fillter per actual separation
                         #create intersecting point
                         conflict = (pair[0][0], pair[1][0], pair[0][1], pair[1][1], temps_sep_vertiport, temps_sep_vertiport)
@@ -299,7 +310,7 @@ def generate_vertiport_intersections(vert_intersection_grid, delta_time, interse
                         intersection_list.append(conflict)
 
 
-def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model):
+def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dict, trajectories_to_path, model, fixed_flights_dict, fixed_flight_levels_dict):
     """Generate intersection points between given trajectories"""
 
     max_delta_fl = model.nb_FL - 1
@@ -351,7 +362,13 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     * clmb_hor_intersection_grid and desc_hor_intersection_grid indexed by edge_id and normalized time
     (edge_id is the one in which middle the vertiport is located)
     * dep_intersection_grid and arr_intersection_grid indexed by vertiport_id and normalized time'''
+    bounds = {"ub_delay": {}, "lb_delay": {}, "ub_fl": {}, "lb_fl": {}}
     for drone_fn, drone in model.drone_dict.items():
+        #initialize bounds
+        bounds["ub_delay"][drone_fn] = model.delay_max
+        bounds["lb_delay"][drone_fn] = 0
+        bounds["ub_fl"][drone_fn] = model.nb_FL
+        bounds["lb_fl"][drone_fn] = 1
         # initialize clmb_intersection_grid and clmb_hor_intersection_grid
         dep_edge = drone.dep_edge
         if not(drone.is_unconstrained_departure) and dep_edge[0] > dep_edge[1]:
@@ -384,7 +401,21 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
         if not arr in horizontal_intersection_grid:
             horizontal_intersection_grid[arr] = {}
 
-        for traj_id in drone_trajectories_dict[drone_fn]:
+        #for drones that are already solved take only chosen traj
+        #refine the delay and fl bounds
+        if drone_fn in fixed_flights_dict:
+            trajs = {fixed_flights_dict[drone_fn][1], }
+            bounds["ub_delay"][drone_fn] = fixed_flights_dict[drone_fn][3]
+            bounds["lb_delay"][drone_fn] = fixed_flights_dict[drone_fn][3]
+            bounds["ub_fl"][drone_fn] = fixed_flights_dict[drone_fn][2]
+            bounds["lb_fl"][drone_fn] = fixed_flights_dict[drone_fn][2]
+        else:
+            trajs = drone_trajectories_dict[drone_fn]
+            if drone_fn in fixed_flight_levels_dict:
+                bounds["ub_fl"][drone_fn] = fixed_flight_levels_dict[drone_fn][1]
+                bounds["lb_fl"][drone_fn] = fixed_flight_levels_dict[drone_fn][1]
+        
+        for traj_id in trajs:
             traj_path = drone_trajectories_dict[drone_fn][traj_id][0]
             # fill clmb_intersection_grid and clmb_hor_intersection_grid
             time_id = traj_path.dep_time // delta_time_clmb_hor
@@ -480,7 +511,17 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
                                                                  horizontal_intersection_grid[node_id][time_id + 1]))
 
             for pair in potential_intersections:
-                if trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]:  # not the same flight intention i.e. drone
+                # they should not be the same flight intention and not both fixed/solved and not both fixed level that are different
+                if (trajectories_to_fn_dict[pair[0][0]] != trajectories_to_fn_dict[pair[1][0]]
+                   and 
+                   not(trajectories_to_fn_dict[pair[0][0]] in fixed_flights_dict and trajectories_to_fn_dict[pair[1][0]] in fixed_flights_dict)
+                   and
+                   not(bounds["ub_fl"][trajectories_to_fn_dict[pair[0][0]]] != bounds["ub_fl"][trajectories_to_fn_dict[pair[1][0]]]
+                       and
+                       bounds["ub_fl"][trajectories_to_fn_dict[pair[0][0]]] != model.nb_FL
+                       and
+                       bounds["ub_fl"][trajectories_to_fn_dict[pair[1][0]]] != model.nb_FL)
+                    ):
                     if abs(pair[0][1] - pair[1][1]) <= delta_time_horizontal:  # further fillterig per actual separation
                         key = (pair[0][0], pair[1][0])
                         val = (node_id, pair[0][1], pair[1][1])
@@ -563,9 +604,9 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     * vert[time_id+1] vs hor[time_id]
     The principle is the same for clmb_hor_intersection_grid and desc_hor_intersection_grid just time norm is different'''
     #DETECTION OF CLIMB HORIZONTAL INTERSECTION POINTS
-    generate_vert_hor_intersections(clmb_intersection_grid, clmb_hor_intersection_grid, delta_time_clmb_hor, climb_horiz_list, trajectories_to_fn_dict, model)
+    generate_vert_hor_intersections(clmb_intersection_grid, clmb_hor_intersection_grid, delta_time_clmb_hor, climb_horiz_list, trajectories_to_fn_dict, model, fixed_flights_dict, bounds)
     #DETECTION OF DESCENT HORIZONTAL INTERSECTION POINTS
-    generate_vert_hor_intersections(desc_intersection_grid, desc_hor_intersection_grid, delta_time_desc_hor, descent_horiz_list, trajectories_to_fn_dict, model)
+    generate_vert_hor_intersections(desc_intersection_grid, desc_hor_intersection_grid, delta_time_desc_hor, descent_horiz_list, trajectories_to_fn_dict, model, fixed_flights_dict, bounds)
     
     '''DETECTION OF VERTICAL INTERSECTION POINTS
     Loop over the dep_intersection_grid and for every dep point and every time_id 
@@ -575,9 +616,9 @@ def generate_intersection_points(drone_trajectories_dict, trajectories_to_fn_dic
     * between deps[time_id] vs deps[time_id+1]
     The principle is the same for arr_intersection_grid just time norm is different.'''
     #DETECTION OF DEP INTERSECTION POINTS
-    generate_vertiport_intersections(dep_intersection_grid, delta_time_dep, climb_climb_list, model.temps_sep_vertiport, trajectories_to_fn_dict)
+    generate_vertiport_intersections(dep_intersection_grid, delta_time_dep, climb_climb_list, model.temps_sep_vertiport, trajectories_to_fn_dict, fixed_flights_dict)
     #DETECTION OF ARR INTERSECTION POINTS
-    generate_vertiport_intersections(arr_intersection_grid, delta_time_arr, descent_descent_list, model.temps_sep_vertiport, trajectories_to_fn_dict)
+    generate_vertiport_intersections(arr_intersection_grid, delta_time_arr, descent_descent_list, model.temps_sep_vertiport, trajectories_to_fn_dict, fixed_flights_dict)
 
     return horizontal_shared_nodes_list, climb_horiz_list, descent_horiz_list, climb_climb_list, descent_descent_list
 

@@ -6,7 +6,7 @@ import Drone
 
 #!!!!Attention verifications are currently desactivated to save computation time
 class Param:
-	def __init__(self, model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = [], fixedLevels = []):
+	def __init__(self, model, A, priorities, K, nbPt, k1, k2, t1, t2, sep12, sep21, fixedIntentions = False, fixedLevels = False):
 		self.nbFL = model.nb_FL				#number of flight levels
 		self.vVert = Drone.vertical_speed	#vertical seed in m/s
 		self.dFL = model.FL_sep				#vertical separation between two flight levels in m = 30ft
@@ -96,19 +96,20 @@ class Param:
 	
 		
 		#fixed flight intentions parameters
-		#if any(a not in self.A for a, k, y, delay in fixedIntentions):
-		#	raise ValueError("Fixed flight is not presented in the list of flights!")
-		#if any(k not in self.K for a, k, y, delay in fixedIntentions):
-		#	raise ValueError("Fixed ftrajector doesn't exist!")
-		#if any(y <= 0 or y > self.nbFL for a, k, y, delay in fixedIntentions):
-		#	raise ValueError("Inexisting fixed flight level!")
-		#if any(delay < 0 or delay > self.maxStep for a, k, y, delay in fixedIntentions):
-		#	raise ValueError("Wrong fixed delay!")
 		self.Kfix = []
 		self.Afix = {}
-		for a, k, y, delay in fixedIntentions:
-			self.Kfix.append(k)
-			self.Afix[a] = (y, delay)
+		if fixedIntentions:
+			#if any(a not in self.A for a, k, y, delay in fixedIntentions):
+			#	raise ValueError("Fixed flight is not presented in the list of flights!")
+			#if any(k not in self.K for a, k, y, delay in fixedIntentions):
+			#	raise ValueError("Fixed ftrajector doesn't exist!")
+			#if any(y <= 0 or y > self.nbFL for a, k, y, delay in fixedIntentions):
+			#	raise ValueError("Inexisting fixed flight level!")
+			#if any(delay < 0 or delay > self.maxStep for a, k, y, delay in fixedIntentions):
+			#	raise ValueError("Wrong fixed delay!")
+			for a, k, y, delay in fixedIntentions:
+				self.Kfix.append(k)
+				self.Afix[a] = (y, delay)
 		
 		self.FLfix = []
 		if fixedLevels:
@@ -117,10 +118,10 @@ class Param:
 			self.FLfix = fixedLevels
 		
 class ParamLevelChoice:
-	def __init__(self, model, A, priorities, conflicts, interactions):
-		self.nbflights = len(A)					#number of flight instances
-		self.FL = list(range(1, model.nb_FL+1))	#set of flight levels
-		self.A = A								#set of flight intentions
+	def __init__(self, FL, A, priorities, conflicts, interactions):
+		self.nbflights = len(A)		#number of flight instances
+		self.FL = FL				#set of flight levels
+		self.A = A					#set of flight intentions
 		
 		#if any(a not in priorities for a in self.A):
 		#	raise ValueError("Priority must be defined for every flight intention!")

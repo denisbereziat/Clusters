@@ -15,6 +15,9 @@ import matplotlib.pyplot as plt
 protection_area = 32
 vertical_protection = 7.62  # 25 ft
 nb_FL = 16
+all_FL = set(range(1, nb_FL+1))
+reserved_FL = {1, }
+FL_set = all_FL.difference(reserved_FL)
 delay_increase_step = 50
 delay_max = 30
 MAX_delay_max = 300
@@ -40,12 +43,17 @@ class Model:
         self.drones_with_dynamic_fences = {}
         #self.drone_order = []
         
+        self.delay_max = delay_max
         self.protection_area = protection_area
         self.vertical_protection = vertical_protection
-        self.nb_FL = nb_FL
-        self.delay_max = delay_max
-        self.FL_sep = FL_sep
         self.temps_sep_vertiport = temps_sep_vertiport
+        
+        self.nb_FL = nb_FL
+        self.all_FL = all_FL
+        self.reserved_FL = reserved_FL
+        self.FL_set = FL_set
+        self.FL_sep = FL_sep
+        
         # Initial constraints contains the constraints caused by the currently
         # flying drones when the model is initialised
         self.initial_constraints_dict = initial_constraints

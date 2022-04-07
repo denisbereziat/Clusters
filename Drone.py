@@ -61,7 +61,7 @@ class Drone:
         return 3
 
     def return_vertical_sep_margin():
-        return 0
+        return 1
     '''
     def find_current_edge(self, current_t, graph):
         """Finds the edge of the drone at given time t in seconds."""

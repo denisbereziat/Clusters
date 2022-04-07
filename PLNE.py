@@ -204,25 +204,26 @@ class ProblemLevelChoice:
 			# computed number of flight instances per level
 			x = model.cbGetSolution(model._x)
 			#print("Old assignement: ", x)
+			available_FL = sorted(list(model._param.FL))
 			level_use = {}
-			for fl in model._param.FL:
+			for fl in available_FL:
 				level_use[fl] = sum(round(x[a,fl]) for a in model._param.A)
 			#print("current level usage ", level_use)
 			
-			er = any(level_use[fl]<level_use[fl+1] for fl in model._param.FL[:-1])
+			er = any(level_use[available_FL[index]]<level_use[available_FL[index+1]] for index in range(len(available_FL)-1))
 			if er:
 				level_use = sorted(level_use.keys(), key=lambda k: -level_use[k])
 				#print("Sorted levels per usage ", level_use)
-				level_use = {level: index+1 for index, level in enumerate(level_use)}
-				#print("Old: new level change ", level_use)
+				level_use = {level: index for index, level in enumerate(level_use)}
+				#print("Old level: index of a new level ", level_use)
 				model._x_vals = {}
 				for a in model._param.A:
 					a_level = False
-					for fl in model._param.FL:
-						model._x_vals[a,fl] = 0 	#default var value
-						if round(x[a,fl]) == 1: 	#it is his ancien level
-							a_level = level_use[fl] #note his new level
-					model._x_vals[a,a_level] = 1	#set his new level
+					for fl in available_FL:
+						model._x_vals[a,fl] = 0 					#default var value
+						if round(x[a,fl]) == 1: 					#it is his ancien level
+							a_level = available_FL[level_use[fl]] 	#note his new level
+					model._x_vals[a,a_level] = 1					#set his new level
 				#print("New assignement: ", model._x_vals)
 				model._z_vals = model.cbGetSolution(model._z) #level assignment (hence z var) doesn't change
 				
@@ -233,81 +234,3 @@ class ProblemLevelChoice:
 			model._x_vals = None
 			
 			model.cbUseSolution()
-			
-			
-if __name__ == "__main__":
-	args = sys.argv[1:]
-	#myProblem = ProblemGlobal(Param.readDat(args[0]))
-	#myProblem = ProblemGlobal(Param.addRandomFixFligth(args[0], 20))
-	#myProblem = ProblemGlobal(Param.fixLevelParam())
-	
-	#myProblem = ProblemLevelChoice(Param.createRandomParamLevelChoice(int(args[0])))
-	
-	#myProblem.solve()
-	#myProblem.printSolution()
-	
-	param, paramLevel = Param.levelChoiceParamGenerator(args[0])
-	
-	#initialization
-	nocostmodel = ProblemLevelChoice(paramLevel, False)
-	nocostmodel.model.setParam('TimeLimit', 5*60)
-	nocostmodel.solve()
-	previous_nocostmodel = False
-	while nocostmodel.model.objVal < 0.00001:
-		previous_nocostmodel = nocostmodel
-		new_y = {a:-1 for a in paramLevel.A}
-		
-		level_use = {i+1: 0 for i in range(paramLevel.nbFL)}
-		level_flight = {i+1: [] for i in range(paramLevel.nbFL)}
-		for a in paramLevel.A:
-			l = int(nocostmodel.y[a].x)
-			level_use[l] += 1
-			level_flight[l].append(a)
-			
-		level_use = sorted(level_use.items(), key=lambda item: -item[1])
-		for new_level, item in enumerate(level_use):
-			if not level_flight[item[0]]:
-				break
-			
-			#set new solution
-			if new_level:
-				for a in level_flight[old_level]:
-					#print("flight ",a, " old level ", old_level, " new level ", new_level)
-					new_y[a] = new_level
-				for a in level_flight[item[0]]:
-					#print("flight ",a, " old level ", item[0], " new level ", new_level)
-					new_y[a] = new_level
-			
-			old_level = item[0]
-		
-		#set new model with less levels
-		paramLevel.nbFL = new_level-1
-		nocostmodel = ProblemLevelChoice(paramLevel, False)
-		print("******************")
-		print("working with level ", nocostmodel.nbFL)
-		print("******************")
-		nocostmodel.model.setParam('TimeLimit', 5*60)
-		for a in paramLevel.A:
-			nocostmodel.y[a].Start = new_y[a]
-		nocostmodel.solve()
-	
-	print("******************")
-	print("best found ", previous_nocostmodel.nbFL)
-	print("******************")
-	
-	#solve now main problem with this intial solution
-	paramLevel.nbFL = previous_nocostmodel.nbFL + 1
-	myProblem = ProblemLevelChoice(paramLevel)
-	myProblem.model.setParam('TimeLimit', 5*60)
-	for a in paramLevel.A:
-		myProblem.y[a].Start = int(previous_nocostmodel.y[a].x)
-	myProblem.solve()
-	myProblem.printSolution()
-	
-	#now fix level and solve remaining general problem
-	for a in paramLevel.A:
-		param.FLfix.append((a, int(myProblem.y[a].x)))
-	
-	myProblem = ProblemGlobal(param)
-	myProblem.solve()
-	myProblem.printSolution()
