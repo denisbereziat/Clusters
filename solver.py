@@ -21,7 +21,7 @@ input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_inte
 
 HEURISTICS_FL = 0.5
 HEURISTICS = 0.3
-T_MAX_OPTIM_FL = 1800
+T_MAX_OPTIM_FL = 900
 T_MAX_OPTIM = 600 #not recommended as it may prevent finding a solution 
 MIP_GAP = 1e-3
 ms_to_knots = 1.94384
@@ -113,9 +113,12 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
         traj_output = None
         geofence_time_intervals = dict()
     
+    
+    '''
     #####
+    #APPROACH 1.1 first do a full resolution of all drones available at 0 at once, than do a sliding window for late-filled drones
     # FULL RESOLUTION FLIGHTS AT T = 0
-    print("Starting FULL resolution")
+    print("\n-------------------------\nStarting FULL resolution of fights at 0")
     previous_solution = {} #neglecting geofences that are anyway fixed
     set_model_drone_list(model, 0, math.inf)
     print("-- NB DRONES :", len(model.drone_dict))
@@ -129,15 +132,42 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
             #calculate/set actual arr_time of this drone based on the chosen solution
             #hor travel time + ground delay + vertical movement time
             model.total_drone_dict[a].arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
+    '''
+    #APPROACH 1.2 (for high demands) first do a sliding-window resolution for drones available at 0, than do a sliding window for late-filled drones
+    # RESOLUTION FLIGHTS AT T = 0 using sliding window
+    print("\n-------------------------\nStarting SLIDING WINDOW resolution of fights at 0")
+    sim_step = 600
+    sim_size = 2700
+    sim_time = 0
+    previous_solution = {} #neglecting geofences that are anyway fixed
+    last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
+    while sim_time <= last_departure - sim_size + sim_step: #we stop when end of window passes last departure
+        set_model_drone_list(model, sim_time,  sim_size, True) #only take drone available at 0
+        print("\n-------------------------\n--", len(fixed_flights_dict), " Total number of fixed flights till now (not all are considered)")
+        print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min")
+        print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min", file=sys.stderr)
+        print("-- NB DRONES :", len(model.drone_dict))
+        traj_output, intersection_outputs, previous_solution = solve_current_model(model, graph, raw_graph, graph_dual, traj_output, fixed_flights_dict, geofence_time_intervals, fixed_flight_levels_dict, previous_solution)
+        trajectories, trajectories_to_fn, trajectories_to_duration, trajectories_to_path, fn_order = traj_output
+        for k in (k for (k, val) in previous_solution['x_val'].items() if val == 1):
+            # For each of the drone find the chosen traj, fl, delay
+            a = trajectories_to_fn[k]
+            drone = model.total_drone_dict[a]
+            if (drone.dep_time < sim_time + sim_step or sim_time > last_departure - sim_size) and a not in fixed_flights_dict: #assure that it saves all flights since window ends earlier
+                fixed_flights_dict[a] = [a, k, previous_solution['y_val'][a], previous_solution['delay_val'][a]]
+                #calculate/set actual arr_time of this drone based on the chosen solution
+                #hor travel time + ground delay + vertical movement time
+                drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
+        sim_time += sim_step
     
-    # START SLIDING WINDOW TO TREATE LATE-FILLED FLIGHTS
-    print("Starting SLIDING WINDOW resolution")
+    # APPROACH 1 START SLIDING WINDOW TO TREATE LATE-FILLED FLIGHTS (goes together with approaches 1.1 and 1.2)
+    print("\n-------------------------\nStarting SLIDING WINDOW resolution for late-filled flights")
     sim_step = 600
     sim_size = 1800
-    sim_time = 0
+    sim_time = sim_step
     last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
     #previous_solution = {} #neglecting since all are fixed
-    while sim_time <= last_departure + sim_step:
+    while sim_time <= last_departure + sim_step: #we stop when begining of window passes last departure to assure late-filled drone
         set_model_drone_list(model, sim_time,  sim_size)
         print("\n-------------------------\n--", len(fixed_flights_dict), " Total number of fixed flights till now (not all are considered)")
         print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min")
@@ -155,18 +185,18 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
                 #hor travel time + ground delay + vertical movement time
                 drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
         sim_time += sim_step
-    """
+    '''
     #####
+    # APPROACH 2 solving all flights in sliding-window
     # FULL RESOLUTION
-    print("Starting resolution")
+    print("\n-------------------------\nStarting SLIDING WINDOW resolution for all flights at once")
     sim_step = 600
     sim_size = 1800
     sim_time = 0
     last_departure = max([drone.dep_time for drone in model.total_drone_dict.values()])
-    print("Last departure : ", last_departure)
     previous_solution = {} #neglecting geofences that are anyway fixed
     while sim_time <= last_departure + sim_step:
-        set_model_drone_list(model, sim_time,  sim_size)
+        set_model_drone_list(model, sim_time, sim_size)#we stop when begining of window passes last departure to assure late-filled drone
         print("\n-------------------------\n--", len(fixed_flights_dict), " Total number of fixed flights till now (not all are considered)")
         print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min")
         print("-- WINDOW :", sim_time/60, "min - ", (sim_time+sim_size)/60, "min", file=sys.stderr)
@@ -183,7 +213,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
                 #hor travel time + ground delay + vertical movement time
                 drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
         sim_time += sim_step
-    """
+    '''
     
     # Generate SCN
     generate_SCN_v2(model, fixed_flights_dict, trajectories, trajectories_to_fn, output_file_path)
@@ -265,15 +295,19 @@ def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
     return fixed_flight_levels
 
 
-def set_model_drone_list(model, sim_time, sim_size):
+def set_model_drone_list(model, sim_time, sim_size, only_at_zero = False):
     """Add the drones from the total_drone_list in the drone_dict depending on specified time
     Drones which are dynamic geofences drones (and should be the first of the list) are added too
-    Fixed drones are removed once they couldn't influence solution anymore """
+    Fixed drones are removed once they couldn't influence solution anymore
+    if only_at_zero is True we only take the flights that filled plan at 0"""
+    deposit_time = sim_time
+    if only_at_zero:
+        deposit_time = 0
     model.drone_dict = {}
     for flight_number, drone in model.total_drone_dict.items():
         if drone.is_loitering_mission: #we let them always since they are not nombreux
             model.drone_dict[flight_number] = drone
-        elif drone.dep_time <= sim_time + sim_size and not drone.arr_time < sim_time and not drone.deposit_time > sim_time:
+        elif drone.dep_time <= sim_time + sim_size and not drone.arr_time < sim_time and not drone.deposit_time > deposit_time:
             model.drone_dict[flight_number] = drone
 
 def set_reserved_flight_level(model, fixed_flight_levels_dict):
