@@ -23,19 +23,15 @@ class ProblemGlobal:
 		return self.model.Status == gb.GRB.OPTIMAL
 	
 	def createVars(self):
-		self.x = self.model.addVars(self.param.K, vtype=gb.GRB.BINARY, name="x")					#assignment variables =1 whether horizontal trajectory i is used
-		self.y = self.model.addVars(self.param.A, vtype=gb.GRB.INTEGER, lb=1, ub=self.param.nbFL, name="y") 				#flight level choice for flight intention i
-		self.delay = self.model.addVars(self.param.A, lb=0, ub=self.param.maxDelay, name="delay")	#(real) delay of flight intention i
+		self.x = self.model.addVars(self.param.K, vtype=gb.GRB.BINARY, name="x")							#assignment variables =1 whether horizontal trajectory i is used
+		self.y = self.model.addVars(self.param.A, vtype=gb.GRB.INTEGER, lb=1, ub=self.param.nbFL, name="y") #flight level choice for flight intention i
+		self.delay = self.model.addVars(self.param.A, lb=0, ub=self.param.maxDelay, name="delay")			#(real) delay of flight intention i
 
-		self.same_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="same_fl")	#auxiliary =1 if two flight intentions i and j are assigned to same flight level
-		self.lower_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="lower_fl")	#auxiliary =1 if flight level of j flight intention is lower than flihgt level of flight intention i
-		self.higher_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="higher_fl")#auxiliary =1 if flight level of j flight intention is higher than flihgt level of flight intention i
+		self.same_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="same_fl")			#auxiliary =1 if two flight intentions i and j are assigned to same flight level
+		self.lower_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="lower_fl")			#auxiliary =1 if flight level of j flight intention is lower than flihgt level of flight intention i
+		self.higher_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="higher_fl")		#auxiliary =1 if flight level of j flight intention is higher than flihgt level of flight intention i
 
-
-		self.x_same_fl = self.model.addVars(self.param.KInterHor, vtype=gb.GRB.BINARY, name="x_same_fl") #auxiliary =1 if trajectory i and j are selected and if flight intention of the trajectories i and j are assigned at the same level 
-		self.x_higher_fl = self.model.addVars(self.param.KInterEvol, vtype=gb.GRB.BINARY, name="x_higher_fl") #auxiliary =1 if trajectory i and j are selected and if flight intention of the trajectories i is assigned at the higher level than j 
-
-		self.z = self.model.addVars(self.param.P, vtype=gb.GRB.BINARY, name="z")					#auxiliary =1 if for given intersecting point order is k1 then k2
+		self.z = self.model.addVars(self.param.P, vtype=gb.GRB.BINARY, name="z")							#auxiliary =1 if for given intersecting point order is k1 then k2
 
 
 	def createObjectiveFunction(self):
@@ -52,32 +48,25 @@ class ProblemGlobal:
 		self.model.addConstrs((self.higher_fl[i,j] == self.lower_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_higher_fl_appendix")
 		self.model.addConstrs((self.same_fl[i,j] == self.same_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_same_fl_appendix")
 
-
-		self.model.addConstrs((self.x_same_fl[i,j] >= self.x[i] + self.x[j] + self.same_fl[self.param.mon_vol[i],self.param.mon_vol[j]] - 2 for i, j in self.param.KInterHor if i < j), "x_same_fl_link")
-		self.model.addConstrs((self.x_same_fl[i,j] == self.x_same_fl[j,i] for i, j in self.param.KInterHor if i < j), "x_same_fl_link_appendix")
-
-		self.model.addConstrs((self.x_higher_fl[i,j] >= self.x[i] + self.x[j] + self.higher_fl[self.param.mon_vol[i],self.param.mon_vol[j]] - 2 for i, j in self.param.KInterEvol if i < j), "x_higher_fl_link")
-		self.model.addConstrs((self.x_higher_fl[i,j] == 1 - self.x_higher_fl[j,i] for i, j in self.param.KInterEvol if i < j), "x_higher_fl_link_appendix")
-
 		#conflicts between to trajectories at same level
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >= self.param.sep12[p]*self.z[p] + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay)*(1 - self.z[p]) + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - max(self.param.sep12[p], self.param.t2[p] - self.param.t1[p] - self.param.maxDelay))*(1 - self.x_same_fl[self.param.k1[p],self.param.k2[p]]) for p in self.param.Phor), "hor_conflict1")
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) <= (self.param.t2[p] - self.param.t1[p] + self.param.maxDelay)*self.z[p] + self.param.sep21[p]*(self.z[p] - 1) + (self.param.t2[p] - self.param.t1[p] + self.param.maxDelay - min(-self.param.sep21[p], self.param.t2[p] - self.param.t1[p] + self.param.maxDelay))*(1 - self.x_same_fl[self.param.k1[p],self.param.k2[p]]) for p in self.param.Phor), "hor_conflict2")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >=  self.param.sep12[p] - (self.param.sep12[p] - self.param.t2[p] + self.param.t1[p] + self.param.maxDelay)*(4 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.same_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Phor), "hor_conflict1")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) <= -self.param.sep21[p] + (self.param.sep21[p] + self.param.t2[p] - self.param.t1[p] + self.param.maxDelay)*(3 + self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.same_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Phor), "hor_conflict2")
 
 		#it is assumed that k1 is climbing trajectory
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]] + self.param.tSeedUp/2) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >= self.param.sep12[p]*self.z[p] + (self.param.t2[p]  + self.param.tSeedUp/2 - self.param.t1[p] - self.param.maxDelay)*(1 - self.z[p]) + (self.param.t2[p]  + self.param.tSeedUp/2 - self.param.t1[p] - self.param.maxDelay - max(self.param.sep12[p], self.param.t2[p] + self.param.tSeedUp/2 - self.param.t1[p] - self.param.maxDelay))*(1 - self.x_higher_fl[self.param.k1[p],self.param.k2[p]]) for p in self.param.Pclmb), "clmb_conflict1")
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]] + self.param.tSeedUp/2) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) <= (self.param.t2[p]  + self.param.tSeedUp/2 + self.param.maxDelay - self.param.t1[p])*self.z[p] + self.param.sep21[p]*(self.z[p] - 1) + (self.param.t2[p]  + self.param.tSeedUp/2 + self.param.maxDelay - self.param.t1[p] - min(-self.param.sep21[p], self.param.t2[p]  + self.param.tSeedUp/2 + self.param.maxDelay - self.param.t1[p]))*(1 - self.x_higher_fl[self.param.k1[p],self.param.k2[p]]) for p in self.param.Pclmb), "clmb_conflict2")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]] + self.param.tSeedUp/2) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >=  self.param.sep12[p] - (self.param.sep12[p] - self.param.t2[p] - self.param.tSeedUp/2 + self.param.t1[p] + self.param.maxDelay)*(4 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.higher_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Pclmb), "clmb_conflict1")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]] + self.param.tSeedUp/2) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) <= -self.param.sep21[p] + (self.param.sep21[p] + self.param.t2[p] + self.param.tSeedUp/2 + self.param.maxDelay - self.param.t1[p])*(3 + self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.higher_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Pclmb), "clmb_conflict2")
 
 		#it is assumed that k1 is descending trajectory
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + self.param.tSeedUp/2 + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) >= self.param.sep12[p]*self.z[p] + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - self.param.tSeedUp/2 - 2*self.param.deltaFLmax/self.param.vVert)*(1 - self.z[p]) + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - self.param.tSeedUp/2 - 2*self.param.deltaFLmax/self.param.vVert - max(self.param.sep12[p], self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - self.param.tSeedUp/2 - 2*self.param.deltaFLmax/self.param.vVert))*(1 - self.x_higher_fl[self.param.k1[p],self.param.k2[p]]) for p in self.param.Pdesc), "desc_conflict1")
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + self.param.tSeedUp/2 + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) <= (self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - self.param.tSeedUp/2 - 2*self.param.dFL/self.param.vVert)*self.z[p] + self.param.sep21[p]*(self.z[p] - 1) + (self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - self.param.tSeedUp/2 - 2*self.param.deltaFLmin/self.param.vVert - min(-self.param.sep21[p], self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - self.param.tSeedUp/2 - 2*self.param.dFL/self.param.vVert))*(1 - self.x_higher_fl[self.param.k1[p],self.param.k2[p]]) for p in self.param.Pdesc), "desc_conflict2")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + self.param.tSeedUp/2 + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) >=  self.param.sep12[p] - (self.param.sep12[p] - self.param.t2[p] + self.param.t1[p] + self.param.maxDelay + self.param.tSeedUp/2 + 2*self.param.deltaFLmax/self.param.vVert)*(1 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.higher_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Pdesc), "desc_conflict1")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + self.param.tSeedUp/2 + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) <= -self.param.sep21[p] + (self.param.sep21[p] + self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - self.param.tSeedUp/2 - 2*self.param.dFL/self.param.vVert)*(3 + self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.higher_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Pdesc), "desc_conflict2")
 
 		#conflicts between two departures
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >= self.param.sep12[p]*self.z[p] + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay)*(1 - self.z[p]) + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - max(self.param.sep12[p], self.param.t2[p] - self.param.t1[p] - self.param.maxDelay))*(2 - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Pdep), "dep_conflict1")
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) <= (self.param.t2[p] + self.param.maxDelay - self.param.t1[p])*self.z[p] + self.param.sep21[p]*(self.z[p] - 1) + (self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - min(-self.param.sep21[p], self.param.t2[p] + self.param.maxDelay - self.param.t1[p]))*(2 - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Pdep), "dep_conflict2")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >=  self.param.sep12[p] - (self.param.sep12[p] - self.param.t2[p] + self.param.t1[p] + self.param.maxDelay)*(3 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Pdep), "dep_conflict1")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) <= -self.param.sep21[p] + (self.param.sep21[p] + self.param.t2[p] + self.param.maxDelay - self.param.t1[p])*(2 + self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Pdep), "dep_conflict2")
 
 		#conflicts between two arrivals
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) >= self.param.sep12[p]*self.z[p] + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - 2*self.param.deltaFLmax/self.param.vVert)*(1 - self.z[p]) + (self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - 2*self.param.deltaFLmax/self.param.vVert - max(self.param.sep12[p], self.param.t2[p] - self.param.t1[p] - self.param.maxDelay - 2*self.param.deltaFLmax/self.param.vVert))*(2 - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Parr), "arr_conflict1")
-		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) <= (self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - 2*self.param.deltaFLmin/self.param.vVert)*self.z[p] + self.param.sep21[p]*(self.z[p] - 1) + (self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - 2*self.param.deltaFLmin/self.param.vVert - min(-self.param.sep21[p], self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - 2*self.param.deltaFLmin/self.param.vVert))*(2 - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Parr), "arr_conflict2")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) >=  self.param.sep12[p] - (self.param.sep12[p] - self.param.t2[p] + self.param.t1[p] + self.param.maxDelay + 2*self.param.deltaFLmax/self.param.vVert)*(3 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Parr), "arr_conflict1")
+		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]] + 2*(self.y[self.param.mon_vol[self.param.k1[p]]] - self.y[self.param.mon_vol[self.param.k2[p]]])*self.param.dFL/self.param.vVert) <= -self.param.sep21[p] + (self.param.sep21[p] + self.param.t2[p] + self.param.maxDelay - self.param.t1[p] - 2*self.param.deltaFLmin/self.param.vVert)*(2 + self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]]) for p in self.param.Parr), "arr_conflict2")
 
 		#fixed flights constraints
 		for k in self.param.Kfix:
@@ -93,7 +82,7 @@ class ProblemGlobal:
 			self.y[a].lb = l
 			self.y[a].ub = l
 
-	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, lower_fl_val, higher_fl_val, x_same_fl_val, x_higher_fl_val):
+	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, lower_fl_val, higher_fl_val):
 		for k in self.param.K:
 			if k in x_val:
 				self.x[k].Start = x_val[k]
@@ -106,13 +95,6 @@ class ProblemGlobal:
 				self.same_fl[a_pair].Start = same_fl_val[a_pair]
 				self.lower_fl[a_pair].Start = lower_fl_val[a_pair]
 				self.higher_fl[a_pair].Start = higher_fl_val[a_pair]
-		for k_pair in self.param.KInterHor:
-			if k_pair in x_same_fl_val:
-				self.x_same_fl[k_pair].Start = x_same_fl_val[k_pair]
-		for k_pair in self.param.KInterEvol:
-			if k_pair in x_higher_fl_val:
-				self.x_higher_fl[k_pair].Start = x_higher_fl_val[k_pair]
-		
 	
 	def printSolution(self):
 		print("Obj: ", self.model.objVal)
