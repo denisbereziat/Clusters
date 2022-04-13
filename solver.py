@@ -114,7 +114,6 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
         geofence_time_intervals = dict()
     
     
-    '''
     #####
     #APPROACH 1.1 first do a full resolution of all drones available at 0 at once, than do a sliding window for late-filled drones
     # FULL RESOLUTION FLIGHTS AT T = 0
@@ -159,6 +158,7 @@ def solve_with_time_segmentation(input_dir, output_dir, input_file_name):
                 #hor travel time + ground delay + vertical movement time
                 drone.arr_time = trajectories_to_path[k].arr_time + previous_solution['delay_val'][a] + 2*Drone.VerticalIntegrator.integrate(model.FL_sep*previous_solution['y_val'][a]).end_time()
         sim_time += sim_step
+    '''
     
     # APPROACH 1 START SLIDING WINDOW TO TREATE LATE-FILLED FLIGHTS (goes together with approaches 1.1 and 1.2)
     print("\n-------------------------\nStarting SLIDING WINDOW resolution for late-filled flights")
@@ -235,10 +235,11 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
         # - Create param
         param = create_param(model, trajectories, trajectories_to_duration, h_h_list, climb_h_list, descent_h_list, c_c_list, d_d_list, fixed_flights_dict, fixed_flight_levels_dict)
         # - Create Problem
-        problem = PLNE.ProblemGlobal(param)
+        #problem = PLNE.ProblemGlobal(param)
+        problem = PLNE.ProblemGlobalRelaxed(param)
         if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'], previous_solution['same_fl_val'], previous_solution['lower_fl_val'], previous_solution['higher_fl_val'])
         problem.model.setParam("Heuristics", HEURISTICS)
-        #problem.model.setParam("TimeLimit", T_MAX_OPTIM)
+        problem.model.setParam("TimeLimit", T_MAX_OPTIM)
         problem.model.setParam("MIPGap", MIP_GAP)
         # Solve
         solution_not_found = not problem.solve()
@@ -246,7 +247,7 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
             #increase delay_max
             model.increase_delay_max()
             print("-- Solution not found increasing max delay ", model.delay_max)
-    # problem.printSolution()
+    #problem.printSolution()
     #Set initial solution to for next problem
     x_val = {k: round(problem.x[k].x) for k in param.K}
     y_val = {}
