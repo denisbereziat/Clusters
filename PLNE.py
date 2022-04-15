@@ -28,7 +28,6 @@ class ProblemGlobal:
 		self.delay = self.model.addVars(self.param.A, lb=0, ub=self.param.maxDelay, name="delay")			#(real) delay of flight intention i
 
 		self.same_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="same_fl")			#auxiliary =1 if two flight intentions i and j are assigned to same flight level
-		self.lower_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="lower_fl")			#auxiliary =1 if flight level of j flight intention is lower than flihgt level of flight intention i
 		self.higher_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="higher_fl")		#auxiliary =1 if flight level of j flight intention is higher than flihgt level of flight intention i
 
 		self.z = self.model.addVars(self.param.P, vtype=gb.GRB.BINARY, name="z")							#auxiliary =1 if for given intersecting point order is k1 then k2
@@ -41,12 +40,10 @@ class ProblemGlobal:
 	def createConstraints(self):
 		self.model.addConstrs((sum(self.x[k] for k in self.param.K if self.param.mon_vol[k]==i) >= 1 for i in self.param.A), "covering")
 
-		self.model.addConstrs((-self.param.FLmax*self.lower_fl[i,j] + self.param.delta*self.higher_fl[i,j] <= self.y[i] - self.y[j] for i, j in self.param.AInter if i < j), "assuring_lower_fl")
-		self.model.addConstrs((self.y[i] - self.y[j] <= -self.param.delta*self.lower_fl[i,j] + self.param.FLmax*self.higher_fl[i,j] for i, j in self.param.AInter if i < j), "assuring_higher_fl")
-		self.model.addConstrs((self.lower_fl[i,j] + self.higher_fl[i,j] + self.same_fl[i,j] == 1 for i, j in self.param.AInter if i < j), "assuring_same_fl")
-		self.model.addConstrs((self.lower_fl[i,j] == self.higher_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_lower_fl_appendix")
-		self.model.addConstrs((self.higher_fl[i,j] == self.lower_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_higher_fl_appendix")
-		self.model.addConstrs((self.same_fl[i,j] == self.same_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_same_fl_appendix")
+		#linking y with same and higher auxilliary variables
+		self.model.addConstrs((-self.param.FLmax*self.higher_fl[j,i] + self.param.delta*self.higher_fl[i,j] <= self.y[i] - self.y[j] for i, j in self.param.AInter if i < j), "assuring_lower_fl")
+		self.model.addConstrs((self.y[i] - self.y[j] <= -self.param.delta*self.higher_fl[j,i] + self.param.FLmax*self.higher_fl[i,j] for i, j in self.param.AInter if i < j), "assuring_higher_fl")
+		self.model.addConstrs((self.higher_fl[j,i] + self.higher_fl[i,j] + self.same_fl[i,j] == 1 for i, j in self.param.AInter), "assuring_same_fl")
 
 		#conflicts between to trajectories at same level
 		self.model.addConstrs(((self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) - (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) >=  self.param.sep12[p] - (self.param.sep12[p] - self.param.t2[p] + self.param.t1[p] + self.param.maxDelay)*(4 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.same_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Phor), "hor_conflict1")
@@ -82,7 +79,7 @@ class ProblemGlobal:
 			self.y[a].lb = l
 			self.y[a].ub = l
 
-	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, lower_fl_val, higher_fl_val):
+	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, higher_fl_val):
 		for k in self.param.K:
 			if k in x_val:
 				self.x[k].Start = x_val[k]
@@ -93,7 +90,6 @@ class ProblemGlobal:
 		for a_pair in self.param.AInter:
 			if a_pair in same_fl_val: # other should have it then
 				self.same_fl[a_pair].Start = same_fl_val[a_pair]
-				self.lower_fl[a_pair].Start = lower_fl_val[a_pair]
 				self.higher_fl[a_pair].Start = higher_fl_val[a_pair]
 	
 	def printSolution(self):
@@ -109,7 +105,7 @@ class ProblemGlobal:
 			print(a, "   ", t[a], "   ", int(self.y[a].x), "   ", int(self.delay[a].x))
 
 class ProblemGlobalRelaxed:
-	def __init__(self, param, name = "MyProblemRelaxed"):
+	def __init__(self, param, softlimit = 36000, name = "MyProblemRelaxed"):
 		self.param = param
 		
 		print("Creating model for ", name)	
@@ -120,9 +116,24 @@ class ProblemGlobalRelaxed:
 		self.createConstraints()
 		self.model.update
 		
+		# Objects to use inside callbacks
+		self.model._softlimit = softlimit
+		self.model._P = param.P
+		self.model._v = self.v
+		self.model._violation = None
+		self.model._v_gap = 0.1*param.nbflights #authorized gap for violation (0.1sec per flight)
+		
 	def solve(self):
-		self.model.optimize()
-		return (self.model.Status == gb.GRB.TIME_LIMIT and self.model.SolCount > 0) or self.model.Status == gb.GRB.OPTIMAL
+		self.model.optimize(ProblemGlobalRelaxed.softtime)
+		rez = False
+		if self.model.Status == gb.GRB.OPTIMAL:
+			print("Optimization interrupted since optimal GAP is reached. Violation of relaxed constraints = ", self.model._violation)
+			rez = True
+		elif self.model.SolCount > 0 and self.model._violation <= self.model._v_gap: # and self.model.Status == gb.GRB.INTERRUPTED
+			print("Optimization interrupted since VIOLATION gap is reached. Violation of relaxed constraints = ", self.model._violation)
+			rez = True
+		#otherwise self.model.Status == gb.GRB.TIME_LIMIT and not acceptable solution is found
+		return rez
 	
 	def createVars(self):
 		self.x = self.model.addVars(self.param.K, vtype=gb.GRB.BINARY, name="x")							#assignment variables =1 whether horizontal trajectory i is used
@@ -130,7 +141,6 @@ class ProblemGlobalRelaxed:
 		self.delay = self.model.addVars(self.param.A, lb=0, ub=self.param.maxDelay, name="delay")			#(real) delay of flight intention i
 
 		self.same_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="same_fl")			#auxiliary =1 if two flight intentions i and j are assigned to same flight level
-		self.lower_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="lower_fl")			#auxiliary =1 if flight level of j flight intention is lower than flihgt level of flight intention i
 		self.higher_fl = self.model.addVars(self.param.AInter, vtype=gb.GRB.BINARY, name="higher_fl")		#auxiliary =1 if flight level of j flight intention is higher than flihgt level of flight intention i
 
 		self.z = self.model.addVars(self.param.P, vtype=gb.GRB.BINARY, name="z")							#auxiliary =1 if for given intersecting point order is k1 then k2
@@ -138,18 +148,15 @@ class ProblemGlobalRelaxed:
 
 
 	def createObjectiveFunction(self):
-		self.model.setObjective(100*sum(self.v[p] for p in self.param.P) + sum(W[self.param.priorities[self.param.mon_vol[k]]]*self.param.d[k]*self.x[k] for k in self.param.K) + sum(W[self.param.priorities[a]]*(self.delay[a] + 2*(self.param.tSeedUp + self.y[a]*self.param.dFL/self.param.vVert)) for a in self.param.A), gb.GRB.MINIMIZE) 
+		self.model.setObjective(1000*sum(self.v[p] for p in self.param.P) + sum(W[self.param.priorities[self.param.mon_vol[k]]]*self.param.d[k]*self.x[k] for k in self.param.K) + sum(W[self.param.priorities[a]]*(self.delay[a] + 2*(self.param.tSeedUp + self.y[a]*self.param.dFL/self.param.vVert)) for a in self.param.A), gb.GRB.MINIMIZE) 
 
 	
 	def createConstraints(self):
 		self.model.addConstrs((sum(self.x[k] for k in self.param.K if self.param.mon_vol[k]==i) >= 1 for i in self.param.A), "covering")
 
-		self.model.addConstrs((-self.param.FLmax*self.lower_fl[i,j] + self.param.delta*self.higher_fl[i,j] <= self.y[i] - self.y[j] for i, j in self.param.AInter if i < j), "assuring_lower_fl")
-		self.model.addConstrs((self.y[i] - self.y[j] <= -self.param.delta*self.lower_fl[i,j] + self.param.FLmax*self.higher_fl[i,j] for i, j in self.param.AInter if i < j), "assuring_higher_fl")
-		self.model.addConstrs((self.lower_fl[i,j] + self.higher_fl[i,j] + self.same_fl[i,j] == 1 for i, j in self.param.AInter if i < j), "assuring_same_fl")
-		self.model.addConstrs((self.lower_fl[i,j] == self.higher_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_lower_fl_appendix")
-		self.model.addConstrs((self.higher_fl[i,j] == self.lower_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_higher_fl_appendix")
-		self.model.addConstrs((self.same_fl[i,j] == self.same_fl[j,i] for i, j in self.param.AInter if i < j), "assuring_same_fl_appendix")
+		self.model.addConstrs((-self.param.FLmax*self.higher_fl[j,i] + self.param.delta*self.higher_fl[i,j] <= self.y[i] - self.y[j] for i, j in self.param.AInter if i < j), "assuring_lower_fl")
+		self.model.addConstrs((self.y[i] - self.y[j] <= -self.param.delta*self.higher_fl[j,i] + self.param.FLmax*self.higher_fl[i,j] for i, j in self.param.AInter if i < j), "assuring_higher_fl")
+		self.model.addConstrs((self.higher_fl[j,i] + self.higher_fl[i,j] + self.same_fl[i,j] == 1 for i, j in self.param.AInter), "assuring_same_fl")
 
 		#conflicts between to trajectories at same level
 		self.model.addConstrs((self.v[p] >= self.param.sep12[p] - (self.param.t2[p] + self.delay[self.param.mon_vol[self.param.k2[p]]]) + (self.param.t1[p] + self.delay[self.param.mon_vol[self.param.k1[p]]]) - (self.param.sep12[p] - self.param.t2[p] + self.param.t1[p] + self.param.maxDelay)*(4 - self.z[p] - self.x[self.param.k1[p]] - self.x[self.param.k2[p]] - self.same_fl[self.param.mon_vol[self.param.k1[p]],self.param.mon_vol[self.param.k2[p]]]) for p in self.param.Phor), "hor_conflict1")
@@ -185,7 +192,7 @@ class ProblemGlobalRelaxed:
 			self.y[a].lb = l
 			self.y[a].ub = l
 
-	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, lower_fl_val, higher_fl_val):
+	def setPartialSolution(self, x_val, y_val, delay_val, same_fl_val, higher_fl_val):
 		for k in self.param.K:
 			if k in x_val:
 				self.x[k].Start = x_val[k]
@@ -196,9 +203,16 @@ class ProblemGlobalRelaxed:
 		for a_pair in self.param.AInter:
 			if a_pair in same_fl_val: # other should have it then
 				self.same_fl[a_pair].Start = same_fl_val[a_pair]
-				self.lower_fl[a_pair].Start = lower_fl_val[a_pair]
 				self.higher_fl[a_pair].Start = higher_fl_val[a_pair]
 	
+	def softtime(model, where):#callback function for model teminal conditions
+		if where == gb.GRB.Callback.MIPSOL:
+			v = model.cbGetSolution(model._v)
+			model._violation = sum(v[p] for p in model._P)
+			runtime = model.cbGet(gb.GRB.Callback.RUNTIME)
+			if runtime > model._softlimit and model._violation <= model._v_gap:
+				model.terminate()
+
 	def printSolution(self):
 		violation = sum(self.v[p] for p in self.param.P)
 		print("Trajectory duration: ", self.model.objVal - violation)
@@ -278,14 +292,22 @@ class ProblemLevelChoice:
 				print("Interacting flights ", a1, a2, " with ", self.param.interactions[a1, a2], "overlap assigned at same level ", self.z[a1, a2].x)
 
 	def mycallback(model, where):
-		'''if where == gb.GRB.Callback.PRESOLVE:
+		'''
+		NOT WORKING approach to provide a heuristic initial solution
+		if where == gb.GRB.Callback.PRESOLVE:
 			interactions = {a: 0 for a in model._param.A}
 			for pair in model._param.AInter:
 				interactions[pair[0]] += 1
 			interactions = sorted(interactions.items(), key=lambda item: -item[1])
 			print(interactions)
-			sys.exit(0)'''
+		'''
 		
+		'''
+		This callback propose simple ordering heuristic to improve a MIP solution found by B&B
+		Since there was a problem of injecting improved solution in the MIPSOL branch
+		it was done in the MIPNODE i.e. when next node was explored.
+		We could try applying it in gb.GRB.Callback.MIP!!!!
+		'''
 		if where == gb.GRB.Callback.MIPSOL:
 			#print("improving ", model.cbGet(gb.GRB.Callback.MIPSOL_OBJ))
 			# computed number of flight instances per level

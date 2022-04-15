@@ -22,7 +22,8 @@ input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_inte
 HEURISTICS_FL = 0.5
 HEURISTICS = 0.3
 T_MAX_OPTIM_FL = 600
-T_MAX_OPTIM = 900 #not recommended as it may prevent finding a solution 
+T_MAX_OPTIM = 1800 #used only for relaxed version of problem
+T_SOFT_MAX_OPTIM = 900 #used only for relaxed version of problem
 MIP_GAP = 1e-3
 ms_to_knots = 1.94384
 m_to_feet = 3.28084
@@ -236,8 +237,8 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
         param = create_param(model, trajectories, trajectories_to_duration, h_h_list, climb_h_list, descent_h_list, c_c_list, d_d_list, fixed_flights_dict, fixed_flight_levels_dict)
         # - Create Problem
         #problem = PLNE.ProblemGlobal(param)
-        problem = PLNE.ProblemGlobalRelaxed(param)
-        if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'], previous_solution['same_fl_val'], previous_solution['lower_fl_val'], previous_solution['higher_fl_val'])
+        problem = PLNE.ProblemGlobalRelaxed(param, T_SOFT_MAX_OPTIM)
+        if previous_solution: problem.setPartialSolution(previous_solution['x_val'], previous_solution['y_val'], previous_solution['delay_val'], previous_solution['same_fl_val'], previous_solution['higher_fl_val'])
         problem.model.setParam("Heuristics", HEURISTICS)
         problem.model.setParam("TimeLimit", T_MAX_OPTIM)
         problem.model.setParam("MIPGap", MIP_GAP)
@@ -260,9 +261,8 @@ def solve_current_model(model, graph, raw_graph, graph_dual, current_param, fixe
     higher_fl_val = {}
     for a_pair in param.AInter:
         same_fl_val[a_pair] = round(problem.same_fl[a_pair].x)
-        lower_fl_val[a_pair] = round(problem.lower_fl[a_pair].x)
         higher_fl_val[a_pair] = round(problem.higher_fl[a_pair].x)
-    return trajectories_output, intersection_outputs, {'x_val': x_val, 'y_val': y_val, 'delay_val': delay_val, 'same_fl_val': same_fl_val, 'lower_fl_val': lower_fl_val, 'higher_fl_val': higher_fl_val}
+    return trajectories_output, intersection_outputs, {'x_val': x_val, 'y_val': y_val, 'delay_val': delay_val, 'same_fl_val': same_fl_val, 'higher_fl_val': higher_fl_val}
 
 
 def solve_flight_levels_current_model(model, graph, raw_graph, graph_dual):
