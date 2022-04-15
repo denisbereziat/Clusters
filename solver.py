@@ -21,8 +21,8 @@ input_directory = "graph_files/Intentions/M2_final_flight_intentions/flight_inte
 
 HEURISTICS_FL = 0.5
 HEURISTICS = 0.3
-T_MAX_OPTIM_FL = 900
-T_MAX_OPTIM = 600 #not recommended as it may prevent finding a solution 
+T_MAX_OPTIM_FL = 600
+T_MAX_OPTIM = 900 #not recommended as it may prevent finding a solution 
 MIP_GAP = 1e-3
 ms_to_knots = 1.94384
 m_to_feet = 3.28084

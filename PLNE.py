@@ -122,7 +122,7 @@ class ProblemGlobalRelaxed:
 		
 	def solve(self):
 		self.model.optimize()
-		return self.model.Status == gb.GRB.SUBOPTIMAL or self.model.Status == gb.GRB.OPTIMAL
+		return (self.model.Status == gb.GRB.TIME_LIMIT and self.model.SolCount > 0) or self.model.Status == gb.GRB.OPTIMAL
 	
 	def createVars(self):
 		self.x = self.model.addVars(self.param.K, vtype=gb.GRB.BINARY, name="x")							#assignment variables =1 whether horizontal trajectory i is used
@@ -138,7 +138,7 @@ class ProblemGlobalRelaxed:
 
 
 	def createObjectiveFunction(self):
-		self.model.setObjective(10*sum(self.v[p] for p in self.param.P) + sum(W[self.param.priorities[self.param.mon_vol[k]]]*self.param.d[k]*self.x[k] for k in self.param.K) + sum(W[self.param.priorities[a]]*(self.delay[a] + 2*(self.param.tSeedUp + self.y[a]*self.param.dFL/self.param.vVert)) for a in self.param.A), gb.GRB.MINIMIZE) 
+		self.model.setObjective(100*sum(self.v[p] for p in self.param.P) + sum(W[self.param.priorities[self.param.mon_vol[k]]]*self.param.d[k]*self.x[k] for k in self.param.K) + sum(W[self.param.priorities[a]]*(self.delay[a] + 2*(self.param.tSeedUp + self.y[a]*self.param.dFL/self.param.vVert)) for a in self.param.A), gb.GRB.MINIMIZE) 
 
 	
 	def createConstraints(self):
